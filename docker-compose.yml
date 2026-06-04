@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # TrustBite PostgreSQL Service
+  postgres:
+    image: postgres:15-alpine
+    container_name: trustbite-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: trustbite_user
+      POSTGRES_PASSWORD: bietthicunglamduoccaichogi
+      POSTGRES_DB: trustbite_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - trustbite-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustbite_user -d trustbite_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # TrustBite LocalStack (AWS mock)
+  localstack:
+    image: localstack/localstack:latest
+    container_name: trustbite-localstack
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      - SERVICES=s3,cognito,ses,secretsmanager,textract
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - AWS_DEFAULT_REGION=ap-southeast-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    networks:
+      - trustbite-network
+
+  # pgAdmin Database Management UI
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: trustbite-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@trustbite.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - trustbite-network
+
+volumes:
+  postgres_data:
+    driver: local
+  localstack_data:
+    driver: local
+
+networks:
+  trustbite-network:
+    driver: bridge
