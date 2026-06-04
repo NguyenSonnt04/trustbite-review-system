@@ -1,10 +1,10 @@
-# TrustBite - Reliable Food Review Platform (JavaScript)
+# TrustBite - Reliable Food Review Platform
 
-TrustBite ("Trust in every bite") is an enterprise-grade platform designed to restore trust in food reviews using anti-fraud verification engines (Receipt OCR validation via AWS Textract, GPS coordinate validation via Haversine formula, and AWS Bedrock/Claude review summarization).
+TrustBite ("Trust in every bite") is an expression-based backend and React frontend platform designed to restore trust in food reviews using anti-fraud verification engines (Receipt OCR validation via AWS Textract, GPS coordinate validation via Haversine formula, and AWS Bedrock/Claude review summarization).
 
 This repository contains the structured skeleton folders for development.
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 / (root)
@@ -29,12 +29,13 @@ This repository contains the structured skeleton folders for development.
 │   └── package.json     # Server package manager
 │
 ├── docker-compose.yml   # Infrastructure (Postgres trustbite_db & LocalStack simulator)
-└── package.json         # Workspace execution scripts
+│   └── package.json     # Workspace execution scripts
+└── .gitignore
 ```
 
 ---
 
-## 🛠️ Local Development Setup
+## Local Development Setup
 
 ### 1. Requirements
 - Node.js (v18+)
@@ -62,30 +63,30 @@ Start both client and server concurrently:
 npm run dev
 ```
 - **Next.js Client**: `http://localhost:3000` (Conforms to the 50-50 Split-Screen layout specified in **SRS Section 1.1**)
-- **Express Server**: `http://localhost:3000`
+- **Express Server**: `http://localhost:5000`
 
 ---
 
-## 🔒 Configuration Files
+## Configuration Files
 
 ### Server Settings (`/server/.env`)
 ```env
-PORT=3000
+PORT=5000
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=trustbite_user
-DATABASE_PASSWORD=trustbite_secure_password
+DATABASE_PASSWORD=bietthicunglamduoccaichogi
 DATABASE_NAME=trustbite_db
 
 AWS_REGION=ap-southeast-1
 AWS_ACCESS_KEY_ID=mock-key
 AWS_SECRET_ACCESS_KEY=mock-secret
-AWS_S3_BUCKET_NAME=trustbite-s3-bucket
+AWS_S3_BUCKET_NAME=trustbite-invoices
 AWS_SES_SENDER_EMAIL=noreply@trustbite.com
 ```
 
 ### Client Settings (`/client/.env.local`)
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_API_URL=http://localhost:5000
 NEXT_PUBLIC_AWS_REGION=ap-southeast-1
 ```
