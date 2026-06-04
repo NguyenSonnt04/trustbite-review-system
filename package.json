@@ -1,19 +1,17 @@
 {
-  "name": "enterprise-monorepo",
+  "name": "trustbite",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "client:install": "npm install --prefix client",
-    "server:install": "npm install --prefix server",
-    "install:all": "npm run client:install && npm run server:install",
+    "dev": "npx concurrently -n \"client,server\" -c \"cyan,magenta\" \"npm run client:dev\" \"npm run server:dev\"",
     "client:dev": "npm run dev --prefix client",
-    "server:dev": "npm run start:dev --prefix server",
+    "server:dev": "npm run dev --prefix server",
     "client:build": "npm run build --prefix client",
     "server:build": "npm run build --prefix server",
-    "build:all": "npm run client:build && npm run server:build",
-    "dev": "npx concurrently -n \"client,server\" -c \"cyan,magenta\" \"npm run client:dev\" \"npm run server:dev\""
+    "install:all": "npm install --prefix client && npm install --prefix server",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:reset": "docker compose down -v"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
