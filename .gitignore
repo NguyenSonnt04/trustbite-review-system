@@ -1,31 +1,47 @@
-# Dependencies
+# ─── Dependencies ────────────────────────────────────
 node_modules/
 
-# Environment variables
+# ─── Environment variables ───────────────────────────
 .env
 .env.local
 .env.*.local
+# Keep .env.example (template for team)
 
-# Build output
+# ─── Build output ────────────────────────────────────
 dist/
 build/
 .next/
+out/
 
-# Logs
+# ─── Logs ────────────────────────────────────────────
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS files
+# ─── OS files ────────────────────────────────────────
 .DS_Store
 Thumbs.db
+Desktop.ini
 
-# IDE
+# ─── IDE ─────────────────────────────────────────────
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Docker volumes
+# ─── Docker volumes ──────────────────────────────────
 postgres_data/
 localstack_data/
 
-# Coverage
+# ─── Test & coverage ─────────────────────────────────
 coverage/
+.nyc_output/
+
+# ─── AI/Agent metadata (auto-generated) ──────────────
+AGENTS.md
+CLAUDE.md
+
+# ─── Misc ────────────────────────────────────────────
+*.tsbuildinfo
+.turbo/
