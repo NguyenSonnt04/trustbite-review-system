@@ -1,0 +1,36 @@
+{
+  "files": [
+    {
+      "path": "AGENTS.md",
+      "description": "Project-specific instructions for agents and code changes."
+    },
+    {
+      "path": "README.md",
+      "description": "Repository structure, setup commands, and runtime configuration."
+    },
+    {
+      "path": "docs/FEATURE_INTAKE.md",
+      "description": "Risk lane classification rules for tiny, normal, and high-risk work."
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "description": "Architecture contract, boundaries, anti-fraud rules, API shape rules, and current gaps."
+    },
+    {
+      "path": "docs/CONTEXT_RULES.md",
+      "description": "Context and validation rules for implementation work."
+    },
+    {
+      "path": "docs/TEST_MATRIX.md",
+      "description": "Validation matrix and proof expectations."
+    },
+    {
+      "path": "docs/product/README.md",
+      "description": "Product documentation entrypoint."
+    },
+    {
+      "path": "docs/stories/README.md",
+      "description": "Story documentation entrypoint."
+    }
+  ]
+}

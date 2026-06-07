@@ -1,0 +1,53 @@
+{
+  "strictness": 2,
+  "commentTypes": ["logic", "syntax", "style"],
+  "triggerOnUpdates": true,
+  "statusCheck": true,
+  "updateExistingSummaryComment": true,
+  "fixWithAI": true,
+  "ignorePatterns": "node_modules/**\n.next/**\ndist/**\nbuild/**\ncoverage/**\n*.log\nclient/package-lock.json\nserver/package-lock.json\npackage-lock.json\n.env\n.env.*\n!.env.example",
+  "summarySection": {
+    "included": true,
+    "collapsible": true,
+    "defaultOpen": false
+  },
+  "issuesTableSection": {
+    "included": true,
+    "collapsible": true,
+    "defaultOpen": true
+  },
+  "confidenceScoreSection": {
+    "included": true,
+    "collapsible": false,
+    "defaultOpen": true
+  },
+  "sequenceDiagramSection": {
+    "included": true,
+    "collapsible": true,
+    "defaultOpen": false
+  },
+  "disabledLabels": ["skip-review", "no-greptile", "wip"],
+  "instructions": "TrustBite is a JavaScript monorepo with a Next.js App Router client and an Express native-ESM server. Prioritize correctness, security, API boundary validation, secret handling, AWS provider isolation, and consistency with the Harness/project docs.",
+  "rules": [
+    {
+      "id": "no-hardcoded-secrets",
+      "rule": "Do not hardcode secrets, credentials, tokens, database passwords, AWS bucket names, user IDs, or provider credentials in source files. Use environment files or documented examples only.",
+      "severity": "high"
+    },
+    {
+      "id": "validate-boundary-input",
+      "rule": "Parse and validate unknown input at boundaries before passing it to services or domain logic. This includes HTTP params, query, body, files, env vars, JWT/Cognito claims, DB rows, provider responses, GPS coordinates, and OCR payloads.",
+      "severity": "high"
+    },
+    {
+      "id": "preserve-layering",
+      "rule": "Preserve dependency direction: client UI -> API client -> server routes/controllers -> services/domain rules -> database/provider adapters. Client must not import server modules.",
+      "severity": "high"
+    },
+    {
+      "id": "document-contract-changes",
+      "rule": "If a change alters API shape, auth behavior, data model, AWS/provider behavior, anti-fraud thresholds, trust score behavior, or public UX contracts, require matching docs/story updates.",
+      "severity": "medium"
+    }
+  ]
+}

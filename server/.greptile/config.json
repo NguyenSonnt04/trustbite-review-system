@@ -1,0 +1,36 @@
+{
+  "strictness": 1,
+  "commentTypes": ["logic", "syntax", "style"],
+  "rules": [
+    {
+      "id": "server-no-provider-in-controller",
+      "rule": "Server controllers/routes must not instantiate AWS, database, or external provider clients directly. Use modules under server/src/services/ or server/src/config/.",
+      "severity": "high",
+      "scope": ["src/controllers/**", "src/routes/**"]
+    },
+    {
+      "id": "server-validate-http-input",
+      "rule": "Validate HTTP params, query, body, files, and auth context before service/domain logic uses them.",
+      "severity": "high",
+      "scope": ["src/controllers/**", "src/routes/**", "src/middlewares/**"]
+    },
+    {
+      "id": "server-parameterized-sql",
+      "rule": "Database access must use parameterized queries. Never interpolate user input into SQL strings.",
+      "severity": "high",
+      "scope": ["src/**"]
+    },
+    {
+      "id": "server-explicit-antifraud-rules",
+      "rule": "Anti-fraud and trust-score behavior must use explicit, testable thresholds/policies and must not be hidden in UI-only state.",
+      "severity": "high",
+      "scope": ["src/services/**", "src/controllers/review.js", "src/controllers/aws.js"]
+    },
+    {
+      "id": "server-env-config",
+      "rule": "Environment variables and provider configuration should be parsed in config modules. Domain logic should receive typed/configured values rather than reading process.env directly.",
+      "severity": "medium",
+      "scope": ["src/**"]
+    }
+  ]
+}
