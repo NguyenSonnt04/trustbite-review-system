@@ -8,7 +8,7 @@ Current architecture:
 
 - `client/`: Next.js App Router, React, JavaScript/JSX, CSS modules.
 - `server/`: Node.js + Express, native ES modules.
-- `mobile/`: Flutter/Dart mobile application.
+- `mobile/`: current checked-in Flutter/Dart mobile application skeleton. Imported product docs may still describe React Native as a target option; review the code that exists now as Flutter unless a later decision changes the framework.
 - PostgreSQL is the application database.
 - AWS integrations are S3, Textract, Cognito, SES, and Bedrock/Claude, with LocalStack for local simulation.
 - `docs/` contains Harness docs and is the source of truth for work intake, risk classification, validation, and traceability.

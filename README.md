@@ -87,6 +87,18 @@ flutter create .
 
 ---
 
+## TrustBite Product Documentation
+
+Imported TrustBite product, UX, API, security, database, QA, compliance, and operations documentation lives in `trustbite-docs/`.
+
+Those docs describe product contracts and target architecture references. Implementation status remains tracked through `docs/`, `docs/stories/`, and:
+
+```bash
+npm run harness -- query matrix
+```
+
+---
+
 ## Harness for Team Development
 
 Harness docs and schemas are version-controlled, but each developer keeps a local Harness database and CLI binary.
@@ -96,16 +108,23 @@ Ignored local Harness files:
 - `harness.db`, `harness.db-wal`, `harness.db-shm`
 - `scripts/bin/harness-cli`, `scripts/bin/harness-cli.exe`
 
-After cloning, install or refresh the Harness CLI:
+After cloning, install or refresh the Harness CLI from the pinned Harness installer revision below. Inspect the downloaded script before executing it.
 
 ```bash
 # macOS/Linux/Git Bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --yes
+HARNESS_INSTALLER_REV=d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4
+curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
+less /tmp/install-harness.sh
+bash /tmp/install-harness.sh --merge --yes
 ```
 
 ```powershell
 # Windows PowerShell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Merge -Yes
+$HarnessInstallerRev = "d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4"
+$Installer = "$env:TEMP\install-harness.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
+Get-Content $Installer
+& $Installer -Merge -Yes
 ```
 
 Then initialize/query local Harness state:

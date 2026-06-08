@@ -4,14 +4,16 @@ TrustBite là nền tảng đánh giá ẩm thực tập trung vào đánh giá 
 
 Bộ tài liệu này được chuẩn hóa theo hướng **tài liệu sống, triển khai và vận hành được**: Ý tưởng → Yêu cầu → Thiết kế → Phát triển → Kiểm thử → Release → Vận hành → Cải tiến.
 
-Repo giữ cấu trúc theo chuyên môn để dễ phân quyền, nhưng cách dùng phải đi theo vòng đời product. Mô hình vận hành chi tiết nằm tại `00_Document_Control/Documentation_Operating_Model.md`.
+Thư mục `trustbite-docs/` giữ cấu trúc theo chuyên môn để dễ phân quyền, nhưng cách dùng phải đi theo vòng đời product. Mô hình vận hành chi tiết nằm tại `00_Document_Control/Documentation_Operating_Model.md`.
+
+> Ghi chú: Đây là bộ tài liệu product/target architecture được import vào monorepo ứng dụng. Trạng thái triển khai thực tế vẫn được theo dõi qua `docs/`, `docs/stories/` và `npm run harness -- query matrix`.
 
 ---
 
 ## 1. Cây tài liệu
 
 ```text
-docs_trustbite/
+trustbite-docs/
 ├── 00_Document_Control/
 │   ├── Document_Index.md
 │   ├── Version_History.md

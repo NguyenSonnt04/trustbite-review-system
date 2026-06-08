@@ -120,16 +120,23 @@ be captured in version-controlled markdown and schema files instead:
 - `docs/decisions/**`
 - `scripts/schema/**`
 
-After cloning the repository, install or refresh the local Harness CLI:
+After cloning the repository, install or refresh the local Harness CLI from the pinned Harness installer revision below. Inspect the downloaded script before executing it.
 
 ```bash
 # macOS/Linux/Git Bash
-curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --yes
+HARNESS_INSTALLER_REV=d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4
+curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
+less /tmp/install-harness.sh
+bash /tmp/install-harness.sh --merge --yes
 ```
 
 ```powershell
 # Windows PowerShell
-& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Merge -Yes
+$HarnessInstallerRev = "d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4"
+$Installer = "$env:TEMP\install-harness.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
+Get-Content $Installer
+& $Installer -Merge -Yes
 ```
 
 Initialize the database if it does not exist:

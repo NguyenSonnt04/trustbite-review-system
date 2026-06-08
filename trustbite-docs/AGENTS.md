@@ -1,10 +1,10 @@
-# TrustBite documentation repo
+# TrustBite documentation folder
 
-## Mục đích repo
+## Mục đích thư mục
 
-Repo này là **kho tài liệu triển khai** cho TrustBite, không phải repo source code ứng dụng. TrustBite là nền tảng đánh giá ẩm thực tin cậy, ưu tiên đánh giá có bằng chứng thực tế: hóa đơn, thời gian ghé quán, GPS tùy chọn và kiểm duyệt minh bạch.
+Thư mục `trustbite-docs/` là **kho tài liệu triển khai** được import vào monorepo ứng dụng TrustBite. TrustBite là nền tảng đánh giá ẩm thực tin cậy, ưu tiên đánh giá có bằng chứng thực tế: hóa đơn, thời gian ghé quán, GPS tùy chọn và kiểm duyệt minh bạch.
 
-Mục tiêu của tài liệu là giúp các nhóm Product, BA, UX/UI, Engineering, Security, DB, QA, Compliance và Ops làm việc thống nhất trước/sau khi triển khai MVP.
+Mục tiêu của tài liệu là giúp các nhóm Product, BA, UX/UI, Engineering, Security, DB, QA, Compliance và Ops làm việc thống nhất trước/sau khi triển khai MVP. Trạng thái triển khai thực tế của ứng dụng vẫn được theo dõi qua Harness trong `docs/`, `docs/stories/` và `npm run harness -- query matrix`.
 
 ## Sự thật sản phẩm cần giữ nhất quán
 
@@ -93,7 +93,7 @@ Nếu chốt framework mobile khác hoặc đổi kiến trúc lớn, cập nh�
 
 ## Lệnh hữu ích trong repo
 
-Repo chưa có package manager/build system. Dùng các lệnh kiểm tra tài liệu cơ bản:
+Thư mục này không có package manager/build system riêng. Dùng các lệnh kiểm tra tài liệu cơ bản từ root monorepo:
 
 ```bash
 # Xem trạng thái git
@@ -109,7 +109,7 @@ rg -n "PENDING_ADMIN_REVIEW|OCR-001|BR-" --glob '*.md'
 git diff --check
 ```
 
-Không thêm dependency, config build hoặc source code ứng dụng vào repo này trừ khi người dùng yêu cầu rõ ràng.
+Không thêm dependency, config build hoặc source code ứng dụng vào `trustbite-docs/` trừ khi người dùng yêu cầu rõ ràng.
 
 ## Checklist trước khi kết thúc thay đổi
 
