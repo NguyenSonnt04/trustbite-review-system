@@ -7,7 +7,7 @@ TrustBite is a food review platform focused on trusted reviews and anti-fraud ve
 Current architecture:
 
 - `client/`: Next.js App Router, React, JavaScript/JSX, CSS modules.
-- `server/`: Node.js + Express, native ES modules.
+- `server/`: current checked-in Node.js + Express native ES modules backend. Imported product docs may still describe NestJS + TypeScript + Prisma as a target architecture; review the code that exists now as Express native ESM unless a later decision changes the backend stack.
 - `mobile/`: current checked-in Flutter/Dart mobile application skeleton. Imported product docs may still describe React Native as a target option; review the code that exists now as Flutter unless a later decision changes the framework.
 - PostgreSQL is the application database.
 - AWS integrations are S3, Textract, Cognito, SES, and Bedrock/Claude, with LocalStack for local simulation.
