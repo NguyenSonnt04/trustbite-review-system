@@ -142,6 +142,7 @@ paths:
       tags:
       - Users
       summary: Update current user profile
+      description: avatarUrl, when supplied, must reference a TrustBite-owned allowlisted media origin or a URL created by the platform avatar upload flow; arbitrary external URLs must be rejected.
       operationId: updateMe
       requestBody:
         required: true
@@ -156,6 +157,7 @@ paths:
                 avatarUrl:
                   type: string
                   format: uri
+                  description: Must be a TrustBite-owned allowlisted media URL or a URL issued by the platform avatar upload flow; arbitrary external URLs are not accepted.
       responses:
         '200':
           description: Updated user
@@ -277,6 +279,7 @@ paths:
       - Reviews
       security: []
       summary: List public reviews for restaurant
+      description: Unauthenticated public listing. Responses must omit reviewer userId values; userId is populated only for the review owner and ADMIN/SUPER_ADMIN callers on authenticated endpoints.
       operationId: listRestaurantReviews
       parameters:
       - $ref: '#/components/parameters/RestaurantId'
@@ -943,6 +946,7 @@ paths:
       - Reviews
       - Receipts
       summary: Submit optional GPS verification signal for a review
+      description: Requires authentication and ownership of the review; reviewId must belong to the authenticated user before GPS data can affect fraud scoring.
       operationId: submitReviewGpsSignal
       parameters:
       - $ref: '#/components/parameters/ReviewId'
@@ -1311,6 +1315,7 @@ components:
           userId:
             type: string
             format: uuid
+            description: Omit on unauthenticated/public responses. Populate only for the review owner and ADMIN/SUPER_ADMIN callers.
           foodRating:
             type: integer
           priceRating:
