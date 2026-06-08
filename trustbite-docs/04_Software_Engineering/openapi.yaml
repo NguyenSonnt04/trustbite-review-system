@@ -477,12 +477,17 @@ paths:
                 latitude:
                   type: number
                   format: double
+                  minimum: -90
+                  maximum: 90
                 longitude:
                   type: number
                   format: double
+                  minimum: -180
+                  maximum: 180
                 gpsAccuracyMeters:
                   type: number
                   format: double
+                  minimum: 0
                 capturedAt:
                   type: string
                   format: date-time
@@ -1031,6 +1036,9 @@ components:
       properties:
         phoneNumber:
           type: string
+          minLength: 7
+          maxLength: 20
+          pattern: '^\+?[0-9]{7,15}$'
           example: '+84901234567'
     OtpRequestResponse:
       type: object
@@ -1056,6 +1064,10 @@ components:
       properties:
         phoneNumber:
           type: string
+          minLength: 7
+          maxLength: 20
+          pattern: '^\+?[0-9]{7,15}$'
+          example: '+84901234567'
         otpCode:
           type: string
           minLength: 6
@@ -1206,6 +1218,7 @@ components:
         comment:
           type: string
           minLength: 30
+          maxLength: 5000
           description: Minimum 30 characters for Reference reviews. Server must enforce 50 characters before allowing receipt verification / VERIFIED intent per BR-REV-002.
         visitedAt:
           type: string
@@ -1233,6 +1246,7 @@ components:
         comment:
           type: string
           minLength: 30
+          maxLength: 5000
           description: Editable review text. Server must enforce 50 characters before allowing receipt verification / VERIFIED intent per BR-REV-002.
     CreateReviewResponse:
       type: object
