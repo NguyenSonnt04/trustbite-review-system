@@ -79,6 +79,12 @@ npm run mobile:pubget
 npm run mobile:run
 ```
 
+If `mobile/android`, `mobile/ios`, `mobile/web`, or another Flutter platform runner folder is missing, generate runners first:
+```bash
+cd mobile
+flutter create .
+```
+
 ---
 
 ## Configuration Files

@@ -11,6 +11,7 @@ class TrustBiteApp extends StatelessWidget {
       title: 'TrustBite',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       home: const HomeScreen(),
     );
   }

@@ -7,7 +7,7 @@
     "client:dev": "npm run dev --prefix client",
     "server:dev": "npm run dev --prefix server",
     "mobile:pubget": "cd mobile && flutter pub get",
-    "mobile:run": "cd mobile && flutter run",
+    "mobile:run": "node scripts/mobile-run.mjs",
     "mobile:test": "cd mobile && flutter test",
     "client:build": "npm run build --prefix client",
     "server:build": "npm run build --prefix server",

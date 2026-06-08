@@ -32,6 +32,7 @@ Do not mark a row `implemented` until code exists and validation evidence is rec
 | TB-FRAUD-002 | GPS/Haversine verification validates user proximity to restaurant using explicit threshold | planned | planned | planned | no | planned | UI simulation exists; backend proof missing |
 | TB-TRUST-001 | Trust score is computed by backend rules from verified reviews and fraud signals | planned | planned | planned | no | planned | high-risk; no proof yet |
 | TB-AWS-001 | AWS integrations work locally through LocalStack where supported and are isolated behind services | no | planned | no | planned | planned | high-risk; no proof yet |
+| TB-MOBILE-001 | Flutter mobile app has documented backend integration contracts before implementing OCR, GPS, reviews, and trust score flows | no | planned | planned | planned | planned | `docs/stories/epics/E03-mobile/US-001-mobile-api-integration-contract.md`; no implementation proof yet |
 
 ## Evidence Rules
 

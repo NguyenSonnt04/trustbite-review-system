@@ -3,7 +3,9 @@
 Stories are work packets. They turn product intent into bounded implementation
 and validation work.
 
-No story packets are active yet.
+Active/planned story packets:
+
+- `docs/stories/epics/E03-mobile/US-001-mobile-api-integration-contract.md`
 
 ## Normal Story
 
