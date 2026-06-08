@@ -87,6 +87,38 @@ flutter create .
 
 ---
 
+## Harness for Team Development
+
+Harness docs and schemas are version-controlled, but each developer keeps a local Harness database and CLI binary.
+
+Ignored local Harness files:
+
+- `harness.db`, `harness.db-wal`, `harness.db-shm`
+- `scripts/bin/harness-cli`, `scripts/bin/harness-cli.exe`
+
+After cloning, install or refresh the Harness CLI:
+
+```bash
+# macOS/Linux/Git Bash
+curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --yes
+```
+
+```powershell
+# Windows PowerShell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Merge -Yes
+```
+
+Then initialize/query local Harness state:
+
+```bash
+npm run harness -- init
+npm run harness -- query matrix
+```
+
+Use `docs/`, `docs/stories/`, `docs/decisions/`, and `scripts/schema/` as the shared source of truth. Do not commit the local Harness DB or binary.
+
+---
+
 ## Configuration Files
 
 ### Server Settings (`/server/.env`)

@@ -26,11 +26,47 @@
     },
     {
       "path": "docs/product/README.md",
-      "description": "Product documentation entrypoint."
+      "description": "Harness product documentation entrypoint. Keep this distinct from imported TrustBite product docs."
     },
     {
       "path": "docs/stories/README.md",
-      "description": "Story documentation entrypoint."
+      "description": "Harness story documentation entrypoint."
+    },
+    {
+      "path": "trustbite-docs/README.md",
+      "description": "Imported TrustBite documentation entrypoint and documentation map."
+    },
+    {
+      "path": "trustbite-docs/00_Document_Control/Document_Index.md",
+      "description": "Index of imported TrustBite documentation."
+    },
+    {
+      "path": "trustbite-docs/01_Product_Management/Product_Requirements_Document_PRD.md",
+      "description": "TrustBite product requirements and scope reference."
+    },
+    {
+      "path": "trustbite-docs/02_Business_Analysis/Functional_Specification.md",
+      "description": "TrustBite functional requirements and business behavior."
+    },
+    {
+      "path": "trustbite-docs/04_Software_Engineering/API_Specification.md",
+      "description": "TrustBite API contract documentation."
+    },
+    {
+      "path": "trustbite-docs/04_Software_Engineering/openapi.yaml",
+      "description": "OpenAPI contract for TrustBite APIs."
+    },
+    {
+      "path": "trustbite-docs/05_Security_Algorithms/Anti_Fraud_Specification.md",
+      "description": "Anti-fraud verification rules and trust-related security behavior."
+    },
+    {
+      "path": "trustbite-docs/06_Database_Design/PostgreSQL_Database_Schema.md",
+      "description": "TrustBite PostgreSQL schema reference."
+    },
+    {
+      "path": "trustbite-docs/07_Testing_and_QA/Acceptance_Criteria.md",
+      "description": "TrustBite acceptance criteria and QA reference."
     }
   ]
 }

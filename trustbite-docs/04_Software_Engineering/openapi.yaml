@@ -1,0 +1,1600 @@
+openapi: 3.1.0
+info:
+  title: TrustBite MVP API
+  version: 1.1.0
+  description: Baseline OpenAPI contract for TrustBite MVP P0. Markdown specs remain the narrative source; this file is the
+    machine-readable contract for development, mocks and contract tests.
+servers:
+- url: /api/v1
+security:
+- bearerAuth: []
+tags:
+- name: Auth
+- name: Users
+- name: Restaurants
+- name: Reviews
+- name: Receipts
+- name: Moderation
+- name: Admin
+- name: Gamification
+- name: Privacy
+paths:
+  /auth/otp/request:
+    post:
+      tags:
+      - Auth
+      security: []
+      summary: Request OTP
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpRequestResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /auth/otp/verify:
+    post:
+      tags:
+      - Auth
+      security: []
+      summary: Verify OTP
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /auth/refresh:
+    post:
+      tags:
+      - Auth
+      summary: Refresh access token
+      operationId: refreshToken
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - accessToken
+                - expiresInSeconds
+                properties:
+                  accessToken:
+                    type: string
+                  expiresInSeconds:
+                    type: integer
+                    example: 900
+        '401':
+          $ref: '#/components/responses/Error'
+  /auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Logout and revoke session
+      operationId: logout
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+  /users/me:
+    get:
+      tags:
+      - Users
+      summary: Get current user
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - Users
+      summary: Update current user profile
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  maxLength: 120
+                avatarUrl:
+                  type: string
+                  format: uri
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /restaurants:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: Search ACTIVE restaurants
+      operationId: listRestaurants
+      parameters:
+      - name: keyword
+        in: query
+        schema:
+          type: string
+      - name: lat
+        in: query
+        schema:
+          type: number
+          format: double
+      - name: lng
+        in: query
+        schema:
+          type: number
+          format: double
+      - name: radiusMeters
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Restaurant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantPage'
+  /restaurants/nearby:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: List restaurants in map bounds
+      operationId: listNearbyRestaurants
+      parameters:
+      - name: northEastLat
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: northEastLng
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: southWestLat
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: southWestLng
+        in: query
+        required: true
+        schema:
+          type: number
+      responses:
+        '200':
+          description: Restaurant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantPage'
+        '422':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: Get restaurant detail
+      operationId: getRestaurant
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantDetail'
+        '404':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}/reviews:
+    get:
+      tags:
+      - Restaurants
+      - Reviews
+      security: []
+      summary: List public reviews for restaurant
+      operationId: listRestaurantReviews
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - VERIFIED
+          - REFERENCE_ONLY
+          - ALL
+          default: ALL
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Review list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewPage'
+  /reviews:
+    post:
+      tags:
+      - Reviews
+      summary: Create review
+      operationId: createReview
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateReviewResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}:
+    get:
+      tags:
+      - Reviews
+      summary: Get review detail
+      operationId: getReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Review detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - Reviews
+      summary: Update editable review
+      operationId: updateReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '200':
+          description: Updated review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Reviews
+      summary: Soft delete review
+      operationId: deleteReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+  /reviews/{reviewId}/skip-verification:
+    post:
+      tags:
+      - Reviews
+      summary: Skip receipt verification and mark reference-only
+      operationId: skipReviewVerification
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum:
+                  - USER_SKIPPED_RECEIPT
+      responses:
+        '200':
+          description: Review marked reference-only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewStatusResponse'
+        '409':
+          $ref: '#/components/responses/Error'
+  /receipts:
+    post:
+      tags:
+      - Receipts
+      summary: Upload receipt for asynchronous verification
+      operationId: uploadReceipt
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - reviewId
+              - restaurantId
+              - receiptImage
+              properties:
+                reviewId:
+                  type: string
+                  format: uuid
+                restaurantId:
+                  type: string
+                  format: uuid
+                receiptImage:
+                  type: string
+                  format: binary
+                  description: JPG, PNG or HEIC, max 10MB.
+                latitude:
+                  type: number
+                  format: double
+                longitude:
+                  type: number
+                  format: double
+                gpsAccuracyMeters:
+                  type: number
+                  format: double
+                capturedAt:
+                  type: string
+                  format: date-time
+      responses:
+        '202':
+          description: Receipt accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptUploadResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /receipts/{receiptVerificationId}:
+    get:
+      tags:
+      - Receipts
+      summary: Get receipt verification status
+      operationId: getReceiptVerification
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      responses:
+        '200':
+          description: Receipt status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptVerification'
+        '404':
+          $ref: '#/components/responses/Error'
+  /moderation/reports:
+    post:
+      tags:
+      - Moderation
+      summary: Report a review or entity
+      operationId: createModerationReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModerationReportRequest'
+      responses:
+        '201':
+          description: Report created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - reportId
+                - status
+                properties:
+                  reportId:
+                    type: string
+                    format: uuid
+                  status:
+                    $ref: '#/components/schemas/ModerationReportStatus'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/queues/receipts:
+    get:
+      tags:
+      - Admin
+      summary: Admin receipt verification queue
+      operationId: adminListReceiptQueue
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/ReceiptStatus'
+      - name: minRiskScore
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: maxRiskScore
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Receipt queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReceiptQueuePage'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/receipt-verifications/{receiptVerificationId}/decision:
+    post:
+      tags:
+      - Admin
+      summary: Decide receipt verification case
+      operationId: adminDecideReceipt
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReceiptDecisionRequest'
+      responses:
+        '200':
+          description: Decision applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReceiptDecisionResponse'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/moderation/reports:
+    get:
+      tags:
+      - Admin
+      summary: Admin moderation queue
+      operationId: adminListModerationReports
+      responses:
+        '200':
+          description: Moderation reports
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                - page
+                - pageSize
+                - total
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModerationReport'
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/moderation/reports/{reportId}/decision:
+    post:
+      tags:
+      - Admin
+      summary: Decide moderation report
+      operationId: adminDecideModerationReport
+      parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - action
+              - reason
+              properties:
+                action:
+                  type: string
+                  enum:
+                  - NO_ACTION
+                  - HIDE_REVIEW
+                  - DELETE_REVIEW
+                  - RESTRICT_USER_REVIEW
+                  - CLOSE_REPORT
+                reason:
+                  type: string
+                  minLength: 10
+      responses:
+        '200':
+          description: Decision applied
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - reportId
+                - status
+                - auditLogId
+                properties:
+                  reportId:
+                    type: string
+                    format: uuid
+                  status:
+                    $ref: '#/components/schemas/ModerationReportStatus'
+                  reviewStatus:
+                    $ref: '#/components/schemas/ReviewStatus'
+                  auditLogId:
+                    type: string
+                    format: uuid
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /gamification/me:
+    get:
+      tags:
+      - Gamification
+      summary: Get current user gamification summary
+      operationId: getMyGamification
+      responses:
+        '200':
+          description: Gamification summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - expPoints
+                - rankCode
+                - badges
+                properties:
+                  expPoints:
+                    type: integer
+                  rankCode:
+                    type: string
+                  badges:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Error'
+  /users/me/deletion-request:
+    post:
+      tags:
+      - Users
+      - Privacy
+      summary: Request account deletion
+      operationId: requestAccountDeletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDeletionRequestInput'
+      responses:
+        '202':
+          description: Deletion requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    get:
+      tags:
+      - Users
+      - Privacy
+      summary: Get current account deletion request
+      operationId: getAccountDeletionRequest
+      responses:
+        '200':
+          description: Open deletion request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /users/me/deletion-request/cancel:
+    post:
+      tags:
+      - Users
+      - Privacy
+      summary: Cancel account deletion during grace period
+      operationId: cancelAccountDeletionRequest
+      responses:
+        '200':
+          description: Deletion request cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /users/{userId}/block:
+    post:
+      tags:
+      - Users
+      - Moderation
+      summary: Block a user
+      operationId: blockUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockUserRequest'
+      responses:
+        '200':
+          description: User blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Users
+      - Moderation
+      summary: Unblock a user
+      operationId: unblockUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User unblocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}/gps:
+    post:
+      tags:
+      - Reviews
+      - Receipts
+      summary: Submit optional GPS verification signal for a review
+      operationId: submitReviewGpsSignal
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GpsSignalRequest'
+      responses:
+        '200':
+          description: GPS signal accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GpsSignalResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    RestaurantId:
+      name: restaurantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReceiptVerificationId:
+      name: receiptVerificationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Error:
+      description: Standard error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    OtpRequest:
+      type: object
+      required:
+      - phoneNumber
+      properties:
+        phoneNumber:
+          type: string
+          example: '+84901234567'
+    OtpRequestResponse:
+      type: object
+      required:
+      - requestId
+      - expiresInSeconds
+      - nextAllowedRequestAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        expiresInSeconds:
+          type: integer
+          example: 120
+        nextAllowedRequestAt:
+          type: string
+          format: date-time
+    OtpVerifyRequest:
+      type: object
+      required:
+      - phoneNumber
+      - otpCode
+      properties:
+        phoneNumber:
+          type: string
+        otpCode:
+          type: string
+          minLength: 6
+          maxLength: 6
+    AuthResponse:
+      type: object
+      required:
+      - accessToken
+      - user
+      properties:
+        accessToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      required:
+      - id
+      - displayName
+      - role
+      - rankCode
+      - status
+      - expPoints
+      properties:
+        id:
+          type: string
+          format: uuid
+        phoneNumber:
+          type: string
+          description: Mask in admin/public contexts.
+        displayName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum:
+          - USER
+          - MERCHANT
+          - ADMIN
+          - SUPER_ADMIN
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - REVIEW_RESTRICTED
+          - SUSPENDED
+          - DELETED
+        expPoints:
+          type: integer
+        rankCode:
+          type: string
+    Restaurant:
+      type: object
+      required:
+      - id
+      - name
+      - address
+      - status
+      - verifiedReviewCount
+      - referenceReviewCount
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        trustScore:
+          type: number
+          nullable: true
+        verifiedReviewCount:
+          type: integer
+        referenceReviewCount:
+          type: integer
+        status:
+          type: string
+          enum:
+          - ACTIVE
+    RestaurantDetail:
+      allOf:
+      - $ref: '#/components/schemas/Restaurant'
+      - type: object
+        properties:
+          description:
+            type: string
+            nullable: true
+          ratingBreakdown:
+            type: object
+            additionalProperties: true
+          ownerClaimStatus:
+            type: string
+            nullable: true
+    RestaurantPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Restaurant'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateReviewRequest:
+      type: object
+      required:
+      - restaurantId
+      - foodRating
+      - priceRating
+      - serviceRating
+      - ambienceRating
+      - comment
+      properties:
+        restaurantId:
+          type: string
+          format: uuid
+        foodRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        priceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        serviceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        ambienceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          minLength: 50
+        visitedAt:
+          type: string
+          format: date-time
+    CreateReviewResponse:
+      type: object
+      required:
+      - reviewId
+      - status
+      - nextStep
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        nextStep:
+          type: string
+          enum:
+          - UPLOAD_RECEIPT
+          - SKIP_VERIFICATION
+    ReviewStatusResponse:
+      type: object
+      required:
+      - reviewId
+      - status
+      - verificationStatus
+      - trustLabel
+      - publicVisibility
+      - trustWeightBucket
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        verificationStatus:
+          $ref: '#/components/schemas/ReviewVerificationStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        publicVisibility:
+          $ref: '#/components/schemas/PublicVisibility'
+        trustWeightBucket:
+          $ref: '#/components/schemas/TrustWeightBucket'
+    Review:
+      allOf:
+      - $ref: '#/components/schemas/ReviewStatusResponse'
+      - type: object
+        required:
+        - id
+        - restaurantId
+        - foodRating
+        - priceRating
+        - serviceRating
+        - ambienceRating
+        - comment
+        - createdAt
+        properties:
+          id:
+            type: string
+            format: uuid
+          restaurantId:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+          foodRating:
+            type: integer
+          priceRating:
+            type: integer
+          serviceRating:
+            type: integer
+          ambienceRating:
+            type: integer
+          averageRating:
+            type: number
+          comment:
+            type: string
+          visitedAt:
+            type: string
+            format: date-time
+            nullable: true
+          createdAt:
+            type: string
+            format: date-time
+    ReviewPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    ReceiptUploadResponse:
+      type: object
+      required:
+      - receiptVerificationId
+      - status
+      - processingStatus
+      properties:
+        receiptVerificationId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReceiptStatus'
+        processingStatus:
+          $ref: '#/components/schemas/ReceiptStatus'
+    ReceiptVerification:
+      type: object
+      required:
+      - id
+      - reviewId
+      - status
+      - reviewStatusSnapshot
+      - trustLabel
+      - fraudRiskScore
+      properties:
+        id:
+          type: string
+          format: uuid
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReceiptStatus'
+        reviewStatusSnapshot:
+          $ref: '#/components/schemas/ReviewStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        ocrSimilarity:
+          type: number
+          nullable: true
+        gpsDistanceMeters:
+          type: number
+          nullable: true
+        fraudRiskScore:
+          type: integer
+        decision:
+          type: string
+          nullable: true
+    CreateModerationReportRequest:
+      type: object
+      required:
+      - entityType
+      - entityId
+      - reasonCode
+      properties:
+        entityType:
+          type: string
+          enum:
+          - REVIEW
+        entityId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          enum:
+          - SPAM_OR_FAKE
+          - ABUSIVE_LANGUAGE
+          - PRIVACY
+          - OTHER
+        description:
+          type: string
+          maxLength: 1000
+    ModerationReport:
+      type: object
+      required:
+      - id
+      - entityType
+      - entityId
+      - reasonCode
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        status:
+          $ref: '#/components/schemas/ModerationReportStatus'
+        createdAt:
+          type: string
+          format: date-time
+    AdminReceiptQueuePage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - reviewId
+            - restaurantName
+            - status
+            - riskScore
+            - ageHours
+            properties:
+              id:
+                type: string
+                format: uuid
+              reviewId:
+                type: string
+                format: uuid
+              maskedUser:
+                type: string
+              restaurantName:
+                type: string
+              status:
+                $ref: '#/components/schemas/ReceiptStatus'
+              riskScore:
+                type: integer
+              ocrSimilarity:
+                type: number
+                nullable: true
+              gpsBucket:
+                type: string
+                enum:
+                - UNDER_200M
+                - BETWEEN_200_500M
+                - OVER_500M
+                - NOT_PROVIDED
+                - UNKNOWN
+              ageHours:
+                type: number
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    AdminReceiptDecisionRequest:
+      type: object
+      required:
+      - decision
+      - reason
+      properties:
+        decision:
+          type: string
+          enum:
+          - APPROVE_VERIFIED
+          - MARK_REFERENCE_ONLY
+          - REJECT
+          - REQUEST_MORE_REVIEW
+        reason:
+          type: string
+          minLength: 10
+        keepReviewAsReference:
+          type: boolean
+          description: Only valid for REJECT when admin chooses to keep review as reference-only.
+    AdminReceiptDecisionResponse:
+      type: object
+      required:
+      - receiptVerificationId
+      - newStatus
+      - reviewStatus
+      - auditLogId
+      properties:
+        receiptVerificationId:
+          type: string
+          format: uuid
+        newStatus:
+          $ref: '#/components/schemas/ReceiptStatus'
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        auditLogId:
+          type: string
+          format: uuid
+    ReviewStatus:
+      type: string
+      enum:
+      - DRAFT
+      - SUBMITTED
+      - VERIFIED
+      - REFERENCE_ONLY
+      - PENDING_ADMIN_REVIEW
+      - REJECTED
+      - HIDDEN
+      - DELETED
+    ReviewVerificationStatus:
+      type: string
+      enum:
+      - UNVERIFIED
+      - PROCESSING
+      - SKIPPED
+      - EXPIRED_NO_RECEIPT
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+      - DUPLICATE_REJECTED
+      - RECEIPT_REJECTED_REFERENCE_ALLOWED
+      - DELETED
+    ReceiptStatus:
+      type: string
+      enum:
+      - UPLOADED
+      - HASH_CHECKING
+      - DUPLICATE_DETECTED
+      - OCR_PROCESSING
+      - OCR_SUCCESS
+      - OCR_FAILED
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+    TrustLabel:
+      type: string
+      enum:
+      - PENDING_VERIFICATION
+      - PROCESSING
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+      - HIDDEN
+      - DELETED
+    PublicVisibility:
+      type: string
+      enum:
+      - PUBLIC
+      - PRIVATE
+      - PRIVATE_UNTIL_DECISION
+    TrustWeightBucket:
+      type: string
+      enum:
+      - HIGH
+      - LOW
+      - NONE
+    ModerationReportStatus:
+      type: string
+      enum:
+      - SUBMITTED
+      - TRIAGED
+      - PENDING_ADMIN_REVIEW
+      - ACTION_TAKEN
+      - REJECTED
+      - CLOSED
+    SuccessResponse:
+      type: object
+      required:
+      - success
+      properties:
+        success:
+          type: boolean
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - requestId
+          properties:
+            code:
+              type: string
+              enum:
+              - VALIDATION_ERROR
+              - AUTH_REQUIRED
+              - TOKEN_EXPIRED
+              - FORBIDDEN
+              - NOT_FOUND
+              - RATE_LIMITED
+              - OTP_INVALID
+              - OTP_EXPIRED
+              - FILE_TOO_LARGE
+              - UNSUPPORTED_FILE_TYPE
+              - DUPLICATE_RECEIPT_HASH
+              - REVIEW_NOT_EDITABLE
+              - RESTAURANT_NOT_ACTIVE
+              - CLAIM_CONFLICT
+              - REPORT_DUPLICATE
+              - PROVIDER_UNAVAILABLE
+              - IDEMPOTENCY_KEY_REQUIRED
+              - IDEMPOTENCY_KEY_INVALID
+              - IDEMPOTENCY_CONFLICT
+              - REQUEST_IN_PROGRESS
+              - REVIEW_VERIFICATION_EXPIRED
+              - ADMIN_REASON_REQUIRED
+              - DELETION_REQUEST_ALREADY_EXISTS
+              - DELETION_REQUEST_NOT_FOUND
+              - CANNOT_BLOCK_SELF
+              - USER_ALREADY_BLOCKED
+              - GPS_PERMISSION_REQUIRED
+              - INVALID_GPS_SIGNAL
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            requestId:
+              type: string
+    AccountDeletionRequestInput:
+      type: object
+      required:
+      - confirmationText
+      properties:
+        confirmationText:
+          type: string
+          minLength: 3
+          description: User-visible confirmation, e.g. XÓA TÀI KHOẢN.
+        reason:
+          type: string
+          maxLength: 1000
+    AccountDeletionRequestResponse:
+      type: object
+      required:
+      - deletionRequestId
+      - status
+      properties:
+        deletionRequestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - REQUESTED
+          - PROCESSING
+          - COMPLETED
+          - CANCELLED
+        scheduledDeletionAt:
+          type: string
+          format: date-time
+          nullable: true
+    BlockUserRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          enum:
+          - HARASSMENT
+          - SPAM
+          - ABUSIVE_LANGUAGE
+          - PRIVACY
+          - OTHER
+        sourceReviewId:
+          type: string
+          format: uuid
+    BlockUserResponse:
+      type: object
+      required:
+      - blockedUserId
+      - blockedAt
+      properties:
+        blockedUserId:
+          type: string
+          format: uuid
+        blockedAt:
+          type: string
+          format: date-time
+    GpsSignalRequest:
+      type: object
+      required:
+      - latitude
+      - longitude
+      - accuracyMeters
+      - capturedAt
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        accuracyMeters:
+          type: number
+          format: double
+          minimum: 0
+        capturedAt:
+          type: string
+          format: date-time
+    GpsSignalResponse:
+      type: object
+      required:
+      - reviewId
+      - gpsSignalAccepted
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        gpsSignalAccepted:
+          type: boolean
+        gpsDistanceMeters:
+          type: number
+          nullable: true

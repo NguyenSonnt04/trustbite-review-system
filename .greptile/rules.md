@@ -8,9 +8,11 @@ Current architecture:
 
 - `client/`: Next.js App Router, React, JavaScript/JSX, CSS modules.
 - `server/`: Node.js + Express, native ES modules.
+- `mobile/`: Flutter/Dart mobile application.
 - PostgreSQL is the application database.
 - AWS integrations are S3, Textract, Cognito, SES, and Bedrock/Claude, with LocalStack for local simulation.
-- Harness docs are the source of truth for work intake, risk classification, validation, and traceability.
+- `docs/` contains Harness docs and is the source of truth for work intake, risk classification, validation, and traceability.
+- `trustbite-docs/` contains imported TrustBite product, UX, API, security, database, QA, compliance, and operations documentation.
 
 ## Review priorities
 
@@ -24,7 +26,7 @@ Prioritize comments about:
 6. Anti-fraud rules being explicit and testable.
 7. Client/server boundary violations.
 8. Missing validation path for backend behavior.
-9. Behavior changes without matching product/story docs.
+9. Behavior changes without matching Harness story docs and TrustBite product docs where applicable.
 
 Avoid low-value comments about subjective style unless the style issue affects maintainability, accessibility, correctness, or consistency.
 

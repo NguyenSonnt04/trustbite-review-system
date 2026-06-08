@@ -27,7 +27,7 @@
     "defaultOpen": false
   },
   "disabledLabels": ["skip-review", "no-greptile", "wip"],
-  "instructions": "TrustBite is a JavaScript monorepo with a Next.js App Router client and an Express native-ESM server. Prioritize correctness, security, API boundary validation, secret handling, AWS provider isolation, and consistency with the Harness/project docs.",
+  "instructions": "TrustBite is a monorepo with a Next.js App Router client, Express native-ESM server, and Flutter mobile app. Use docs/ for Harness intake/traceability rules and trustbite-docs/ for product, UX, API, security, database, QA, compliance, and operations documentation. Prioritize correctness, security, API boundary validation, secret handling, AWS provider isolation, and consistency with both Harness and TrustBite product docs.",
   "rules": [
     {
       "id": "no-hardcoded-secrets",

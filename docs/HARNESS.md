@@ -96,10 +96,46 @@ a structured, queryable record of operational state. It also prepares the
 harness for future observability and automated evolution without adding more
 markdown files.
 
+## Team Setup and Local State
+
+Each team member has a local Harness database. This is intentional.
+
+Ignored local Harness files:
+
+- `harness.db`
+- `harness.db-wal`
+- `harness.db-shm`
+- `scripts/bin/harness-cli`
+- `scripts/bin/harness-cli.exe`
+
+Do not commit those files. SQLite databases create noisy merge conflicts, and
+Harness binaries are platform-specific. Shared, reviewable Harness state should
+be captured in version-controlled markdown and schema files instead:
+
+- `docs/FEATURE_INTAKE.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CONTEXT_RULES.md`
+- `docs/TEST_MATRIX.md`
+- `docs/stories/**`
+- `docs/decisions/**`
+- `scripts/schema/**`
+
+After cloning the repository, install or refresh the local Harness CLI:
+
+```bash
+# macOS/Linux/Git Bash
+curl -fsSL "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.sh?$(date +%s)" | bash -s -- --merge --yes
+```
+
+```powershell
+# Windows PowerShell
+& ([scriptblock]::Create((irm "https://raw.githubusercontent.com/hoangnb24/repository-harness/main/scripts/install-harness.ps1"))) -Merge -Yes
+```
+
 Initialize the database if it does not exist:
 
 ```bash
-scripts/bin/harness-cli init
+npm run harness -- init
 ```
 
 Common commands:
