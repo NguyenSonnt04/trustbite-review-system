@@ -337,11 +337,14 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
   /reviews/{reviewId}:
     get:
       tags:
       - Reviews
       summary: Get review detail
+      description: Owner may read a review at any status. Other authenticated users may read only public VERIFIED or REFERENCE_ONLY reviews. ADMIN and SUPER_ADMIN may read any status.
       operationId: getReview
       parameters:
       - $ref: '#/components/parameters/ReviewId'
@@ -352,6 +355,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Review'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
     patch:
@@ -446,7 +453,7 @@ paths:
       tags:
       - Receipts
       summary: Upload receipt for asynchronous verification
-      description: Requires authentication and ownership of the target review; request reviewId must belong to the authenticated user and match the restaurant being verified.
+      description: Requires authentication and ownership of the target review; request reviewId must belong to the authenticated user. The server derives restaurant_id exclusively from the review record.
       operationId: uploadReceipt
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyRequired'
@@ -458,13 +465,9 @@ paths:
               type: object
               required:
               - reviewId
-              - restaurantId
               - receiptImage
               properties:
                 reviewId:
-                  type: string
-                  format: uuid
-                restaurantId:
                   type: string
                   format: uuid
                 receiptImage:
@@ -494,6 +497,8 @@ paths:
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
         '413':
@@ -501,6 +506,8 @@ paths:
         '415':
           $ref: '#/components/responses/Error'
         '422':
+          $ref: '#/components/responses/Error'
+        '429':
           $ref: '#/components/responses/Error'
   /receipts/{receiptVerificationId}:
     get:
@@ -604,6 +611,45 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '403':
+          $ref: '#/components/responses/Error'
+  /admin/receipt-verifications/{receiptVerificationId}/image-url:
+    get:
+      tags:
+      - Admin
+      summary: Get short-lived receipt image URL
+      description: Requires ADMIN or SUPER_ADMIN role. Returns a short-lived signed URL for a redacted receipt image when available; raw private S3 object URLs must not be exposed.
+      operationId: adminGetReceiptImageUrl
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      responses:
+        '200':
+          description: Short-lived signed receipt image URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - receiptVerificationId
+                - signedUrl
+                - expiresAt
+                - redacted
+                properties:
+                  receiptVerificationId:
+                    type: string
+                    format: uuid
+                  signedUrl:
+                    type: string
+                    format: uri
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  redacted:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
           $ref: '#/components/responses/Error'
   /admin/receipt-verifications/{receiptVerificationId}/decision:
     post:
@@ -1435,6 +1481,9 @@ components:
                 - OVER_500M
                 - NOT_PROVIDED
                 - UNKNOWN
+              imageUrlAvailable:
+                type: boolean
+                description: True when an admin can request a short-lived signed URL through adminGetReceiptImageUrl.
               ageHours:
                 type: number
         page:
