@@ -32,7 +32,7 @@ Tài liệu này mô tả baseline triển khai TrustBite cho backend API, worke
 
 | Thành phần | Artifact | Ghi chú |
 |---|---|---|
-| Backend API | Container image/build artifact | NestJS API cho mobile/admin |
+| Backend API | Container image/build artifact | Express native-ESM API hiện có trong `server/`. Bộ tài liệu nhập khẩu có thể nhắc NestJS như stack mục tiêu; dùng Express ESM cho đến khi có quyết định đổi stack chính thức. |
 | Worker | Container image/build artifact | OCR, risk scoring, queue jobs |
 | Admin portal | Web build/container | Next.js admin web |
 | Database migration | Migration scripts | Prisma/migration tool tương ứng |

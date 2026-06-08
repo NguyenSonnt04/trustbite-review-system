@@ -59,6 +59,12 @@ paths:
       responses:
         '200':
           description: Authenticated
+          headers:
+            Set-Cookie:
+              description: HttpOnly Secure SameSite=Strict refresh token cookie; server stores only the token hash.
+              schema:
+                type: string
+                example: refresh_token=opaque-token; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000
           content:
             application/json:
               schema:
@@ -73,18 +79,20 @@ paths:
     post:
       tags:
       - Auth
-      security: []
+      security:
+      - refreshCookieAuth: []
       summary: Refresh access token
+      description: Uses the HttpOnly Secure SameSite=Strict refresh token cookie issued by the OTP verification flow; clients do not send refresh tokens in JSON bodies.
       operationId: refreshToken
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshTokenRequest'
       responses:
         '200':
           description: Token refreshed
+          headers:
+            Set-Cookie:
+              description: Rotated HttpOnly Secure SameSite=Strict refresh token cookie; server stores only the token hash.
+              schema:
+                type: string
+                example: refresh_token=opaque-token; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000
           content:
             application/json:
               schema:
@@ -856,6 +864,11 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    refreshCookieAuth:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: HttpOnly Secure SameSite=Strict refresh token cookie issued by auth endpoints; raw token values must not be exposed to JavaScript or stored in localStorage.
   parameters:
     RestaurantId:
       name: restaurantId
@@ -943,24 +956,13 @@ components:
           type: string
           minLength: 6
           maxLength: 6
-    RefreshTokenRequest:
-      type: object
-      required:
-      - refreshToken
-      properties:
-        refreshToken:
-          type: string
-          description: Opaque refresh token issued by the OTP verification flow; servers store only its hash.
     AuthResponse:
       type: object
       required:
       - accessToken
-      - refreshToken
       - user
       properties:
         accessToken:
-          type: string
-        refreshToken:
           type: string
         user:
           $ref: '#/components/schemas/User'
