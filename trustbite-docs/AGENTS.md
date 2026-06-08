@@ -85,7 +85,8 @@ assets/                       Hình ảnh/sơ đồ
 
 - Mobile MVP ưu tiên: React Native + TypeScript; Flutter + Dart là phương án thay thế nếu team chốt lại.
 - Admin/Merchant web: Next.js + TypeScript.
-- Backend: Node.js 20+ LTS, NestJS, TypeScript, Prisma ORM.
+- Backend mục tiêu trong bộ tài liệu nhập khẩu: Node.js 20+ LTS, NestJS, TypeScript, Prisma ORM.
+- Backend hiện có trong repo: `server/` đang là Node.js + Express native ES modules; khi đánh giá hoặc cập nhật theo code hiện tại, dùng Express ESM trừ khi có quyết định chính thức đổi stack.
 - Database/cache/queue: PostgreSQL 15+ + PostGIS, Redis + BullMQ.
 - OCR/storage/auth/infra: AWS Textract hoặc tương đương, S3-compatible storage, OTP SMS, AWS managed/container services.
 
