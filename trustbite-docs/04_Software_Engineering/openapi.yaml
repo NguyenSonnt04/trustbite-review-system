@@ -282,6 +282,7 @@ paths:
       - $ref: '#/components/parameters/RestaurantId'
       - name: status
         in: query
+        description: Public-facing filter only. ALL means VERIFIED plus REFERENCE_ONLY; HIDDEN, REJECTED, and DELETED reviews are always excluded on this unauthenticated endpoint regardless of filter value.
         schema:
           type: string
           enum:
@@ -630,6 +631,20 @@ paths:
       - Admin
       summary: Admin moderation queue
       operationId: adminListModerationReports
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
       responses:
         '200':
           description: Moderation reports
@@ -1279,7 +1294,7 @@ components:
       - status
       - reviewStatusSnapshot
       - trustLabel
-      - fraudRiskScore
+      - fraudRiskBucket
       properties:
         id:
           type: string
@@ -1299,8 +1314,14 @@ components:
         gpsDistanceMeters:
           type: number
           nullable: true
-        fraudRiskScore:
-          type: integer
+        fraudRiskBucket:
+          type: string
+          description: Coarse user-facing fraud signal; exact numeric fraud scores are admin-only to avoid adversarial calibration.
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - UNKNOWN
         decision:
           type: string
           nullable: true

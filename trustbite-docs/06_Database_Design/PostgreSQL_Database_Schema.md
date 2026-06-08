@@ -459,7 +459,8 @@ CREATE TABLE user_blocks (
   source_review_id UUID REFERENCES reviews(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   deleted_at TIMESTAMPTZ,
-  UNIQUE(blocker_user_id, blocked_user_id)
+  UNIQUE(blocker_user_id, blocked_user_id),
+  CHECK (blocker_user_id <> blocked_user_id)
 );
 ```
 
@@ -480,7 +481,8 @@ CREATE INDEX idx_restaurants_geo ON restaurants USING GIST(geo);
 CREATE INDEX idx_reviews_restaurant_status ON reviews(restaurant_id, status);
 CREATE INDEX idx_reviews_public_trust ON reviews(restaurant_id, public_visibility, trust_weight_bucket);
 CREATE INDEX idx_reviews_user_restaurant ON reviews(user_id, restaurant_id);
-CREATE UNIQUE INDEX idx_receipts_hash_unique ON receipt_verifications(file_hash_sha256);
+CREATE UNIQUE INDEX idx_receipts_hash_unique ON receipt_verifications(file_hash_sha256)
+  WHERE status NOT IN ('OCR_FAILED');
 CREATE UNIQUE INDEX idx_receipts_transaction_unique ON receipt_verifications(transaction_unique_hash) WHERE transaction_unique_hash IS NOT NULL;
 CREATE INDEX idx_receipts_review ON receipt_verifications(review_id);
 CREATE INDEX idx_receipts_status ON receipt_verifications(status);
