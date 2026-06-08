@@ -446,6 +446,7 @@ paths:
       tags:
       - Receipts
       summary: Upload receipt for asynchronous verification
+      description: Requires authentication and ownership of the target review; request reviewId must belong to the authenticated user and match the restaurant being verified.
       operationId: uploadReceipt
       parameters:
       - $ref: '#/components/parameters/IdempotencyKeyRequired'

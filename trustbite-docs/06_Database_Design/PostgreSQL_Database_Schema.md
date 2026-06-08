@@ -483,7 +483,9 @@ CREATE INDEX idx_reviews_public_trust ON reviews(restaurant_id, public_visibilit
 CREATE INDEX idx_reviews_user_restaurant ON reviews(user_id, restaurant_id);
 CREATE UNIQUE INDEX idx_receipts_hash_unique ON receipt_verifications(file_hash_sha256)
   WHERE status NOT IN ('OCR_FAILED');
-CREATE UNIQUE INDEX idx_receipts_transaction_unique ON receipt_verifications(transaction_unique_hash) WHERE transaction_unique_hash IS NOT NULL;
+CREATE UNIQUE INDEX idx_receipts_transaction_unique ON receipt_verifications(transaction_unique_hash)
+  WHERE transaction_unique_hash IS NOT NULL
+    AND status IN ('VERIFIED');
 CREATE INDEX idx_receipts_review ON receipt_verifications(review_id);
 CREATE INDEX idx_receipts_status ON receipt_verifications(status);
 CREATE INDEX idx_review_replies_review ON review_replies(review_id);
