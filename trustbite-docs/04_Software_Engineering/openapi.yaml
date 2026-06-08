@@ -946,7 +946,7 @@ paths:
       - Reviews
       - Receipts
       summary: Submit optional GPS verification signal for a review
-      description: Requires authentication and ownership of the review; reviewId must belong to the authenticated user before GPS data can affect fraud scoring.
+      description: Requires authentication and ownership of the review; reviewId must belong to the authenticated user before GPS data can affect fraud scoring. GPS submission is accepted only while the linked receipt verification is UPLOADED, OCR_PROCESSING, or OCR_SUCCESS and before the fraud score is finalized. Once status becomes VERIFIED, REFERENCE_ONLY, REJECTED, or PENDING_ADMIN_REVIEW, GPS cannot trigger re-scoring and must be rejected with 409.
       operationId: submitReviewGpsSignal
       parameters:
       - $ref: '#/components/parameters/ReviewId'
@@ -968,6 +968,8 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
+          $ref: '#/components/responses/Error'
+        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -1529,7 +1531,7 @@ components:
           minLength: 10
         keepReviewAsReference:
           type: boolean
-          description: Only valid for REJECT when admin chooses to keep review as reference-only.
+          description: Only valid for REJECT when admin chooses to keep review as reference-only. Requests with keepReviewAsReference=true and any non-REJECT decision must fail with 422 INVALID_RECEIPT_DECISION_COMBINATION.
     AdminReceiptDecisionResponse:
       type: object
       required:
@@ -1670,6 +1672,7 @@ components:
               - USER_ALREADY_BLOCKED
               - GPS_PERMISSION_REQUIRED
               - INVALID_GPS_SIGNAL
+              - INVALID_RECEIPT_DECISION_COMBINATION
             message:
               type: string
             details:
@@ -1686,8 +1689,8 @@ components:
       properties:
         confirmationText:
           type: string
-          minLength: 3
-          description: User-visible confirmation, e.g. XÓA TÀI KHOẢN.
+          const: XÓA TÀI KHOẢN
+          description: User-visible confirmation phrase required exactly for irreversible deletion.
         reason:
           type: string
           maxLength: 1000
