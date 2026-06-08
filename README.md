@@ -28,6 +28,13 @@ This repository contains the structured skeleton folders for development.
 │   │   └── server.js    # Entrypoint booster
 │   └── package.json     # Server package manager
 │
+├── mobile/              # Flutter/Dart Mobile Application
+│   ├── lib/
+│   │   ├── main.dart    # Flutter entrypoint
+│   │   └── src/         # App, theme, and feature modules
+│   ├── test/            # Flutter widget tests
+│   └── pubspec.yaml     # Flutter package configuration
+│
 ├── docker-compose.yml   # Infrastructure (Postgres trustbite_db & LocalStack simulator)
 │   └── package.json     # Workspace execution scripts
 └── .gitignore
@@ -40,6 +47,7 @@ This repository contains the structured skeleton folders for development.
 ### 1. Requirements
 - Node.js (v18+)
 - Docker & Docker Compose
+- Flutter SDK 3.4+ for mobile development
 
 ### 2. Install Workspace Dependencies
 Run this in the root directory:
@@ -64,6 +72,18 @@ npm run dev
 ```
 - **Next.js Client**: `http://localhost:3000` (Conforms to the 50-50 Split-Screen layout specified in **SRS Section 1.1**)
 - **Express Server**: `http://localhost:5000`
+
+Run the Flutter mobile app:
+```bash
+npm run mobile:pubget
+npm run mobile:run
+```
+
+If `mobile/android`, `mobile/ios`, `mobile/web`, or another Flutter platform runner folder is missing, generate runners first:
+```bash
+cd mobile
+flutter create .
+```
 
 ---
 
