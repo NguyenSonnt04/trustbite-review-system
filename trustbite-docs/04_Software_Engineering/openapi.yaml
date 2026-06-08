@@ -169,6 +169,59 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
+  /users/me/avatar-upload-url:
+    post:
+      tags:
+      - Users
+      summary: Create avatar upload URL
+      description: Requires authentication. Returns a short-lived upload URL for a TrustBite-owned media object; avatarUrl on PATCH /users/me must reference the returned public media URL after upload completion.
+      operationId: createAvatarUploadUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - contentType
+              properties:
+                contentType:
+                  type: string
+                  enum:
+                  - image/jpeg
+                  - image/png
+                  - image/webp
+                fileSizeBytes:
+                  type: integer
+                  minimum: 1
+                  maximum: 5242880
+      responses:
+        '200':
+          description: Avatar upload URL created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - uploadUrl
+                - avatarUrl
+                - expiresAt
+                properties:
+                  uploadUrl:
+                    type: string
+                    format: uri
+                    description: Short-lived signed URL for uploading the avatar image.
+                  avatarUrl:
+                    type: string
+                    format: uri
+                    description: TrustBite-owned allowlisted media URL accepted by PATCH /users/me after upload.
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
   /restaurants:
     get:
       tags:
@@ -1452,6 +1505,13 @@ components:
           format: uuid
         reasonCode:
           type: string
+        reporterId:
+          type: string
+          format: uuid
+          description: Admin-only reporter identifier; omit from public-facing responses.
+        maskedReporter:
+          type: string
+          description: Admin-facing masked reporter display value for abuse-pattern review.
         status:
           $ref: '#/components/schemas/ModerationReportStatus'
         createdAt:

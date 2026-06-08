@@ -173,7 +173,7 @@ MVP chỉ nên làm kiểm tra nhẹ:
 ### MVP
 
 - Giới hạn tần suất OTP: Tối đa 3 lần/10 phút cho mỗi số điện thoại. Sai 5 lần liên tiếp sẽ bị khóa tạm thời (Khóa 15 phút cho lần đầu, 24 giờ cho lần vi phạm tiếp theo).
-- Lưu trạng thái rate limit và danh sách khóa tạm thời (blacklisted phone numbers) trên Redis để truy xuất nhanh với độ trễ thấp.
+- Lưu trạng thái rate limit và danh sách khóa tạm thời (blacklisted phone numbers) trên Redis/AWS ElastiCache Redis để truy xuất nhanh với độ trễ thấp; AWS Cloud Infrastructure phải khai báo dịch vụ này trong nhóm queue/cache.
 - Giới hạn tần suất đánh giá/tải hóa đơn.
 - Theo dõi IP/user-agent ở mức bảo mật cơ bản.
 - Ghi `fraud_flags` khi nhiều tài khoản đánh giá cùng quán với mẫu hành vi bất thường.

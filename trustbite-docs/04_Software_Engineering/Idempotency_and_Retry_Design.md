@@ -153,3 +153,11 @@ Nếu key khác nhưng file hash đã tồn tại trong receipt verification đ�
 - Duplicate hash với key khác vẫn tạo fraud flag đúng rule.
 - Không log raw file content, OTP, token, GPS raw ngoài nơi được phép.
 - Có integration test mô phỏng timeout/mất mạng giữa lúc upload và nhận response.
+
+## 9. Recovery for stale `IN_PROGRESS` keys
+
+- When creating an `IN_PROGRESS` idempotency key, set `locked_until = now() + interval '2 minutes'` for synchronous API work. Long-running OCR/fraud work must be represented by the created `receipt_verifications` resource, not by keeping the idempotency key locked.
+- On retry, if a matching key is `IN_PROGRESS` and `locked_until > now()`, return `202` with the existing resource if available, otherwise `409 REQUEST_IN_PROGRESS`.
+- On retry, if a matching key is `IN_PROGRESS` and `locked_until <= now()`, the backend must atomically transition it to `FAILED_RETRYABLE` and allow the same `Idempotency-Key` + `request_hash` to restart the request.
+- A background recovery job should run at least once per minute and mark expired `IN_PROGRESS` keys as `FAILED_RETRYABLE` using `WHERE status = 'IN_PROGRESS' AND locked_until <= now()`.
+- `FAILED_RETRYABLE` retains the original `request_hash` for conflict detection; it must not replay a partial response body.
