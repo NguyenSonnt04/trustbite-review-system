@@ -1100,7 +1100,8 @@ components:
           maximum: 5
         comment:
           type: string
-          minLength: 50
+          minLength: 30
+          description: Minimum 30 characters for Reference reviews. Server must enforce 50 characters before allowing receipt verification / VERIFIED intent per BR-REV-002.
         visitedAt:
           type: string
           format: date-time

@@ -140,8 +140,8 @@ Hệ thống nên chuẩn hóa trước khi so khớp:
 - Tạo `fraud_flags` với loại `DUPLICATE_RECEIPT_HASH`.
 
 ### 7.2. Trùng lặp thông tin giao dịch (Composite Transaction Hash)
-- Chụp ảnh ở góc khác nhau sẽ làm thay đổi SHA-256 của file nhưng thông tin giao dịch vẫn giữ nguyên. Do đó, hệ thống sinh một khóa duy nhất sau khi OCR thành công:
-  $$\text{transaction\_unique\_hash} = \text{SHA256}(\text{normalized\_restaurant\_name} + \text{transaction\_datetime} + \text{invoice\_no} + \text{total\_amount})$$
+- Chụp ảnh ở góc khác nhau sẽ làm thay đổi SHA-256 của file nhưng thông tin giao dịch vẫn giữ nguyên. Do đó, hệ thống sinh một khóa duy nhất sau khi OCR thành công bằng chuỗi canonical có phân tách trường rõ ràng:
+  $$\text{transaction\_unique\_hash} = \text{SHA256}(\text{normalized\_restaurant\_name} + "|" + \text{transaction\_datetime} + "|" + \text{invoice\_no} + "|" + \text{total\_amount})$$
 - Trong đó:
   - `normalized_restaurant_name`: Tên quán đã được chuyển thường, loại bỏ dấu, khoảng trắng thừa và ký tự đặc biệt.
   - `transaction_datetime`: Ngày giờ giao dịch được chuẩn hóa về định dạng ISO.

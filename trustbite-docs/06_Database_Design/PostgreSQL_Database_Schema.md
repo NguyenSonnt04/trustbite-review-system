@@ -372,17 +372,18 @@ CREATE TABLE push_tokens (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id),
   platform VARCHAR(30) NOT NULL,
-  token_hash TEXT NOT NULL,
+  token_ciphertext TEXT NOT NULL,
+  token_fingerprint TEXT NOT NULL,
   provider VARCHAR(30),
   status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
   last_seen_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(user_id, token_hash)
+  UNIQUE(user_id, token_fingerprint)
 );
 ```
 
-Ghi chú: push notification là P1. Không lưu raw token nếu không cần thiết cho provider integration; nếu cần raw token, phải mã hóa hoặc bảo vệ theo chính sách secret/data access.
+Ghi chú: push notification là P1. FCM/APNs cần token gốc để gửi thông báo, vì vậy hệ thống lưu token ở dạng mã hóa có thể giải mã bởi backend (`token_ciphertext`, ví dụ AES-256-GCM/KMS) và chỉ dùng `token_fingerprint` một chiều để dedupe/tìm kiếm. Không log hoặc hiển thị raw token.
 
 ## 2.22. idempotency_keys - khóa chống tạo trùng request
 
