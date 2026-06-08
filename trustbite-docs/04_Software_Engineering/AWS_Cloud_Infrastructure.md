@@ -26,7 +26,7 @@ Lưu ý: sơ đồ có thể thể hiện một số thành phần tương lai h
 
 ```mermaid
 graph TD
-    Mobile[Mobile App iOS/Android] --> API[NestJS API Container]
+    Mobile[Mobile App iOS/Android] --> API[Express ESM API Container]
     Admin[Admin Web Portal] --> CDN[CloudFront hoặc hosting web]
     Merchant[Merchant Web Portal P1] --> CDN
     CDN --> API
