@@ -79,6 +79,12 @@ graph TD
 | Người dùng có >=3 hóa đơn bị từ chối trong 7 ngày | +40 |
 | Nhiều tài khoản cùng thiết bị/IP đánh giá cùng quán trong 24h | +50 |
 
+Quy tắc thời gian cho GPS:
+
+- Mốc so sánh 1 giờ dùng `receipt_verifications.created_at` hoặc timestamp server-side khi `POST /receipts` được nhận, không dùng trực tiếp timestamp do client gửi.
+- `capturedAt` trong `POST /receipts` và `POST /reviews/{reviewId}/gps` chỉ là metadata/tín hiệu phụ. Backend phải từ chối hoặc hạ độ tin cậy GPS nếu `capturedAt` nằm ngoài cửa sổ cho phép quanh thời điểm server nhận request, ví dụ lệch quá 5 phút so với server time hoặc sau `received_at`.
+- Fraud worker không được cho người dùng giảm điểm rủi ro bằng cách tự khai `capturedAt` cũ hơn 1 giờ; nếu timestamp client không hợp lệ, chấm như GPS không đáng tin cậy hoặc không được cung cấp.
+
 ### 4.2. Ngưỡng quyết định
 
 | Fraud Risk Score | Kết quả | Ý nghĩa |

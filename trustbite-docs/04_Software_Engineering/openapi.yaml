@@ -717,7 +717,7 @@ paths:
       tags:
       - Admin
       summary: Decide receipt verification case
-      description: Requires ADMIN or SUPER_ADMIN role.
+      description: Requires ADMIN or SUPER_ADMIN role. Decisions map to receipt status as follows: APPROVE_VERIFIED -> VERIFIED, MARK_REFERENCE_ONLY -> REFERENCE_ONLY, REJECT -> REJECTED unless keepReviewAsReference=true keeps the review reference-only, and REQUEST_MORE_REVIEW keeps the receipt in PENDING_ADMIN_REVIEW while writing an audit log/escalation marker so the admin queue can distinguish escalated cases from first-pass pending cases.
       operationId: adminDecideReceipt
       parameters:
       - $ref: '#/components/parameters/ReceiptVerificationId'
@@ -1586,6 +1586,7 @@ components:
           - MARK_REFERENCE_ONLY
           - REJECT
           - REQUEST_MORE_REVIEW
+          description: REQUEST_MORE_REVIEW leaves newStatus as PENDING_ADMIN_REVIEW and must create an audit/escalation record with the admin reason; clients should surface it separately from first-pass pending cases.
         reason:
           type: string
           minLength: 10
@@ -1825,6 +1826,7 @@ components:
         capturedAt:
           type: string
           format: date-time
+          description: Client-captured timestamp used only as metadata. Server fraud scoring must compare the 1-hour GPS freshness threshold against the server-side receipt submission timestamp and must reject or downgrade GPS signals whose capturedAt is outside the server-enforced freshness window.
     GpsSignalResponse:
       type: object
       required:

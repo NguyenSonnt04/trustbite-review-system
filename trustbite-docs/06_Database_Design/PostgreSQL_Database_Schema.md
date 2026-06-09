@@ -474,6 +474,8 @@ Ghi chú: không cho phép `blocker_user_id = blocked_user_id`. Soft delete bằ
 CREATE INDEX idx_users_phone_number ON users(phone_number);
 CREATE INDEX idx_user_sessions_user ON user_sessions(user_id, revoked_at);
 CREATE INDEX idx_account_deletion_requests_user_status ON account_deletion_requests(user_id, status);
+CREATE UNIQUE INDEX idx_account_deletion_requests_one_open ON account_deletion_requests(user_id)
+  WHERE status IN ('REQUESTED', 'PROCESSING');
 CREATE INDEX idx_user_blocks_blocker ON user_blocks(blocker_user_id, deleted_at);
 CREATE INDEX idx_user_blocks_blocked ON user_blocks(blocked_user_id, deleted_at);
 CREATE INDEX idx_restaurants_status ON restaurants(status);
@@ -491,6 +493,8 @@ CREATE INDEX idx_receipts_status ON receipt_verifications(status);
 CREATE INDEX idx_review_replies_review ON review_replies(review_id);
 CREATE INDEX idx_user_badges_user ON user_badges(user_id);
 CREATE INDEX idx_reports_status ON moderation_reports(status);
+CREATE UNIQUE INDEX idx_reports_reporter_entity_open ON moderation_reports(reporter_id, entity_type, entity_id)
+  WHERE status NOT IN ('CLOSED', 'ACTION_TAKEN');
 CREATE INDEX idx_fraud_flags_entity ON fraud_flags(entity_type, entity_id);
 CREATE INDEX idx_notifications_recipient ON notifications(recipient_user_id, read_at);
 CREATE INDEX idx_push_tokens_user ON push_tokens(user_id, status);
