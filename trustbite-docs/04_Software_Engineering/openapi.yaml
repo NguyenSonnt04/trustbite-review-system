@@ -1743,6 +1743,7 @@ components:
               - GPS_PERMISSION_REQUIRED
               - INVALID_GPS_SIGNAL
               - INVALID_RECEIPT_DECISION_COMBINATION
+              - INVALID_MODERATION_DECISION_COMBINATION
             message:
               type: string
             details:
@@ -1850,3 +1851,4 @@ components:
         gpsDistanceMeters:
           type: number
           nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration of GPS spoofing distance.
