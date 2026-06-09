@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Kiến trúc mobile app |
-| Phiên bản | v1.1.0 |
+| Phiên bản | v1.2.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Mobile Lead / Kiến trúc sư trưởng |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -20,26 +20,25 @@ Tài liệu này **không chốt màu sắc, layout chi tiết hoặc visual sty
 
 ## 2. Quyết định công nghệ
 
-### Khuyến nghị MVP
+### Quyết định MVP theo task manager
 
-| Nhóm | Quyết định đề xuất |
+| Nhóm | Quyết định |
 |---|---|
-| Framework | React Native |
-| Ngôn ngữ | TypeScript |
-| Tooling | Expo nếu chưa cần native module phức tạp; chuyển sang prebuild/custom native khi cần |
-| State server | TanStack Query |
-| State local | Zustand hoặc Context cho state nhỏ |
-| Form | React Hook Form + Zod |
-| Navigation | React Navigation |
-| Secure storage | expo-secure-store hoặc react-native-keychain |
-| Image picker/camera | expo-image-picker, expo-camera hoặc package native tương đương |
-| Maps | Google Maps hoặc Mapbox |
+| Framework | Flutter |
+| Ngôn ngữ | Dart |
+| Tooling | Flutter SDK 3.4+ theo README; tạo platform runner bằng `flutter create .` nếu thiếu |
+| State | Riverpod hoặc Bloc; chọn một pattern trong story implementation đầu tiên |
+| Form | Flutter form validation hoặc package validation được story chốt |
+| Navigation | go_router |
+| Secure storage | flutter_secure_storage |
+| Image picker/camera | image_picker hoặc camera |
+| Maps | google_maps_flutter hoặc mapbox_maps_flutter |
 | Error/crash | Sentry hoặc Firebase Crashlytics |
 | Analytics | Firebase Analytics, PostHog hoặc Segment |
 
 ### Phương án thay thế
 
-Flutter + Dart được chấp nhận nếu team có năng lực Flutter tốt hơn. Khi chọn Flutter, tài liệu này phải được cập nhật tương ứng với Riverpod/Bloc, Dio, flutter_secure_storage và tooling Flutter release.
+React Native + TypeScript chỉ là phương án tương lai nếu team quyết định đổi framework. Khi đổi, phải cập nhật tài liệu này, device matrix, release checklist, CI và story validation trước khi implementation.
 
 ---
 
@@ -58,28 +57,29 @@ Flutter + Dart được chấp nhận nếu team có năng lực Flutter tốt h
 ## 4. Cấu trúc module đề xuất
 
 ```text
-src/
-  app/
-    navigation/
-    providers/
-    config/
-  features/
-    auth/
-    restaurants/
-    reviews/
-    receipts/
-    profile/
-    moderation/
-    gamification/
-  shared/
-    api/
-    components/
-    hooks/
-    storage/
-    permissions/
-    analytics/
-    errors/
-    utils/
+lib/
+  main.dart
+  src/
+    app/
+      navigation/
+      providers/
+      config/
+    features/
+      auth/
+      restaurants/
+      reviews/
+      receipts/
+      profile/
+      moderation/
+      gamification/
+    shared/
+      api/
+      widgets/
+      storage/
+      permissions/
+      analytics/
+      errors/
+      utils/
 ```
 
 | Module | Trách nhiệm |

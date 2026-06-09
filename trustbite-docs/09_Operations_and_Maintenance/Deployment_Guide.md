@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Deployment guide |
-| Phiên bản | v1.0.0 |
+| Phiên bản | v1.1.0 |
 | Trạng thái | Bản nháp |
 | Chủ sở hữu | DevOps / Engineering Lead |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -32,10 +32,10 @@ Tài liệu này mô tả baseline triển khai TrustBite cho backend API, worke
 
 | Thành phần | Artifact | Ghi chú |
 |---|---|---|
-| Backend API | Container image/build artifact | Express native-ESM API hiện có trong `server/`. Bộ tài liệu nhập khẩu có thể nhắc NestJS như stack mục tiêu; dùng Express ESM cho đến khi có quyết định đổi stack chính thức. |
+| Backend API | Container image/build artifact | Express native-ESM API hiện có trong `server/`; mọi migration sang framework khác cần story/decision riêng. |
 | Worker | Container image/build artifact | OCR, risk scoring, queue jobs |
 | Admin portal | Web build/container | Next.js admin web |
-| Database migration | Migration scripts | Prisma/migration tool tương ứng |
+| Database migration | Migration scripts | SQL migration hoặc migration tool được story backend chốt |
 | Mobile app | iOS/Android build | TestFlight/Google Play/Internal/Production |
 | Object storage | Bucket/policy/lifecycle | Receipt private bucket, redacted variants nếu có |
 

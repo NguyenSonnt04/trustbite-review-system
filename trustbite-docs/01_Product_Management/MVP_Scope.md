@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Phạm vi MVP |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.7.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Product Owner |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -85,7 +85,7 @@ Với giả thuyết chủ quán, MVP chỉ cần đủ cơ chế vận hành đ
 - Merchant portal đầy đủ.
 - Notification/push notification bắt buộc.
 - Signed upload bắt buộc.
-- App native riêng biệt iOS/Android nếu React Native/Flutter đã đáp ứng.
+- App native riêng biệt iOS/Android nếu Flutter đã đáp ứng MVP.
 - Cổng đặt chỗ/thanh toán.
 - AI summary, nhiệm vụ bí mật, hoàn tiền.
 - Device fingerprint bắt buộc hoặc profiling dài hạn.
