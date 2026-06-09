@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Lịch sử phiên bản |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.7.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | PMO |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -20,6 +20,7 @@
 | v2.4.0 | 2026-06-07 | Bổ sung production-readiness baseline | Thêm traceability matrix, status mapping API/DB/UI, idempotency retry design, OpenAPI baseline, migration/seed plan và cập nhật DB/API/index liên quan | Đang rà soát |
 | v2.5.0 | 2026-06-07 | Chuẩn hóa tài liệu sống | Bổ sung mô hình vận hành tài liệu theo vòng đời product, product model, UX writing, development guideline, deployment guide, release notes, bug template và support guide | Đang rà soát |
 | v2.6.0 | 2026-06-07 | Rà soát product/store readiness | Chuẩn hóa ngày tài liệu, thêm checklist App Store/Google Play, mapping Privacy/Data Safety, luồng xóa tài khoản, UGC report/block và cập nhật API/DB/QA liên quan | Đang rà soát |
+| v2.6.1 | 2026-06-09 | Rà soát CI/CD baseline | Làm rõ baseline CI/security/container hiện tại so với mục tiêu MVP CI/CD đầy đủ; ghi nhận các phần deploy, migration, OpenAPI và security blocking còn là future work | Đang rà soát |
 | v2.7.0 | 2026-06-09 | Đồng bộ tech stack theo task manager | Chốt Flutter + Dart cho mobile MVP, Next.js cho admin web và Node.js + Express native ESM cho backend hiện tại; chuyển React Native/NestJS/Prisma thành phương án tương lai cần story/decision riêng | Đang rà soát |
 
 ## Quy tắc kiểm soát thay đổi
