@@ -1,0 +1,1854 @@
+openapi: 3.1.0
+info:
+  title: TrustBite MVP API
+  version: 1.1.0
+  description: Baseline OpenAPI contract for TrustBite MVP P0. Markdown specs remain the narrative source; this file is the
+    machine-readable contract for development, mocks and contract tests.
+servers:
+- url: /api/v1
+security:
+- bearerAuth: []
+tags:
+- name: Auth
+- name: Users
+- name: Restaurants
+- name: Reviews
+- name: Receipts
+- name: Moderation
+- name: Admin
+- name: Gamification
+- name: Privacy
+paths:
+  /auth/otp/request:
+    post:
+      tags:
+      - Auth
+      security: []
+      summary: Request OTP
+      operationId: requestOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpRequest'
+      responses:
+        '200':
+          description: OTP request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpRequestResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /auth/otp/verify:
+    post:
+      tags:
+      - Auth
+      security: []
+      summary: Verify OTP
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OtpVerifyRequest'
+      responses:
+        '200':
+          description: Authenticated
+          headers:
+            Set-Cookie:
+              description: HttpOnly Secure SameSite=Strict refresh token cookie; server stores only the token hash.
+              schema:
+                type: string
+                example: refresh_token=opaque-token; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /auth/refresh:
+    post:
+      tags:
+      - Auth
+      security:
+      - refreshCookieAuth: []
+      summary: Refresh access token
+      description: Uses the HttpOnly Secure SameSite=Strict refresh token cookie issued by the OTP verification flow; clients do not send refresh tokens in JSON bodies.
+      operationId: refreshToken
+      responses:
+        '200':
+          description: Token refreshed
+          headers:
+            Set-Cookie:
+              description: Rotated HttpOnly Secure SameSite=Strict refresh token cookie; server stores only the token hash.
+              schema:
+                type: string
+                example: refresh_token=opaque-token; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - accessToken
+                - expiresInSeconds
+                properties:
+                  accessToken:
+                    type: string
+                  expiresInSeconds:
+                    type: integer
+                    example: 900
+        '401':
+          $ref: '#/components/responses/Error'
+  /auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Logout and revoke session
+      operationId: logout
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+  /users/me:
+    get:
+      tags:
+      - Users
+      summary: Get current user
+      operationId: getMe
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - Users
+      summary: Update current user profile
+      description: avatarUrl, when supplied, must reference a TrustBite-owned allowlisted media origin or a URL created by the platform avatar upload flow; arbitrary external URLs must be rejected.
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  maxLength: 120
+                avatarUrl:
+                  type: string
+                  format: uri
+                  description: Must be a TrustBite-owned allowlisted media URL or a URL issued by the platform avatar upload flow; arbitrary external URLs are not accepted.
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /users/me/avatar-upload-url:
+    post:
+      tags:
+      - Users
+      summary: Create avatar upload URL
+      description: Requires authentication. Returns a short-lived upload URL for a TrustBite-owned media object; avatarUrl on PATCH /users/me must reference the returned public media URL after upload completion.
+      operationId: createAvatarUploadUrl
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - contentType
+              properties:
+                contentType:
+                  type: string
+                  enum:
+                  - image/jpeg
+                  - image/png
+                  - image/webp
+                fileSizeBytes:
+                  type: integer
+                  minimum: 1
+                  maximum: 5242880
+      responses:
+        '200':
+          description: Avatar upload URL created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - uploadUrl
+                - avatarUrl
+                - expiresAt
+                properties:
+                  uploadUrl:
+                    type: string
+                    format: uri
+                    description: Short-lived signed URL for uploading the avatar image.
+                  avatarUrl:
+                    type: string
+                    format: uri
+                    description: TrustBite-owned allowlisted media URL accepted by PATCH /users/me after upload.
+                  expiresAt:
+                    type: string
+                    format: date-time
+        '401':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /restaurants:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: Search ACTIVE restaurants
+      operationId: listRestaurants
+      parameters:
+      - name: keyword
+        in: query
+        schema:
+          type: string
+      - name: lat
+        in: query
+        schema:
+          type: number
+          format: double
+      - name: lng
+        in: query
+        schema:
+          type: number
+          format: double
+      - name: radiusMeters
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 50000
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Restaurant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantPage'
+  /restaurants/nearby:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: List restaurants in map bounds
+      operationId: listNearbyRestaurants
+      parameters:
+      - name: northEastLat
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: northEastLng
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: southWestLat
+        in: query
+        required: true
+        schema:
+          type: number
+      - name: southWestLng
+        in: query
+        required: true
+        schema:
+          type: number
+      responses:
+        '200':
+          description: Restaurant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantPage'
+        '422':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}:
+    get:
+      tags:
+      - Restaurants
+      security: []
+      summary: Get restaurant detail
+      operationId: getRestaurant
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Restaurant detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantDetail'
+        '404':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}/reviews:
+    get:
+      tags:
+      - Restaurants
+      - Reviews
+      security: []
+      summary: List public reviews for restaurant
+      description: Unauthenticated public listing. Responses must omit reviewer userId values; userId is populated only for the review owner and ADMIN/SUPER_ADMIN callers on authenticated endpoints.
+      operationId: listRestaurantReviews
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - name: status
+        in: query
+        description: Public-facing filter only. ALL means VERIFIED plus REFERENCE_ONLY; HIDDEN, REJECTED, and DELETED reviews are always excluded on this unauthenticated endpoint regardless of filter value.
+        schema:
+          type: string
+          enum:
+          - VERIFIED
+          - REFERENCE_ONLY
+          - ALL
+          default: ALL
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Review list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewPage'
+  /reviews:
+    post:
+      tags:
+      - Reviews
+      summary: Create review
+      operationId: createReview
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyOptional'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+      responses:
+        '201':
+          description: Review created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateReviewResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}:
+    get:
+      tags:
+      - Reviews
+      summary: Get review detail
+      description: Owner may read a review at any status. Other authenticated users may read only public VERIFIED or REFERENCE_ONLY reviews. ADMIN and SUPER_ADMIN may read any status.
+      operationId: getReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Review detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - Reviews
+      summary: Update editable review
+      description: Requires authentication and ownership of the review; restaurant association is immutable after creation.
+      operationId: updateReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReviewRequest'
+      responses:
+        '200':
+          description: Updated review
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Reviews
+      summary: Soft delete review
+      description: Requires authentication and ownership of the review.
+      operationId: deleteReview
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}/skip-verification:
+    post:
+      tags:
+      - Reviews
+      summary: Skip receipt verification and mark reference-only
+      description: Requires authentication and ownership of the review.
+      operationId: skipReviewVerification
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  enum:
+                  - USER_SKIPPED_RECEIPT
+      responses:
+        '200':
+          description: Review marked reference-only
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewStatusResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /receipts:
+    post:
+      tags:
+      - Receipts
+      summary: Upload receipt for asynchronous verification
+      description: Requires authentication and ownership of the target review; request reviewId must belong to the authenticated user. The server derives restaurant_id exclusively from the review record.
+      operationId: uploadReceipt
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - reviewId
+              - receiptImage
+              properties:
+                reviewId:
+                  type: string
+                  format: uuid
+                receiptImage:
+                  type: string
+                  format: binary
+                  description: JPG, PNG or HEIC, max 10MB.
+                latitude:
+                  type: number
+                  format: double
+                  minimum: -90
+                  maximum: 90
+                longitude:
+                  type: number
+                  format: double
+                  minimum: -180
+                  maximum: 180
+                gpsAccuracyMeters:
+                  type: number
+                  format: double
+                  minimum: 0
+                capturedAt:
+                  type: string
+                  format: date-time
+      responses:
+        '202':
+          description: Receipt accepted for processing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptUploadResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /receipts/{receiptVerificationId}:
+    get:
+      tags:
+      - Receipts
+      summary: Get receipt verification status
+      description: Requires authentication and ownership of the receipt verification record; receipt_verifications.user_id must match the authenticated user.
+      operationId: getReceiptVerification
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      responses:
+        '200':
+          description: Receipt status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptVerification'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /moderation/reports:
+    post:
+      tags:
+      - Moderation
+      summary: Report a review or entity
+      description: Requires authentication; reports are tied to the submitting user for abuse prevention and deduplication.
+      operationId: createModerationReport
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModerationReportRequest'
+      responses:
+        '201':
+          description: Report created
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - reportId
+                - status
+                properties:
+                  reportId:
+                    type: string
+                    format: uuid
+                  status:
+                    $ref: '#/components/schemas/ModerationReportStatus'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/queues/receipts:
+    get:
+      tags:
+      - Admin
+      summary: Admin receipt verification queue
+      description: Requires ADMIN or SUPER_ADMIN role.
+      operationId: adminListReceiptQueue
+      parameters:
+      - name: status
+        in: query
+        schema:
+          $ref: '#/components/schemas/ReceiptStatus'
+      - name: minRiskScore
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: maxRiskScore
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Receipt queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReceiptQueuePage'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/receipt-verifications/{receiptVerificationId}/image-url:
+    get:
+      tags:
+      - Admin
+      summary: Get short-lived receipt image URL
+      description: Requires ADMIN or SUPER_ADMIN role. Returns a short-lived signed URL for a redacted receipt image when available; raw private S3 object URLs must not be exposed.
+      operationId: adminGetReceiptImageUrl
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      responses:
+        '200':
+          description: Short-lived signed receipt image URL
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - receiptVerificationId
+                - signedUrl
+                - expiresAt
+                - redacted
+                properties:
+                  receiptVerificationId:
+                    type: string
+                    format: uuid
+                  signedUrl:
+                    type: string
+                    format: uri
+                  expiresAt:
+                    type: string
+                    format: date-time
+                  redacted:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /admin/receipt-verifications/{receiptVerificationId}/decision:
+    post:
+      tags:
+      - Admin
+      summary: Decide receipt verification case
+      description: Requires ADMIN or SUPER_ADMIN role. Decisions map to receipt status as follows: APPROVE_VERIFIED -> VERIFIED, MARK_REFERENCE_ONLY -> REFERENCE_ONLY, REJECT -> REJECTED unless keepReviewAsReference=true keeps the review reference-only, and REQUEST_MORE_REVIEW keeps the receipt in PENDING_ADMIN_REVIEW while writing an audit log/escalation marker so the admin queue can distinguish escalated cases from first-pass pending cases.
+      operationId: adminDecideReceipt
+      parameters:
+      - $ref: '#/components/parameters/ReceiptVerificationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminReceiptDecisionRequest'
+      responses:
+        '200':
+          description: Decision applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReceiptDecisionResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/moderation/reports:
+    get:
+      tags:
+      - Admin
+      summary: Admin moderation queue
+      description: Requires ADMIN or SUPER_ADMIN role.
+      operationId: adminListModerationReports
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      responses:
+        '200':
+          description: Moderation reports
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                - page
+                - pageSize
+                - total
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ModerationReport'
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+                  total:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin/moderation/reports/{reportId}/decision:
+    post:
+      tags:
+      - Admin
+      summary: Decide moderation report
+      description: Requires ADMIN or SUPER_ADMIN role. When action is RESTRICT_USER_REVIEW, restrictDurationDays is required and the backend sets users.review_restricted_until = now() + restrictDurationDays days.
+      operationId: adminDecideModerationReport
+      parameters:
+      - name: reportId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - action
+              - reason
+              properties:
+                action:
+                  type: string
+                  enum:
+                  - NO_ACTION
+                  - HIDE_REVIEW
+                  - DELETE_REVIEW
+                  - RESTRICT_USER_REVIEW
+                  - CLOSE_REPORT
+                reason:
+                  type: string
+                  minLength: 10
+                restrictDurationDays:
+                  type: integer
+                  minimum: 1
+                  maximum: 365
+                  description: Required only when action is RESTRICT_USER_REVIEW. Backend maps this duration to users.review_restricted_until; requests with this field for any other action, or missing it for RESTRICT_USER_REVIEW, must fail with 422 INVALID_MODERATION_DECISION_COMBINATION.
+      responses:
+        '200':
+          description: Decision applied
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - reportId
+                - status
+                - auditLogId
+                properties:
+                  reportId:
+                    type: string
+                    format: uuid
+                  status:
+                    $ref: '#/components/schemas/ModerationReportStatus'
+                  reviewStatus:
+                    $ref: '#/components/schemas/ReviewStatus'
+                  auditLogId:
+                    type: string
+                    format: uuid
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /gamification/me:
+    get:
+      tags:
+      - Gamification
+      summary: Get current user gamification summary
+      operationId: getMyGamification
+      responses:
+        '200':
+          description: Gamification summary
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - expPoints
+                - rankCode
+                - badges
+                properties:
+                  expPoints:
+                    type: integer
+                  rankCode:
+                    type: string
+                  badges:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          $ref: '#/components/responses/Error'
+  /users/me/deletion-request:
+    post:
+      tags:
+      - Users
+      - Privacy
+      summary: Request account deletion
+      operationId: requestAccountDeletion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountDeletionRequestInput'
+      responses:
+        '202':
+          description: Deletion requested
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    get:
+      tags:
+      - Users
+      - Privacy
+      summary: Get current account deletion request
+      operationId: getAccountDeletionRequest
+      responses:
+        '200':
+          description: Open deletion request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /users/me/deletion-request/cancel:
+    post:
+      tags:
+      - Users
+      - Privacy
+      summary: Cancel account deletion during grace period
+      operationId: cancelAccountDeletionRequest
+      responses:
+        '200':
+          description: Deletion request cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDeletionRequestResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /users/{userId}/block:
+    post:
+      tags:
+      - Users
+      - Moderation
+      summary: Block a user
+      operationId: blockUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BlockUserRequest'
+      responses:
+        '200':
+          description: User blocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BlockUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Users
+      - Moderation
+      summary: Unblock a user
+      operationId: unblockUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User unblocked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}/gps:
+    post:
+      tags:
+      - Reviews
+      - Receipts
+      summary: Submit optional GPS verification signal for a review
+      description: Requires authentication and ownership of the review; reviewId must belong to the authenticated user before GPS data can affect fraud scoring. GPS submission is accepted only while the linked receipt verification is UPLOADED, OCR_PROCESSING, or OCR_SUCCESS and before the fraud score is finalized. Once status becomes VERIFIED, REFERENCE_ONLY, REJECTED, or PENDING_ADMIN_REVIEW, GPS cannot trigger re-scoring and must be rejected with 409.
+      operationId: submitReviewGpsSignal
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GpsSignalRequest'
+      responses:
+        '200':
+          description: GPS signal accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GpsSignalResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookieAuth:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: HttpOnly Secure SameSite=Strict refresh token cookie issued by auth endpoints; raw token values must not be exposed to JavaScript or stored in localStorage.
+  parameters:
+    RestaurantId:
+      name: restaurantId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReviewId:
+      name: reviewId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReceiptVerificationId:
+      name: receiptVerificationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKeyRequired:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKeyOptional:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Error:
+      description: Standard error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    OtpRequest:
+      type: object
+      required:
+      - phoneNumber
+      properties:
+        phoneNumber:
+          type: string
+          minLength: 7
+          maxLength: 20
+          pattern: '^\+?[0-9]{7,15}$'
+          example: '+84901234567'
+    OtpRequestResponse:
+      type: object
+      required:
+      - requestId
+      - expiresInSeconds
+      - nextAllowedRequestAt
+      properties:
+        requestId:
+          type: string
+          format: uuid
+        expiresInSeconds:
+          type: integer
+          example: 120
+        nextAllowedRequestAt:
+          type: string
+          format: date-time
+    OtpVerifyRequest:
+      type: object
+      required:
+      - phoneNumber
+      - otpCode
+      properties:
+        phoneNumber:
+          type: string
+          minLength: 7
+          maxLength: 20
+          pattern: '^\+?[0-9]{7,15}$'
+          example: '+84901234567'
+        otpCode:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^[0-9]{6}$'
+    AuthResponse:
+      type: object
+      required:
+      - accessToken
+      - user
+      properties:
+        accessToken:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+    User:
+      type: object
+      required:
+      - id
+      - displayName
+      - role
+      - rankCode
+      - status
+      - expPoints
+      properties:
+        id:
+          type: string
+          format: uuid
+        phoneNumber:
+          type: string
+          description: Mask in admin/public contexts.
+        displayName:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum:
+          - USER
+          - MERCHANT
+          - ADMIN
+          - SUPER_ADMIN
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - REVIEW_RESTRICTED
+          - SUSPENDED
+          - DELETED
+        expPoints:
+          type: integer
+        rankCode:
+          type: string
+    Restaurant:
+      type: object
+      required:
+      - id
+      - name
+      - address
+      - status
+      - verifiedReviewCount
+      - referenceReviewCount
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        trustScore:
+          type: number
+          nullable: true
+        verifiedReviewCount:
+          type: integer
+        referenceReviewCount:
+          type: integer
+        status:
+          type: string
+          enum:
+          - ACTIVE
+    RestaurantDetail:
+      allOf:
+      - $ref: '#/components/schemas/Restaurant'
+      - type: object
+        properties:
+          description:
+            type: string
+            nullable: true
+          ratingBreakdown:
+            type: object
+            additionalProperties: true
+          ownerClaimStatus:
+            type: string
+            nullable: true
+    RestaurantPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Restaurant'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    CreateReviewRequest:
+      type: object
+      required:
+      - restaurantId
+      - foodRating
+      - priceRating
+      - serviceRating
+      - ambienceRating
+      - comment
+      properties:
+        restaurantId:
+          type: string
+          format: uuid
+        foodRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        priceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        serviceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        ambienceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          minLength: 30
+          maxLength: 5000
+          description: Minimum 30 characters for Reference reviews. Server must enforce 50 characters before allowing receipt verification / VERIFIED intent per BR-REV-002.
+        visitedAt:
+          type: string
+          format: date-time
+    UpdateReviewRequest:
+      type: object
+      minProperties: 1
+      properties:
+        foodRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        priceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        serviceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        ambienceRating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        comment:
+          type: string
+          minLength: 30
+          maxLength: 5000
+          description: Editable review text. Server must enforce 50 characters before allowing receipt verification / VERIFIED intent per BR-REV-002.
+    CreateReviewResponse:
+      type: object
+      required:
+      - reviewId
+      - status
+      - nextStep
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        nextStep:
+          type: string
+          enum:
+          - UPLOAD_RECEIPT
+          - SKIP_VERIFICATION
+    ReviewStatusResponse:
+      type: object
+      required:
+      - reviewId
+      - status
+      - verificationStatus
+      - trustLabel
+      - publicVisibility
+      - trustWeightBucket
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReviewStatus'
+        verificationStatus:
+          $ref: '#/components/schemas/ReviewVerificationStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        publicVisibility:
+          $ref: '#/components/schemas/PublicVisibility'
+        trustWeightBucket:
+          $ref: '#/components/schemas/TrustWeightBucket'
+    Review:
+      allOf:
+      - $ref: '#/components/schemas/ReviewStatusResponse'
+      - type: object
+        required:
+        - id
+        - restaurantId
+        - foodRating
+        - priceRating
+        - serviceRating
+        - ambienceRating
+        - comment
+        - createdAt
+        properties:
+          id:
+            type: string
+            format: uuid
+          restaurantId:
+            type: string
+            format: uuid
+          userId:
+            type: string
+            format: uuid
+            description: Omit on unauthenticated/public responses. Populate only for the review owner and ADMIN/SUPER_ADMIN callers.
+          foodRating:
+            type: integer
+          priceRating:
+            type: integer
+          serviceRating:
+            type: integer
+          ambienceRating:
+            type: integer
+          averageRating:
+            type: number
+          comment:
+            type: string
+          visitedAt:
+            type: string
+            format: date-time
+            nullable: true
+          createdAt:
+            type: string
+            format: date-time
+    ReviewPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Review'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    ReceiptUploadResponse:
+      type: object
+      required:
+      - receiptVerificationId
+      - status
+      - processingStatus
+      properties:
+        receiptVerificationId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReceiptStatus'
+          description: Current persisted receipt verification status for the receiptVerificationId. On initial 202 acceptance this is usually UPLOADED or OCR_PROCESSING; on idempotency-key replay it must return the latest stored status reached by the worker, such as OCR_SUCCESS, VERIFIED, PENDING_ADMIN_REVIEW, REFERENCE_ONLY, REJECTED, or OCR_FAILED.
+        processingStatus:
+          $ref: '#/components/schemas/ReceiptStatus'
+          description: Client-facing async pipeline state to drive polling/progress UI. On first acceptance it reflects the processing step just started (UPLOADED or OCR_PROCESSING); on idempotency-key replay it mirrors the latest pipeline state and must not be interpreted as a separate HTTP acceptance result.
+    ReceiptVerification:
+      type: object
+      required:
+      - id
+      - reviewId
+      - status
+      - reviewStatusSnapshot
+      - trustLabel
+      - fraudRiskBucket
+      properties:
+        id:
+          type: string
+          format: uuid
+        reviewId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/ReceiptStatus'
+        reviewStatusSnapshot:
+          $ref: '#/components/schemas/ReviewStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        ocrSimilarity:
+          type: number
+          nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration.
+        gpsDistanceMeters:
+          type: number
+          nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration.
+        fraudRiskBucket:
+          type: string
+          description: Coarse user-facing fraud signal; exact numeric fraud scores and raw sub-signals are admin-only to avoid adversarial calibration.
+          enum:
+          - LOW
+          - MEDIUM
+          - HIGH
+          - UNKNOWN
+        decision:
+          type: string
+          nullable: true
+    CreateModerationReportRequest:
+      type: object
+      required:
+      - entityType
+      - entityId
+      - reasonCode
+      properties:
+        entityType:
+          type: string
+          enum:
+          - REVIEW
+        entityId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          enum:
+          - SPAM_OR_FAKE
+          - ABUSIVE_LANGUAGE
+          - PRIVACY
+          - OTHER
+        description:
+          type: string
+          maxLength: 1000
+    ModerationReport:
+      type: object
+      required:
+      - id
+      - entityType
+      - entityId
+      - reasonCode
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        entityType:
+          type: string
+        entityId:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        reporterId:
+          type: string
+          format: uuid
+          description: Admin-only reporter identifier; omit from public-facing responses.
+        maskedReporter:
+          type: string
+          description: Admin-facing masked reporter display value for abuse-pattern review.
+        status:
+          $ref: '#/components/schemas/ModerationReportStatus'
+        createdAt:
+          type: string
+          format: date-time
+    AdminReceiptQueuePage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required:
+            - id
+            - reviewId
+            - restaurantName
+            - status
+            - riskScore
+            - ageHours
+            properties:
+              id:
+                type: string
+                format: uuid
+              reviewId:
+                type: string
+                format: uuid
+              maskedUser:
+                type: string
+              restaurantName:
+                type: string
+              status:
+                $ref: '#/components/schemas/ReceiptStatus'
+              riskScore:
+                type: integer
+              ocrSimilarity:
+                type: number
+                nullable: true
+              gpsBucket:
+                type: string
+                enum:
+                - UNDER_200M
+                - BETWEEN_200_500M
+                - OVER_500M
+                - NOT_PROVIDED
+                - UNKNOWN
+              imageUrlAvailable:
+                type: boolean
+                description: True when an admin can request a short-lived signed URL through adminGetReceiptImageUrl.
+              ageHours:
+                type: number
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    AdminReceiptDecisionRequest:
+      type: object
+      required:
+      - decision
+      - reason
+      properties:
+        decision:
+          type: string
+          enum:
+          - APPROVE_VERIFIED
+          - MARK_REFERENCE_ONLY
+          - REJECT
+          - REQUEST_MORE_REVIEW
+          description: REQUEST_MORE_REVIEW leaves newStatus as PENDING_ADMIN_REVIEW and must create an audit/escalation record with the admin reason; clients should surface it separately from first-pass pending cases.
+        reason:
+          type: string
+          minLength: 10
+        keepReviewAsReference:
+          type: boolean
+          description: Only valid for REJECT when admin chooses to keep review as reference-only. Requests with keepReviewAsReference=true and any non-REJECT decision must fail with 422 INVALID_RECEIPT_DECISION_COMBINATION.
+    AdminReceiptDecisionResponse:
+      type: object
+      required:
+      - receiptVerificationId
+      - newStatus
+      - reviewStatus
+      - auditLogId
+      properties:
+        receiptVerificationId:
+          type: string
+          format: uuid
+        newStatus:
+          $ref: '#/components/schemas/ReceiptStatus'
+        reviewStatus:
+          $ref: '#/components/schemas/ReviewStatus'
+        trustLabel:
+          $ref: '#/components/schemas/TrustLabel'
+        auditLogId:
+          type: string
+          format: uuid
+    ReviewStatus:
+      type: string
+      enum:
+      - DRAFT
+      - SUBMITTED
+      - VERIFIED
+      - REFERENCE_ONLY
+      - PENDING_ADMIN_REVIEW
+      - REJECTED
+      - HIDDEN
+      - DELETED
+    ReviewVerificationStatus:
+      type: string
+      enum:
+      - UNVERIFIED
+      - PROCESSING
+      - SKIPPED
+      - EXPIRED_NO_RECEIPT
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+      - DUPLICATE_REJECTED
+      - RECEIPT_REJECTED_REFERENCE_ALLOWED
+      - DELETED
+    ReceiptStatus:
+      type: string
+      enum:
+      - UPLOADED
+      - HASH_CHECKING
+      - DUPLICATE_DETECTED
+      - OCR_PROCESSING
+      - OCR_SUCCESS
+      - OCR_FAILED
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+    TrustLabel:
+      type: string
+      enum:
+      - PENDING_VERIFICATION
+      - PROCESSING
+      - VERIFIED
+      - PENDING_ADMIN_REVIEW
+      - REFERENCE_ONLY
+      - REJECTED
+      - HIDDEN
+      - DELETED
+    PublicVisibility:
+      type: string
+      enum:
+      - PUBLIC
+      - PRIVATE
+      - PRIVATE_UNTIL_DECISION
+    TrustWeightBucket:
+      type: string
+      enum:
+      - HIGH
+      - LOW
+      - NONE
+    ModerationReportStatus:
+      type: string
+      enum:
+      - SUBMITTED
+      - TRIAGED
+      - PENDING_ADMIN_REVIEW
+      - ACTION_TAKEN
+      - REJECTED
+      - CLOSED
+    SuccessResponse:
+      type: object
+      required:
+      - success
+      properties:
+        success:
+          type: boolean
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          - requestId
+          properties:
+            code:
+              type: string
+              enum:
+              - VALIDATION_ERROR
+              - AUTH_REQUIRED
+              - TOKEN_EXPIRED
+              - FORBIDDEN
+              - NOT_FOUND
+              - RATE_LIMITED
+              - OTP_INVALID
+              - OTP_EXPIRED
+              - FILE_TOO_LARGE
+              - UNSUPPORTED_FILE_TYPE
+              - DUPLICATE_RECEIPT_HASH
+              - REVIEW_NOT_EDITABLE
+              - RESTAURANT_NOT_ACTIVE
+              - CLAIM_CONFLICT
+              - REPORT_DUPLICATE
+              - PROVIDER_UNAVAILABLE
+              - IDEMPOTENCY_KEY_REQUIRED
+              - IDEMPOTENCY_KEY_INVALID
+              - IDEMPOTENCY_CONFLICT
+              - REQUEST_IN_PROGRESS
+              - REVIEW_VERIFICATION_EXPIRED
+              - ADMIN_REASON_REQUIRED
+              - DELETION_REQUEST_ALREADY_EXISTS
+              - DELETION_REQUEST_NOT_FOUND
+              - CANNOT_BLOCK_SELF
+              - USER_ALREADY_BLOCKED
+              - GPS_PERMISSION_REQUIRED
+              - INVALID_GPS_SIGNAL
+              - INVALID_RECEIPT_DECISION_COMBINATION
+              - INVALID_MODERATION_DECISION_COMBINATION
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                additionalProperties: true
+            requestId:
+              type: string
+    AccountDeletionRequestInput:
+      type: object
+      required:
+      - confirmationText
+      properties:
+        confirmationText:
+          type: string
+          const: XÓA TÀI KHOẢN
+          description: User-visible confirmation phrase required exactly for irreversible deletion.
+        reason:
+          type: string
+          maxLength: 1000
+    AccountDeletionRequestResponse:
+      type: object
+      required:
+      - deletionRequestId
+      - status
+      properties:
+        deletionRequestId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - REQUESTED
+          - PROCESSING
+          - COMPLETED
+          - CANCELLED
+        scheduledDeletionAt:
+          type: string
+          format: date-time
+          nullable: true
+    BlockUserRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          enum:
+          - HARASSMENT
+          - SPAM
+          - ABUSIVE_LANGUAGE
+          - PRIVACY
+          - OTHER
+        sourceReviewId:
+          type: string
+          format: uuid
+    BlockUserResponse:
+      type: object
+      required:
+      - blockedUserId
+      - blockedAt
+      properties:
+        blockedUserId:
+          type: string
+          format: uuid
+        blockedAt:
+          type: string
+          format: date-time
+    GpsSignalRequest:
+      type: object
+      required:
+      - latitude
+      - longitude
+      - accuracyMeters
+      - capturedAt
+      properties:
+        latitude:
+          type: number
+          format: double
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          format: double
+          minimum: -180
+          maximum: 180
+        accuracyMeters:
+          type: number
+          format: double
+          minimum: 0
+        capturedAt:
+          type: string
+          format: date-time
+          description: Client-captured timestamp used only as metadata. Server fraud scoring must compare the 1-hour GPS freshness threshold against the server-side receipt submission timestamp and must reject or downgrade GPS signals whose capturedAt is outside the server-enforced freshness window.
+    GpsSignalResponse:
+      type: object
+      required:
+      - reviewId
+      - gpsSignalAccepted
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        gpsSignalAccepted:
+          type: boolean
+        gpsDistanceMeters:
+          type: number
+          nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration of GPS spoofing distance.
