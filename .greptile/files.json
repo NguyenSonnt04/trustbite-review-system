@@ -9,6 +9,14 @@
       "description": "Repository structure, setup commands, and runtime configuration."
     },
     {
+      "path": "package.json",
+      "description": "Root workspace scripts and package orchestration."
+    },
+    {
+      "path": "docker-compose.yml",
+      "description": "Local PostgreSQL, LocalStack, and pgAdmin infrastructure baseline."
+    },
+    {
       "path": "docs/FEATURE_INTAKE.md",
       "description": "Risk lane classification rules for tiny, normal, and high-risk work."
     },

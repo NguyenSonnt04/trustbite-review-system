@@ -5,7 +5,7 @@
   "statusCheck": true,
   "updateExistingSummaryComment": true,
   "fixWithAI": true,
-  "ignorePatterns": "node_modules/**\n.next/**\ndist/**\nbuild/**\ncoverage/**\n*.log\nclient/package-lock.json\nserver/package-lock.json\npackage-lock.json\n.env\n.env.*\n!.env.example",
+  "ignorePatterns": "node_modules/**\n.next/**\ndist/**\nbuild/**\ncoverage/**\n*.log\nclient/package-lock.json\nserver/package-lock.json\npackage-lock.json\n.env\n.env.*\n!.env.example\nmobile/.dart_tool/**\nmobile/build/**\nmobile/.flutter-plugins\nmobile/.flutter-plugins-dependencies",
   "summarySection": {
     "included": true,
     "collapsible": true,
