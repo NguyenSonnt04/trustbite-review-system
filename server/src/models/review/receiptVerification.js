@@ -15,14 +15,14 @@ export class ReceiptVerificationModel {
     this.status = data.status || 'UPLOADED'; // 'UPLOADED' | 'OCR_PROCESSING' | 'OCR_DONE' | 'VERIFIED' | 'REJECTED'
     this.ocr_text = data.ocr_text || null; // Raw OCR text
     this.ocr_restaurant_name = data.ocr_restaurant_name || null;
-    this.ocr_similarity = data.ocr_similarity ? parseFloat(data.ocr_similarity) : null;
+    this.ocr_similarity = data.ocr_similarity != null ? parseFloat(data.ocr_similarity) : null;
     this.ocr_receipt_time = data.ocr_receipt_time ? new Date(data.ocr_receipt_time) : null;
     this.ocr_invoice_no = data.ocr_invoice_no || null;
-    this.ocr_total_amount = data.ocr_total_amount ? parseFloat(data.ocr_total_amount) : null;
-    this.gps_latitude = data.gps_latitude ? parseFloat(data.gps_latitude) : null;
-    this.gps_longitude = data.gps_longitude ? parseFloat(data.gps_longitude) : null;
-    this.gps_accuracy_meters = data.gps_accuracy_meters ? parseFloat(data.gps_accuracy_meters) : null;
-    this.gps_distance_meters = data.gps_distance_meters ? parseFloat(data.gps_distance_meters) : null;
+    this.ocr_total_amount = data.ocr_total_amount != null ? parseFloat(data.ocr_total_amount) : null;
+    this.gps_latitude = data.gps_latitude != null ? parseFloat(data.gps_latitude) : null;
+    this.gps_longitude = data.gps_longitude != null ? parseFloat(data.gps_longitude) : null;
+    this.gps_accuracy_meters = data.gps_accuracy_meters != null ? parseFloat(data.gps_accuracy_meters) : null;
+    this.gps_distance_meters = data.gps_distance_meters != null ? parseFloat(data.gps_distance_meters) : null;
     this.fraud_risk_score = data.fraud_risk_score || 0;
     this.decision = data.decision || null; // 'VERIFIED' | 'REJECTED' | 'REFERENCE_ONLY'
     this.redacted_file_url = data.redacted_file_url || null; // S3 path ẩn thông tin PII

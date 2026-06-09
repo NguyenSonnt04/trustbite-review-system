@@ -7,7 +7,7 @@ export class MenuItemModel {
     this.id = data.id || null;
     this.restaurant_id = data.restaurant_id || null;
     this.name = data.name || null;
-    this.price_default = data.price_default ? parseFloat(data.price_default) : null;
+    this.price_default = data.price_default != null ? parseFloat(data.price_default) : null;
     this.currency = data.currency || 'VND';
     this.status = data.status || 'ACTIVE'; // 'ACTIVE' | 'ARCHIVED'
     this.created_at = data.created_at ? new Date(data.created_at) : null;

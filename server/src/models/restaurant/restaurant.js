@@ -10,11 +10,11 @@ export class RestaurantModel {
     this.description = data.description || null;
     this.phone_number = data.phone_number || null;
     this.address = data.address || null;
-    this.latitude = data.latitude ? parseFloat(data.latitude) : null;
-    this.longitude = data.longitude ? parseFloat(data.longitude) : null;
+    this.latitude = data.latitude != null ? parseFloat(data.latitude) : null;
+    this.longitude = data.longitude != null ? parseFloat(data.longitude) : null;
     this.geo = data.geo || null; // PostGIS Geography Point
     this.status = data.status || 'DRAFT'; // 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'CLOSED'
-    this.trust_score = data.trust_score ? parseFloat(data.trust_score) : 5.00;
+    this.trust_score = data.trust_score != null ? parseFloat(data.trust_score) : 5.00;
     this.verified_review_count = data.verified_review_count || 0;
     this.reference_review_count = data.reference_review_count || 0;
     this.created_at = data.created_at ? new Date(data.created_at) : null;

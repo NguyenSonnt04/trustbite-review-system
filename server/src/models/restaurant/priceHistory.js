@@ -7,7 +7,7 @@ export class PriceHistoryModel {
     this.id = data.id || null;
     this.menu_item_id = data.menu_item_id || null;
     this.branch_id = data.branch_id || null; // Null nếu đổi giá chung cho cả thương hiệu
-    this.observed_price = data.observed_price ? parseFloat(data.observed_price) : null;
+    this.observed_price = data.observed_price != null ? parseFloat(data.observed_price) : null;
     this.currency = data.currency || 'VND';
     this.source = data.source || null; // 'OCR_RECEIPT' | 'MERCHANT_UPDATE' | 'MANUAL'
     this.review_id = data.review_id || null;
