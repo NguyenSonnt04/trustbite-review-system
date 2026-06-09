@@ -1420,8 +1420,10 @@ components:
           format: uuid
         status:
           $ref: '#/components/schemas/ReceiptStatus'
+          description: Current persisted receipt verification status for the receiptVerificationId. On initial 202 acceptance this is usually UPLOADED or OCR_PROCESSING; on idempotency-key replay it must return the latest stored status reached by the worker, such as OCR_SUCCESS, VERIFIED, PENDING_ADMIN_REVIEW, REFERENCE_ONLY, REJECTED, or OCR_FAILED.
         processingStatus:
           $ref: '#/components/schemas/ReceiptStatus'
+          description: Client-facing async pipeline state to drive polling/progress UI. On first acceptance it reflects the processing step just started (UPLOADED or OCR_PROCESSING); on idempotency-key replay it mirrors the latest pipeline state and must not be interpreted as a separate HTTP acceptance result.
     ReceiptVerification:
       type: object
       required:

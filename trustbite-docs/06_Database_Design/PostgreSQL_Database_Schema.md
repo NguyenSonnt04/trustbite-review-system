@@ -202,6 +202,8 @@ CREATE TABLE receipt_verifications (
   ocr_restaurant_name VARCHAR(200),
   ocr_similarity NUMERIC(5,2),
   ocr_receipt_time TIMESTAMPTZ,
+  ocr_invoice_no VARCHAR(120),
+  ocr_total_amount NUMERIC(14,2),
   gps_latitude NUMERIC(10,7),
   gps_longitude NUMERIC(10,7),
   gps_accuracy_meters NUMERIC(10,2),
