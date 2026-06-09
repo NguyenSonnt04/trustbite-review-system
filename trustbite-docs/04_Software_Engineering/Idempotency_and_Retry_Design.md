@@ -37,6 +37,7 @@ Quy tắc mobile:
 
 - Một user intent tạo mới một key.
 - Retry cùng intent phải gửi lại đúng key cũ.
+- Tất cả trường đóng góp vào `request_hash` — bao gồm `capturedAt` — phải được lưu cục bộ khi tạo key và gửi lại nguyên vẹn, không tính lại, trong mọi retry cùng key. Tạo mới `capturedAt` trên mỗi lần retry sẽ làm `request_hash` không khớp và trả về `409 IDEMPOTENCY_CONFLICT`.
 - Khi người dùng chọn file khác hoặc sửa payload quan trọng, app phải tạo key mới.
 - Key không được chứa thông tin cá nhân.
 - Nếu app bị kill khi upload đang xử lý, app lưu key cục bộ tạm thời để khôi phục trạng thái bằng polling/refetch.

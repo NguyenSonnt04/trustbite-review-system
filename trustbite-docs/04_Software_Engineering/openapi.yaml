@@ -1454,12 +1454,14 @@ components:
         ocrSimilarity:
           type: number
           nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration.
         gpsDistanceMeters:
           type: number
           nullable: true
+          description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration.
         fraudRiskBucket:
           type: string
-          description: Coarse user-facing fraud signal; exact numeric fraud scores are admin-only to avoid adversarial calibration.
+          description: Coarse user-facing fraud signal; exact numeric fraud scores and raw sub-signals are admin-only to avoid adversarial calibration.
           enum:
           - LOW
           - MEDIUM
