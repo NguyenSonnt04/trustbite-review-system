@@ -149,18 +149,20 @@ Các chức năng không phục vụ trực tiếp 3 giả thuyết này đượ
 
 TrustBite được định hướng **mobile-first**. Mobile app là client chính cho người dùng cuối; web được dùng cho admin portal và merchant portal.
 
-| Lớp | Công nghệ đề xuất |
+| Lớp | Công nghệ MVP theo task manager |
 |---|---|
-| Mobile app | React Native + TypeScript là phương án ưu tiên MVP; Flutter + Dart là phương án thay thế nếu team mạnh về Flutter |
-| Admin portal | Next.js, TypeScript |
+| Mobile app | Flutter + Dart |
+| Admin portal | Next.js |
 | Merchant portal | Next.js, TypeScript ở V1.1 hoặc khi cần kiểm chứng giả thuyết chủ quán |
-| Backend | Node.js, NestJS, TypeScript, Prisma ORM |
+| Backend | Node.js + Express native ES modules trong repo hiện tại |
 | Database | PostgreSQL + PostGIS |
 | Cache/Queue | Redis + BullMQ |
 | OCR | AWS Textract hoặc OCR provider tương đương |
 | Storage | S3-compatible object storage |
 | Auth | OTP SMS, access token + refresh/session token |
 | Infra | AWS container/managed services, RDS, S3, Redis, mobile beta distribution |
+
+React Native, NestJS, Prisma hoặc migration TypeScript toàn diện chỉ được coi là hướng tương lai nếu có story/decision riêng. Trong MVP hiện tại, tài liệu triển khai phải ưu tiên stack trong task manager và codebase hiện có.
 
 ---
 

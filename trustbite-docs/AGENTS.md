@@ -83,14 +83,15 @@ assets/                       Hình ảnh/sơ đồ
 
 ## Công nghệ tham chiếu hiện tại
 
-- Mobile MVP ưu tiên: React Native + TypeScript; Flutter + Dart là phương án thay thế nếu team chốt lại.
-- Admin/Merchant web: Next.js + TypeScript.
-- Backend mục tiêu trong bộ tài liệu nhập khẩu: Node.js 20+ LTS, NestJS, TypeScript, Prisma ORM.
-- Backend hiện có trong repo: `server/` đang là Node.js + Express native ES modules; khi đánh giá hoặc cập nhật theo code hiện tại, dùng Express ESM trừ khi có quyết định chính thức đổi stack.
-- Database/cache/queue: PostgreSQL 15+ + PostGIS, Redis + BullMQ.
-- OCR/storage/auth/infra: AWS Textract hoặc tương đương, S3-compatible storage, OTP SMS, AWS managed/container services.
+Task manager của team là nguồn chuẩn cho stack MVP đang triển khai:
 
-Nếu chốt framework mobile khác hoặc đổi kiến trúc lớn, cập nhật `04_Software_Engineering/Mobile_App_Architecture.md` và các tài liệu liên quan trước khi coi là quyết định chính thức.
+- Mobile MVP: Flutter + Dart.
+- Admin web: Next.js.
+- Backend hiện có trong repo: `server/` là Node.js + Express native ES modules.
+- Database/cache/queue: PostgreSQL 15+ + PostGIS, Redis + BullMQ.
+- OCR/storage/auth/infra: AWS Textract hoặc tương đương, S3-compatible storage, OTP SMS, AWS managed/container services như RDS, S3, ECS/container hosting và Redis managed.
+
+React Native, NestJS, Prisma hoặc chuyển toàn bộ sang TypeScript chỉ là phương án tương lai/alternative. Không giả định các stack đó cho story mới nếu chưa có story/decision riêng được PO/Engineering chốt.
 
 ## Lệnh hữu ích trong repo
 

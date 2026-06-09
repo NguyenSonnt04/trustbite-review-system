@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Thiết kế kiến trúc hệ thống |
-| Phiên bản | v2.2.0 |
+| Phiên bản | v2.7.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Kiến trúc sư hệ thống |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -29,7 +29,7 @@ Không dùng microservices đầy đủ ở MVP trừ khi có nhu cầu vận h�
 
 ```mermaid
 graph TD
-    Mobile[Mobile App: React Native hoặc Flutter] --> API[NestJS API]
+    Mobile[Mobile App: Flutter + Dart] --> API[Node.js Express ESM API]
     Admin[Admin Portal: Next.js] --> API
     Merchant[Merchant Portal P1: Next.js] --> API
 
@@ -59,6 +59,8 @@ Mobile app không xử lý quyết định gian lận ở client. Client chỉ t
 ---
 
 ## 4. Module phía backend
+
+Các module dưới đây là ranh giới logic trong Express routes/controllers/services hiện tại. Tên `Module` không hàm ý NestJS; nếu sau này chuyển sang NestJS phải có story/decision riêng.
 
 | Module | Trách nhiệm |
 |---|---|
