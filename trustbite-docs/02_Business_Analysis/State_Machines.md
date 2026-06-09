@@ -65,7 +65,7 @@ VERIFIED / REFERENCE_ONLY / PENDING_ADMIN_REVIEW / REJECTED
 
 ```text
 UPLOADED
-→ DUPLICATE_CHECKING
+→ HASH_CHECKING
   → DUPLICATE_DETECTED
       → REJECTED
   → OCR_PROCESSING
@@ -82,7 +82,7 @@ UPLOADED
 | Trạng thái | Ý nghĩa |
 |---|---|
 | UPLOADED | File đã được lưu riêng tư. |
-| DUPLICATE_CHECKING | Đang kiểm tra trùng lặp (SHA-256 ảnh và Composite Transaction Hash). |
+| HASH_CHECKING | Đang kiểm tra trùng lặp (SHA-256 ảnh và Composite Transaction Hash). |
 | OCR_PROCESSING | Đang OCR. |
 | OCR_SUCCESS | OCR hoàn tất. |
 | OCR_FAILED | OCR lỗi kỹ thuật hoặc không đọc được. |

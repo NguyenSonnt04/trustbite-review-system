@@ -84,12 +84,13 @@ Loại commit khuyến nghị:
 
 ## 6. Coding convention baseline
 
-### 6.1. TypeScript/NestJS/Next.js/React Native
+### 6.1. Current implementation stack and target-doc caveat
 
-- Bật TypeScript strict mode nếu khả thi.
-- Tên biến/hàm dùng `camelCase`; type/interface/class dùng `PascalCase`.
+- Repo hiện tại dùng JavaScript Express native ESM cho backend, Next.js/React cho web client, và Flutter/Dart cho mobile skeleton; không giả định NestJS, Prisma, React Native hoặc TypeScript cho code đang tồn tại nếu chưa có story/decision chuyển stack.
+- Với JavaScript/React/Flutter hiện tại: tên biến/hàm dùng `camelCase`; class/component/type Dart dùng `PascalCase`; giữ module ESM rõ ràng và tránh decorator/DI pattern chỉ dành cho NestJS.
+- Nếu một story tương lai chọn TypeScript/NestJS/React Native, phải bật TypeScript strict mode nếu khả thi và ghi rõ phạm vi chuyển stack trong story/decision trước khi áp dụng convention đó.
 - Enum/status nghiệp vụ phải khớp `State_Machines.md` và `Status_Mapping.md`.
-- DTO/request/response phải có validation rõ ràng.
+- DTO/request/response hoặc request parser phải có validation rõ ràng ở API boundary.
 - Không hard-code endpoint, secret, bucket, provider key trong source.
 - API client mobile/admin nên sinh từ OpenAPI hoặc có contract test tương đương.
 
