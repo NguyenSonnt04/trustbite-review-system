@@ -45,7 +45,7 @@ This repository contains the structured skeleton folders for development.
 ## Local Development Setup
 
 ### 1. Requirements
-- Node.js (v18+)
+- Node.js (v20.9+; CI and Docker images currently use Node.js 24)
 - Docker & Docker Compose
 - Flutter SDK 3.4+ for mobile development
 
