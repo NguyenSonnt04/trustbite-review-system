@@ -134,7 +134,18 @@ Nếu key khác nhưng file hash đã tồn tại trong receipt verification đ�
 
 ---
 
-## 9. Error code bổ sung
+## 9. Cơ chế khôi phục key `IN_PROGRESS` bị treo
+
+- Khi tạo idempotency key trạng thái `IN_PROGRESS`, đặt `locked_until = now() + interval '2 minutes'` cho phần xử lý đồng bộ của API.
+- Công việc OCR/fraud chạy lâu phải được theo dõi bằng resource `receipt_verifications` đã tạo, không được giữ idempotency key ở trạng thái khóa trong toàn bộ thời gian worker xử lý.
+- Khi retry cùng key và cùng `request_hash` trong lúc `locked_until > now()`, backend trả resource hiện có để client poll nếu đã có; nếu chưa có resource thì trả `409 REQUEST_IN_PROGRESS`.
+- Khi retry cùng key và cùng `request_hash` sau khi `locked_until <= now()`, backend phải chuyển key từ `IN_PROGRESS` sang `FAILED_RETRYABLE` trong một transaction rồi cho phép chạy lại request với cùng `Idempotency-Key`.
+- Background recovery job nên chạy ít nhất mỗi phút để đánh dấu key hết khóa bằng điều kiện `status = 'IN_PROGRESS' AND locked_until <= now()` thành `FAILED_RETRYABLE`.
+- `FAILED_RETRYABLE` giữ lại `request_hash` gốc để phát hiện conflict, nhưng không được replay `response_body` chưa hoàn chỉnh.
+
+---
+
+## 10. Error code bổ sung
 
 | Code | HTTP | Ý nghĩa |
 |---|---:|---|
@@ -145,19 +156,12 @@ Nếu key khác nhưng file hash đã tồn tại trong receipt verification đ�
 
 ---
 
-## 10. Tiêu chí nghiệm thu
+## 11. Tiêu chí nghiệm thu
 
 - Retry `POST /receipts` cùng key/payload không tạo thêm row `receipt_verifications`.
 - Retry cùng key nhưng file khác trả `409 IDEMPOTENCY_CONFLICT`.
 - Retry sau khi response bị mất trả lại cùng `receiptVerificationId`.
+- Retry sau khi `locked_until` hết hạn chuyển key treo sang `FAILED_RETRYABLE` và cho phép chạy lại cùng key/payload.
 - Duplicate hash với key khác vẫn tạo fraud flag đúng rule.
 - Không log raw file content, OTP, token, GPS raw ngoài nơi được phép.
 - Có integration test mô phỏng timeout/mất mạng giữa lúc upload và nhận response.
-
-## 9. Recovery for stale `IN_PROGRESS` keys
-
-- When creating an `IN_PROGRESS` idempotency key, set `locked_until = now() + interval '2 minutes'` for synchronous API work. Long-running OCR/fraud work must be represented by the created `receipt_verifications` resource, not by keeping the idempotency key locked.
-- On retry, if a matching key is `IN_PROGRESS` and `locked_until > now()`, return `202` with the existing resource if available, otherwise `409 REQUEST_IN_PROGRESS`.
-- On retry, if a matching key is `IN_PROGRESS` and `locked_until <= now()`, the backend must atomically transition it to `FAILED_RETRYABLE` and allow the same `Idempotency-Key` + `request_hash` to restart the request.
-- A background recovery job should run at least once per minute and mark expired `IN_PROGRESS` keys as `FAILED_RETRYABLE` using `WHERE status = 'IN_PROGRESS' AND locked_until <= now()`.
-- `FAILED_RETRYABLE` retains the original `request_hash` for conflict detection; it must not replay a partial response body.
