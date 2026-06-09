@@ -3,16 +3,16 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Migration/seed production readiness |
-| Phiên bản | v1.1.0 |
+| Phiên bản | v1.2.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | DBA / Backend Lead / QA Lead |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
 ## 1. Mục tiêu
 
-Đảm bảo schema PostgreSQL/Prisma có thể triển khai an toàn lên staging/beta/production, có rollback hợp lý và có seed data đủ cho QA/UAT.
+Đảm bảo schema PostgreSQL và migration scripts có thể triển khai an toàn lên staging/beta/production, có rollback hợp lý và có seed data đủ cho QA/UAT.
 
 ---
 
@@ -101,7 +101,7 @@ Ghi chú: Nếu repo migration thực tế đã có file được đánh số, t
 
 ## 8. Definition of Done
 
-- Prisma/schema thực tế khớp `PostgreSQL_Database_Schema.md`.
+- Migration/schema thực tế khớp `PostgreSQL_Database_Schema.md`.
 - Tất cả bảng P0 có index tối thiểu theo query path.
 - Dữ liệu seed đủ để chạy toàn bộ test P0 trong `Test_Plan.md` và `Mobile_Test_Plan.md`.
 - Không có PII thật trong seed/test fixtures.
