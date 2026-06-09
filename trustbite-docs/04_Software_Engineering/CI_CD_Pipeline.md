@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Quy trình CI/CD và triển khai |
-| Phiên bản | v2.5.0 |
+| Phiên bản | v2.6.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | DevOps |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
@@ -27,7 +27,40 @@ Quy tắc:
 
 ---
 
-## 2. Quy trình CI
+## 2. Baseline hiện tại của repository
+
+Tính đến baseline CI/security/container của PR #4, repository mới triển khai lớp kiểm tra nền tảng, chưa triển khai đầy đủ CD staging/production.
+
+Đã triển khai:
+
+- Pull request và push workflow cho `main`.
+- Client dependency install, lint và production build.
+- Server dependency install và kiểm tra cú pháp JavaScript vì `server/package.json` chưa có `build`/`test` script.
+- Mobile dependency install và `flutter test`.
+- Harness CLI bootstrap, brownfield import và matrix query trong CI.
+- Client/server Docker image build không push registry.
+- Trivy image scan ở chế độ report-only cho baseline build.
+- Dependency Review và CodeQL chạy ở chế độ tolerant/report-only khi repository chưa bật đầy đủ GitHub Advanced Security/code scanning.
+- Không dùng AWS credentials, registry credentials hoặc deploy permissions trong baseline.
+
+Chưa triển khai:
+
+- Format check riêng ngoài lint.
+- Client unit test.
+- Server unit/integration test và backend build proof.
+- API/DB integration test.
+- Database migration validation và rollback automation.
+- OpenAPI contract validation.
+- Generated API client/schema validation cho mobile.
+- Mobile staging/beta/production build artifact.
+- Registry push, staging deploy, production deploy và deploy approval.
+- Blocking CodeQL/SARIF/code scanning khi repository security features chưa được bật.
+
+Vì vậy các mục bên dưới là yêu cầu mục tiêu cho MVP pipeline. Không nên hiểu baseline PR #4 là đã hoàn thành toàn bộ tài liệu này.
+
+---
+
+## 3. Quy trình CI mục tiêu
 
 Mỗi pull request cần chạy tối thiểu:
 
@@ -39,20 +72,29 @@ Mỗi pull request cần chạy tối thiểu:
 6. Kiểm tra OpenAPI contract nếu có thay đổi API.
 7. Kiểm tra mobile type/schema nếu app dùng generated API client.
 
+Yêu cầu theo giai đoạn:
+
+| Giai đoạn | Yêu cầu tối thiểu |
+|---|---|
+| Baseline hiện tại | Client lint/build, server syntax check, mobile test, Harness matrix, Docker build/scan report-only. |
+| Server test baseline | Thêm server test script, health/API smoke test và CI job tương ứng. |
+| API/DB baseline | Thêm OpenAPI validation, migration validation và integration test khi API/DB thay đổi. |
+| Release baseline | Thêm mobile build artifact, registry push, staging deploy và approval/rollback path. |
+
 ---
 
-## 3. Quy trình CD
+## 4. Quy trình CD mục tiêu
 
 | Môi trường | Điều kiện triển khai | Ghi chú |
 |---|---|---|
 | Local | Developer tự chạy | Docker Compose cho PostgreSQL/Redis, mobile app trỏ API local/staging. |
-| Staging | Merge vào `main` hoặc tag staging | Dùng cho QA/UAT. |
-| Beta mobile | Tag beta hoặc approval thủ công | TestFlight/Google Play Internal Testing. |
-| Production | Tag release hoặc approval thủ công | Cần backup/migration plan trước deploy và release note. |
+| Staging | Merge vào `main` hoặc tag staging | Dùng cho QA/UAT. Chưa nằm trong baseline PR #4. |
+| Beta mobile | Tag beta hoặc approval thủ công | TestFlight/Google Play Internal Testing. Chưa nằm trong baseline PR #4. |
+| Production | Tag release hoặc approval thủ công | Cần backup/migration plan trước deploy và release note. Chưa nằm trong baseline PR #4. |
 
 ---
 
-## 4. Yêu cầu triển khai MVP
+## 5. Yêu cầu triển khai MVP
 
 - Mobile app có build riêng cho staging/beta/production.
 - API và worker có thể deploy độc lập.
@@ -63,7 +105,9 @@ Mỗi pull request cần chạy tối thiểu:
 
 ---
 
-## 5. Điều kiện chặn merge/deploy
+## 6. Điều kiện chặn merge/deploy
+
+Điều kiện chặn merge/deploy mục tiêu:
 
 - Lint hoặc build thất bại.
 - Test P0 thất bại.
@@ -71,9 +115,11 @@ Mỗi pull request cần chạy tối thiểu:
 - Thay đổi API không cập nhật `API_Specification.md`.
 - Thay đổi trạng thái nghiệp vụ không cập nhật `State_Machines.md` và test case liên quan.
 
+Trong baseline hiện tại, các kiểm tra security phụ thuộc GitHub Advanced Security/code scanning được chạy ở chế độ tolerant/report-only. Khi repository bật đầy đủ security features, có thể chuyển CodeQL, Dependency Review và SARIF upload sang blocking theo policy này.
+
 ---
 
-## 6. Khôi phục phiên bản
+## 7. Khôi phục phiên bản
 
 - Admin/Merchant web: rollback về artifact/build trước đó.
 - Backend: rollback image/container trước đó.
@@ -83,7 +129,7 @@ Mỗi pull request cần chạy tối thiểu:
 
 ---
 
-## 7. Tài liệu liên quan
+## 8. Tài liệu liên quan
 
 - `Development_Guidelines.md`: quy chuẩn code, branch, commit, review và PR checklist.
 - `09_Operations_and_Maintenance/Deployment_Guide.md`: các bước deploy, verify và rollback chi tiết.
