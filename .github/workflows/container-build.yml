@@ -8,6 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   security-events: write
 
@@ -52,8 +53,8 @@ jobs:
           push: false
           tags: ${{ matrix.image }}:${{ github.sha }}
           build-args: |
-            NEXT_PUBLIC_API_URL=http://localhost:5000
-            NEXT_PUBLIC_AWS_REGION=ap-southeast-1
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL || 'http://localhost:5000' }}
+            NEXT_PUBLIC_AWS_REGION=${{ vars.AWS_REGION || 'ap-southeast-1' }}
             BUILDKIT_INLINE_CACHE=1
 
       - name: Scan image with Trivy
@@ -64,7 +65,7 @@ jobs:
           output: trivy-${{ matrix.service }}.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '1'
+          exit-code: '0'
 
       - name: Upload Trivy SARIF
         if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)

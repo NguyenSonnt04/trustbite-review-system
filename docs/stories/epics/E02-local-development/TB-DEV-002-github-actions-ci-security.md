@@ -26,8 +26,9 @@ The TrustBite repository has a GitHub Actions baseline that validates pull reque
 - Client lint and build are included because `client/package.json` exposes `lint` and `build` scripts.
 - Server dependency installation is included, but backend build/test proof is explicitly omitted until server scripts exist.
 - Mobile tests run in a separate job after GitHub Actions installs Flutter, so Node/web CI and mobile proof remain separated.
-- Harness matrix query runs in CI to expose current proof gaps.
+- Harness matrix query runs in CI after installing the local Harness CLI from the pinned installer revision.
 - A security workflow exists for CodeQL and dependency review without AWS secrets or deploy permissions.
+- Dependency review runs on pull requests but is non-blocking when repository security features do not support it.
 - Workflows use minimal permissions, concurrency controls, and avoid secret use on untrusted pull requests.
 
 ## Design Notes
@@ -37,7 +38,7 @@ The TrustBite repository has a GitHub Actions baseline that validates pull reque
   - `npm run lint --prefix client`
   - `npm run build --prefix client`
   - `npm ci --prefix server`
-  - `npm run harness -- query matrix`
+  - pinned Harness CLI installer, then `npm run harness -- query matrix`
   - `flutter test` in the mobile job after `subosito/flutter-action` installs Flutter.
 - Queries:
   - Harness matrix remains the source of truth for implemented/planned proof.
@@ -97,3 +98,4 @@ Observed results:
 - `npm run mobile:test` was attempted locally but failed because `flutter` is not installed on this machine; GitHub CI installs Flutter before running mobile tests in a separate job.
 - Durable story row `TB-DEV-002` was added and marked implemented with integration/platform proof.
 - Review fix: story wording was aligned with the actual workflow, where Flutter is installed in CI rather than pre-detected.
+- PR #4 fix: CI installs the pinned Harness CLI before querying the matrix; CodeQL permissions include `actions: read`; dependency review remains visible but non-blocking when unsupported by repository security settings.

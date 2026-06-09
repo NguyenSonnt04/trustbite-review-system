@@ -12,11 +12,13 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ARG NEXT_PUBLIC_API_URL=http://localhost:5000
-ARG NEXT_PUBLIC_AWS_REGION=ap-southeast-1
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_AWS_REGION
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 ENV NEXT_PUBLIC_AWS_REGION=${NEXT_PUBLIC_AWS_REGION}
-RUN npm run build
+RUN test -n "$NEXT_PUBLIC_API_URL" && \
+    test -n "$NEXT_PUBLIC_AWS_REGION" && \
+    npm run build
 
 FROM node:24-alpine AS runner
 WORKDIR /app

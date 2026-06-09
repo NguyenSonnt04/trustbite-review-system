@@ -54,6 +54,12 @@ jobs:
       - name: Syntax-check server sources
         run: find server/src -name '*.js' -print0 | xargs -0 -n 1 node --check
 
+      - name: Install Harness CLI
+        run: |
+          HARNESS_INSTALLER_REV=d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4
+          curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
+          bash /tmp/install-harness.sh --merge --yes
+
       - name: Query Harness matrix
         run: npm run harness -- query matrix
 

@@ -25,13 +25,14 @@ The TrustBite client and server can be built as production-oriented Docker image
 - `server/Dockerfile` installs production dependencies only, runs as non-root, exposes port 5000, and includes a `/health` healthcheck.
 - Client and server Docker build contexts exclude local dependencies, env files, logs, and build output.
 - A container workflow builds both images on PR/push without pushing to AWS/ECR/GHCR.
-- The container workflow scans built images for high/critical vulnerabilities and uploads SARIF when available.
+- The container workflow scans built images for high/critical vulnerabilities and uploads SARIF when available; scan findings are reported without blocking the baseline build job.
+- Client image builds require explicit public build args for API URL and AWS region, so deploy-target values are not silently baked into the bundle by Dockerfile defaults.
 - No AWS secrets, registry credentials, or deploy permissions are required.
 
 ## Design Notes
 
 - Commands:
-  - `docker build -t trustbite-client:ci ./client`
+  - `docker build --build-arg NEXT_PUBLIC_API_URL=http://localhost:5000 --build-arg NEXT_PUBLIC_AWS_REGION=ap-southeast-1 -t trustbite-client:ci ./client`
   - `docker build -t trustbite-server:ci ./server`
   - `bash .agents/skills/github-actions-validator/scripts/validate_workflow.sh --lint-only .github/workflows/container-build.yml`
   - `bash .agents/skills/dockerfile-validator/scripts/dockerfile-validate.sh client/Dockerfile`
@@ -83,5 +84,7 @@ Observed results:
 - Client production build passed with standalone output enabled.
 - Server source syntax check passed.
 - Local Docker builds passed for both `client/Dockerfile` and `server/Dockerfile` after switching to cache mounts with explicit ids.
+- PR #4 review fix: `client/Dockerfile` no longer has default public build args; the container workflow passes API URL and AWS region explicitly, with region sourced from `vars.AWS_REGION` when configured.
+- PR #4 review fix: `server/Dockerfile` copies only `package.json` into the runtime stage.
 - The Dockerfile validator script exited before completing in this local environment because its Python/tool-install preflight failed; manual fallback checks were used instead.
 - Durable Harness row `TB-DEV-003` can now be marked implemented with integration/platform proof.
