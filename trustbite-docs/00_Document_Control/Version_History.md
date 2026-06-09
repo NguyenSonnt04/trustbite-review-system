@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Lịch sử phiên bản |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.6.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | PMO |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-09 |
 
 ---
 
