@@ -85,8 +85,13 @@ Quy uoc:
 - Bang trung gian N-N co model rieng.
 - Bang seed/config (`roles`, `rank_definitions`, `badge_definitions`, `otp_purposes`, `report_reason_codes`, `restaurant_categories`, `amenities`, `payment_methods`, `tags`, `fraud_rule_configs`) van co model rieng.
 - `users.role` khong phai contract chinh; phan quyen dung `roles` + `user_roles`.
+- `fraud_flags` khong co FK truc tiep den user/review/receipt; moi loader tra ve fraud flag phai JOIN `fraud_flag_entities` va map vao `FraudFlagModel.entities`.
 
-### 5.3. Naming rules
+### 5.3. Sensitive field rules
+
+- `receipt_verifications.ocr_text` la OCR raw co the chua PII. Khong tra field nay trong API response; `ReceiptVerificationModel.toJSON()` mac dinh loai bo `ocr_text`.
+
+### 5.4. Naming rules
 
 - `user_id`, `restaurant_id`, `review_id` giu nguyen snake_case theo DB.
 - Ten file va ten class phai khop nghia:
@@ -130,4 +135,3 @@ Truoc khi sua model:
 - Schema table count: 54.
 - Model file count: 54.
 - Model folder da bao phu cac bang trong schema v2.7.0.
-

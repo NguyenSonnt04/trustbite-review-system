@@ -8,7 +8,7 @@ export class UserSavedListModel {
     this.user_id = data.user_id || null;
     this.name = data.name || null;
     this.description = data.description || null;
-    this.is_public = data.is_public !== undefined ? data.is_public : false;
+    this.is_public = data.is_public != null ? Boolean(data.is_public) : false;
     this.created_at = data.created_at ? new Date(data.created_at) : null;
     this.updated_at = data.updated_at ? new Date(data.updated_at) : null;
   }
