@@ -61,7 +61,10 @@ jobs:
           bash /tmp/install-harness.sh --merge --yes
 
       - name: Query Harness matrix
-        run: npm run harness -- query matrix
+        run: |
+          npm run harness -- init
+          npm run harness -- import brownfield
+          npm run harness -- query matrix
 
       - name: Write CI summary
         if: always()

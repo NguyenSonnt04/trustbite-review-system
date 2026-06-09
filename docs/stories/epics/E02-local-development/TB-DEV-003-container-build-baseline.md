@@ -25,7 +25,7 @@ The TrustBite client and server can be built as production-oriented Docker image
 - `server/Dockerfile` installs production dependencies only, runs as non-root, exposes port 5000, and includes a `/health` healthcheck.
 - Client and server Docker build contexts exclude local dependencies, env files, logs, and build output.
 - A container workflow builds both images on PR/push without pushing to AWS/ECR/GHCR.
-- The container workflow scans built images for high/critical vulnerabilities and uploads SARIF when available; scan findings are reported without blocking the baseline build job.
+- The container workflow scans built images for high/critical vulnerabilities and uploads SARIF when available; scan findings and SARIF upload support are reported without blocking the baseline build job.
 - Client image builds require explicit public build args for API URL and AWS region, so deploy-target values are not silently baked into the bundle by Dockerfile defaults.
 - No AWS secrets, registry credentials, or deploy permissions are required.
 

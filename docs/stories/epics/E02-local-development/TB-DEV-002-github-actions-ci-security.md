@@ -98,4 +98,4 @@ Observed results:
 - `npm run mobile:test` was attempted locally but failed because `flutter` is not installed on this machine; GitHub CI installs Flutter before running mobile tests in a separate job.
 - Durable story row `TB-DEV-002` was added and marked implemented with integration/platform proof.
 - Review fix: story wording was aligned with the actual workflow, where Flutter is installed in CI rather than pre-detected.
-- PR #4 fix: CI installs the pinned Harness CLI before querying the matrix; CodeQL permissions include `actions: read`; dependency review remains visible but non-blocking when unsupported by repository security settings.
+- PR #4 fix: CI installs the pinned Harness CLI and initializes/imports brownfield Harness records before querying the matrix; CodeQL permissions include `actions: read`; dependency review and CodeQL upload remain visible but non-blocking when unsupported by repository security settings.
