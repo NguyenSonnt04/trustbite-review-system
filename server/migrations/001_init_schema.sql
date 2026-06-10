@@ -17,6 +17,13 @@ CREATE TABLE rank_definitions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+INSERT INTO rank_definitions (code, label, min_exp, description)
+VALUES ('NEWBIE', 'Newbie', 0, 'Default rank for new users')
+ON CONFLICT (code) DO UPDATE
+SET label = EXCLUDED.label,
+    min_exp = EXCLUDED.min_exp,
+    description = EXCLUDED.description;
+
 CREATE TABLE badge_definitions (
   code VARCHAR(80) PRIMARY KEY,
   label VARCHAR(120) NOT NULL,

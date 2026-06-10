@@ -11,7 +11,7 @@
 ---
 
 ## 1. Muc dich
-`server/src/models/` cua TrustBite.
+Tai lieu nay huong dan AI va dev sau follow cay thu muc `server/src/models/` cua TrustBite.
 
 Muc tieu:
 
