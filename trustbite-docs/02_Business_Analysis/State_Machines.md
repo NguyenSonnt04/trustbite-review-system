@@ -211,8 +211,12 @@ ACTIVE
 
 REVIEW_RESTRICTED
 → ACTIVE
+→ SUSPENDED
+→ DELETED
+
 SUSPENDED
 → ACTIVE
+→ DELETED
 ```
 
 | Trạng thái | Ý nghĩa |
@@ -224,7 +228,7 @@ SUSPENDED
 
 Ghi chú phân biệt:
 
-- `REVIEW_RESTRICTED` chỉ hạn chế quyền viết review có thời hạn.
+- `REVIEW_RESTRICTED` chỉ hạn chế quyền viết review có thời hạn; admin vẫn có thể chuyển tài khoản từ `REVIEW_RESTRICTED` sang `SUSPENDED` nếu vi phạm cần khóa ở mức hệ thống.
 - `SUSPENDED` là khóa tài khoản ở mức hệ thống.
 - `user_blocks` là quan hệ một user chặn user khác trong UGC, không thay đổi `users.status`.
 - Account deletion dùng `account_deletion_requests`, `users.deletion_requested_at` và `users.deleted_at`, không dùng để biểu diễn suspend.
