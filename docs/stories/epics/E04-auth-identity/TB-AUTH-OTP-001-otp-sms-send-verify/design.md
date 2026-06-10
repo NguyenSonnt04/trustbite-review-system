@@ -29,7 +29,7 @@ Errors include `VALIDATION_ERROR`, `RATE_LIMITED`, `OTP_INVALID`, `OTP_EXPIRED`,
 
 ## Data Model
 
-No new table/field. May require seed migration for `otp_purposes` such as `LOGIN` with ttl 120 and max attempts 5.
+No new schema table or column change required. The `otp_purposes` reference table (seed/lookup data) must contain at least `LOGIN` with ttl 120 and max attempts 5; if this seed row does not exist in the target environment, a seed migration is required before the OTP flow can run. This is a data-only change, not a schema change, and does not require high-risk migration/rollback proof.
 
 ## UI / Platform Impact
 

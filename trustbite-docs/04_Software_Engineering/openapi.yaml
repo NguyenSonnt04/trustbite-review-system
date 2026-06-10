@@ -994,8 +994,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AdminSuspendUserResponse'
-        '400':
-          $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -1036,8 +1034,6 @@ paths:
         '403':
           $ref: '#/components/responses/Error'
         '404':
-          $ref: '#/components/responses/Error'
-        '409':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
