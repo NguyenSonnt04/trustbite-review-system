@@ -10,7 +10,7 @@ In scope:
 
 - `POST /api/v1/auth/otp/request`.
 - `POST /api/v1/auth/otp/verify`.
-- Redis local service/config for OTP rate-limit, failed attempts, temporary phone locks, and local/dev message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV !== 'production'`.
+- Redis local service/config for OTP rate-limit, failed attempts, temporary phone locks, and local/dev message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV` in `development`/`test`.
 - PostgreSQL `otp_verifications` records with hashed OTP.
 - Local fake SMS provider abstraction; production target documented as AWS End User Messaging SMS.
 

@@ -95,6 +95,8 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `CLAIM_CONFLICT` | Claim quán xung đột |
 | `REPORT_DUPLICATE` | Báo cáo trùng |
 | `PROVIDER_UNAVAILABLE` | OCR/SMS/provider ngoài lỗi tạm thời |
+| `ACCOUNT_SUSPENDED` | Tài khoản bị khóa ở trạng thái SUSPENDED và không được thực hiện auth/mutation |
+| `ACCOUNT_DELETED` | Tài khoản ở trạng thái DELETED và không được thực hiện auth/mutation |
 | `IDEMPOTENCY_KEY_REQUIRED` | Thiếu Idempotency-Key ở endpoint bắt buộc |
 | `IDEMPOTENCY_KEY_INVALID` | Idempotency-Key sai định dạng |
 | `IDEMPOTENCY_CONFLICT` | Idempotency key được dùng lại với payload khác |

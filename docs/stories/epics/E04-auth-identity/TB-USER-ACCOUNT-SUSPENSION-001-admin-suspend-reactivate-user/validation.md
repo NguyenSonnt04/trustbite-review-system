@@ -8,7 +8,7 @@ Prove admin authorization, status transitions, session revocation, audit log wri
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Status transition validation, self-suspend guard, deleted-user reactivation guard. |
+| Unit | Status transition validation, self-suspend guard, self-reactivate guard, deleted-user reactivation guard, and reactivate validation order (`DELETED` before not-`SUSPENDED`). |
 | Integration | Admin suspends active user; sessions revoked; audit log inserted; suspended user cannot login/refresh/update profile; admin reactivates user; old session remains revoked. |
 | E2E | API smoke through admin bearer token. |
 | Platform | None beyond local DB. |

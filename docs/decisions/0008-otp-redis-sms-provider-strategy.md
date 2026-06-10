@@ -14,12 +14,12 @@ TrustBite OTP login is P0. Product docs require OTP rate-limit state and tempora
 
 TrustBite will implement OTP with two storage roles:
 
-- Redis stores OTP rate-limit counters, failed verification counters, temporary phone locks, and local/dev message capture only when `OTP_CAPTURE_MODE=redis` and `NODE_ENV !== 'production'`.
+- Redis stores OTP rate-limit counters, failed verification counters, temporary phone locks, and local/dev message capture only when `OTP_CAPTURE_MODE=redis` and `NODE_ENV` is explicitly allowlisted as `development` or `test`.
 - PostgreSQL stores OTP evidence in `otp_verifications` using hashed OTP values and persisted status.
 
 The backend will introduce an SMS provider abstraction under `server/src/services/`:
 
-- local/dev default: fake SMS provider or safe message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV !== 'production'`,
+- local/dev default: fake SMS provider or safe message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV` in `development`/`test`,
 - production target: AWS End User Messaging SMS, preferably Notify for managed OTP-style verification templates,
 - optional LocalStack integration: SNS SMS only when needed for local/provider smoke proof.
 

@@ -6,7 +6,7 @@ Backend auth is a skeleton. Routes/controllers/services exist but do not request
 
 ## Target Behavior
 
-Users can request a 6-digit OTP for a phone number and verify it within 120 seconds. Redis enforces request rate limits and temporary phone locks. PostgreSQL stores hashed OTP evidence in `otp_verifications`. Local/dev delivery uses a fake provider or safe message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV !== 'production'`; production SMS is behind a provider abstraction and must not capture plaintext OTP codes.
+Users can request a 6-digit OTP for a phone number and verify it within 120 seconds. Redis enforces request rate limits and temporary phone locks. PostgreSQL stores hashed OTP evidence in `otp_verifications`. Local/dev delivery uses a fake provider or safe message capture guarded by `OTP_CAPTURE_MODE=redis` and explicit `NODE_ENV` allowlist (`development`/`test`); staging/QA/production must not capture plaintext OTP codes.
 
 ## Affected Users
 

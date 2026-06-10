@@ -65,7 +65,7 @@ Ghi chú triển khai:
 - OTP gồm 6 chữ số, hết hạn sau 120 giây.
 - Rate limit request phải dùng Redis: tối đa 3 request / 10 phút / phone number.
 - PostgreSQL `otp_verifications` lưu bằng chứng OTP dạng hash/trạng thái; không lưu OTP thô.
-- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn chỉ khi `OTP_CAPTURE_MODE=redis` và `NODE_ENV !== 'production'`; production dùng SMS provider đã được duyệt và không được capture OTP plaintext.
+- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn chỉ khi `OTP_CAPTURE_MODE=redis` và `NODE_ENV` thuộc allowlist tường minh `development` hoặc `test`; staging/QA/production không được capture OTP plaintext.
 - Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass rate limit.
 
 ### POST /auth/otp/verify
@@ -99,7 +99,7 @@ Ghi chú triển khai:
 - Khóa tạm OTP là khóa theo phone number cho luồng xác thực, khác với account suspension.
 - Nếu Redis/rate-limit store không khả dụng trong bước verify, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass failed-attempt/lock checks.
 - Khi verify đúng, backend tạo user nếu phone chưa tồn tại, tạo session, trả access JWT và set refresh token dạng HttpOnly cookie.
-- User `SUSPENDED` hoặc `DELETED` không được nhận token mới.
+- User `SUSPENDED` hoặc `DELETED` không được nhận token mới; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` để mobile hiển thị đúng copy.
 
 ### POST /auth/refresh
 
@@ -119,7 +119,7 @@ Ghi chú triển khai:
 - Access token là JWT ngắn hạn.
 - Refresh token là opaque random token; database chỉ lưu `user_sessions.refresh_token_hash`.
 - Refresh thành công phải rotate refresh token và cập nhật/revoke session theo chiến lược đã chốt.
-- Refresh với session revoked/expired, user `SUSPENDED`, hoặc user `DELETED` trả `401`/`403` và không phát token mới.
+- Refresh với session revoked/expired trả `401`; user `SUSPENDED` hoặc `DELETED` trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` và không phát token mới.
 
 ### POST /auth/logout
 
@@ -165,7 +165,7 @@ Ghi chú triển khai:
 
 - Chỉ cập nhật các cột có trong schema `users`: `display_name`, `avatar_url`.
 - `avatarUrl` phải là URL TrustBite-owned/allowlisted hoặc URL được tạo bởi avatar upload flow; không nhận arbitrary external URL.
-- User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar.
+- User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED`.
 - User `REVIEW_RESTRICTED` vẫn được xem/cập nhật hồ sơ nếu không bị suspend/delete.
 
 ### POST /users/me/deletion-request
@@ -458,7 +458,7 @@ Phản hồi:
 }
 ```
 
-Lỗi: `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản gửi report đang `SUSPENDED` hoặc `DELETED`, `409 REPORT_DUPLICATE`, `422 VALIDATION_ERROR`.
+Lỗi: `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản gửi report đang `SUSPENDED` hoặc `DELETED`, `409 REPORT_DUPLICATE`, `422 VALIDATION_ERROR`.
 
 ### POST /users/{userId}/block
 
@@ -482,13 +482,13 @@ Phản hồi:
 }
 ```
 
-Lỗi: `400 CANNOT_BLOCK_SELF`, `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản thực hiện block đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`.
+Lỗi: `400 CANNOT_BLOCK_SELF`, `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản thực hiện block đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`.
 
 ### DELETE /users/{userId}/block
 
 Bỏ chặn người dùng. Phản hồi `{ "success": true }`.
 
-Lỗi: `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản thực hiện unblock đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`.
+Lỗi: `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản thực hiện unblock đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`.
 
 ---
 
@@ -625,7 +625,7 @@ Ghi chú:
 
 - `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Backend phải revoke active sessions của user bị khóa.
-- User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó.
+- User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó; các endpoint auth/mutation bị chặn trả `403 ACCOUNT_SUSPENDED`. User `DELETED` bị chặn tương tự với `403 ACCOUNT_DELETED`.
 - Không được suspend chính mình (`403 CANNOT_SUSPEND_SELF`).
 - Nếu user đã `SUSPENDED`, trả `409 USER_ALREADY_SUSPENDED`.
 - Nếu user `DELETED`, trả `400 CANNOT_SUSPEND_DELETED_USER`.
@@ -658,7 +658,7 @@ Ghi chú:
 
 - `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
-- Nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`. Nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`.
+- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`; sau đó nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`.
 - Không được reactivate chính mình (`403 CANNOT_REACTIVATE_SELF`).
 
 ### POST /admin/restaurant-claims/{id}/decision

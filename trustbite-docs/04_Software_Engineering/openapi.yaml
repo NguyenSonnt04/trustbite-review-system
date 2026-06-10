@@ -1826,6 +1826,8 @@ components:
               - CLAIM_CONFLICT
               - REPORT_DUPLICATE
               - PROVIDER_UNAVAILABLE
+              - ACCOUNT_SUSPENDED
+              - ACCOUNT_DELETED
               - IDEMPOTENCY_KEY_REQUIRED
               - IDEMPOTENCY_KEY_INVALID
               - IDEMPOTENCY_CONFLICT
