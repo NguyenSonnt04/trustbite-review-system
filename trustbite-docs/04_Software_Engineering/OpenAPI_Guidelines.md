@@ -104,6 +104,8 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `USER_ALREADY_SUSPENDED` | Tài khoản đã ở trạng thái SUSPENDED |
 | `USER_NOT_SUSPENDED` | Tài khoản hiện không ở trạng thái SUSPENDED |
 | `CANNOT_SUSPEND_SELF` | Không thể suspend chính mình |
+| `CANNOT_SUSPEND_DELETED_USER` | Không thể suspend user đã DELETED |
+| `CANNOT_REACTIVATE_SELF` | Không thể reactivate chính mình |
 | `CANNOT_REACTIVATE_DELETED_USER` | Không thể reactivate user DELETED |
 
 ---

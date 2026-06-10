@@ -1839,6 +1839,8 @@ components:
               - USER_ALREADY_SUSPENDED
               - USER_NOT_SUSPENDED
               - CANNOT_SUSPEND_SELF
+              - CANNOT_SUSPEND_DELETED_USER
+              - CANNOT_REACTIVATE_SELF
               - CANNOT_REACTIVATE_DELETED_USER
             message:
               type: string
