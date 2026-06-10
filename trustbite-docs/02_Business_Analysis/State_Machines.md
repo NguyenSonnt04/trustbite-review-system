@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Máy trạng thái nghiệp vụ |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.6.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | BA / Kỹ thuật |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -211,7 +211,23 @@ ACTIVE
 
 REVIEW_RESTRICTED
 → ACTIVE
+SUSPENDED
+→ ACTIVE
 ```
+
+| Trạng thái | Ý nghĩa |
+|---|---|
+| ACTIVE | Tài khoản hoạt động bình thường. |
+| REVIEW_RESTRICTED | User bị hạn chế viết review, thường qua `users.review_restricted_until`; vẫn có thể đăng nhập và cập nhật hồ sơ nếu không bị suspend/delete. |
+| SUSPENDED | Tài khoản bị quản trị viên khóa. User không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation bằng tài khoản đó. Khi chuyển sang trạng thái này, backend phải revoke active sessions và ghi audit log. |
+| DELETED | Tài khoản đã xóa/ẩn danh hóa theo quy trình account deletion/data retention. Không được reactivate bằng luồng suspend/reactivate. |
+
+Ghi chú phân biệt:
+
+- `REVIEW_RESTRICTED` chỉ hạn chế quyền viết review có thời hạn.
+- `SUSPENDED` là khóa tài khoản ở mức hệ thống.
+- `user_blocks` là quan hệ một user chặn user khác trong UGC, không thay đổi `users.status`.
+- Account deletion dùng `account_deletion_requests`, `users.deletion_requested_at` và `users.deleted_at`, không dùng để biểu diễn suspend.
 
 ---
 
@@ -259,3 +275,4 @@ ACTIVE
 
 - Account deletion request `COMPLETED` phải tương ứng với session/push token bị revoke và PII đã xóa/ẩn danh hóa theo `Data_Retention_Policy.md`.
 - User block không được dùng để thay đổi trạng thái public của review; kiểm duyệt review vẫn đi qua `moderation_reports`/`moderation_actions`.
+- Admin account suspension phải ghi `audit_logs` với previous/new status, reason và actor; session hiện có của user bị suspend phải bị revoke.

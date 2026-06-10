@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Đặc tả API |
-| Phiên bản | v1.4.0 |
+| Phiên bản | v1.4.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Trưởng nhóm Backend / Mobile Lead |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -60,6 +60,14 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- OTP gồm 6 chữ số, hết hạn sau 120 giây.
+- Rate limit request phải dùng Redis: tối đa 3 request / 10 phút / phone number.
+- PostgreSQL `otp_verifications` lưu bằng chứng OTP dạng hash/trạng thái; không lưu OTP thô.
+- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn; production dùng SMS provider đã được duyệt.
+- Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với lỗi provider/service unavailable, không được bypass rate limit.
+
 ### POST /auth/otp/verify
 
 Yêu cầu:
@@ -75,7 +83,7 @@ Phản hồi:
 
 ```json
 {
-  "accessToken": "jwt-or-session-token",
+  "accessToken": "jwt-access-token",
   "user": {
     "id": "uuid",
     "displayName": "Nguyen Van A",
@@ -85,9 +93,16 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- OTP sai tăng failed counter trên Redis và/hoặc request state; tối đa 5 lần sai trước khóa tạm.
+- Khóa tạm OTP là khóa theo phone number cho luồng xác thực, khác với account suspension.
+- Khi verify đúng, backend tạo user nếu phone chưa tồn tại, tạo session, trả access JWT và set refresh token dạng HttpOnly cookie.
+- User `SUSPENDED` hoặc `DELETED` không được nhận token mới.
+
 ### POST /auth/refresh
 
-Yêu cầu phụ thuộc auth strategy. Mobile app dùng endpoint này hoặc session refresh tương đương khi access token hết hạn.
+Refresh token dùng cookie `refresh_token` HttpOnly Secure SameSite=Strict được phát hành khi OTP verify thành công; client không gửi refresh token trong JSON body.
 
 Phản hồi:
 
@@ -97,6 +112,13 @@ Phản hồi:
   "expiresInSeconds": 900
 }
 ```
+
+Ghi chú triển khai:
+
+- Access token là JWT ngắn hạn.
+- Refresh token là opaque random token; database chỉ lưu `user_sessions.refresh_token_hash`.
+- Refresh thành công phải rotate refresh token và cập nhật/revoke session theo chiến lược đã chốt.
+- Refresh với session revoked/expired, user `SUSPENDED`, hoặc user `DELETED` trả `401`/`403` và không phát token mới.
 
 ### POST /auth/logout
 
@@ -137,6 +159,13 @@ Yêu cầu:
   "avatarUrl": "https://..."
 }
 ```
+
+Ghi chú triển khai:
+
+- Chỉ cập nhật các cột có trong schema `users`: `display_name`, `avatar_url`.
+- `avatarUrl` phải là URL TrustBite-owned/allowlisted hoặc URL được tạo bởi avatar upload flow; không nhận arbitrary external URL.
+- User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar.
+- User `REVIEW_RESTRICTED` vẫn được xem/cập nhật hồ sơ nếu không bị suspend/delete.
 
 ### POST /users/me/deletion-request
 
@@ -557,6 +586,68 @@ Yêu cầu:
 ```
 
 `reason` bắt buộc với mọi action trừ `CLOSE_REPORT` kỹ thuật sau khi đã có action trước đó.
+
+### POST /admin/users/{userId}/suspend
+
+Auth: `ADMIN` hoặc `SUPER_ADMIN`.
+
+Khóa tài khoản người dùng ở mức account suspension. Đây là trạng thái `users.status = SUSPENDED`, khác với:
+
+- `users.review_restricted_until`: chỉ hạn chế viết review có thời hạn.
+- `user_blocks`: quan hệ user chặn user khác trong UGC.
+- account deletion: yêu cầu xóa/ẩn danh hóa dữ liệu theo privacy policy.
+
+Yêu cầu:
+
+```json
+{
+  "reason": "Repeated abuse and policy violation."
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "userId": "uuid",
+  "status": "SUSPENDED",
+  "revokedSessions": 3,
+  "auditLogId": "uuid"
+}
+```
+
+Ghi chú:
+
+- `reason` bắt buộc; thiếu reason trả `422 ADMIN_REASON_REQUIRED`.
+- Backend phải revoke active sessions của user bị khóa.
+- User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó.
+- Không được suspend chính mình. Không được reactivate user `DELETED` bằng endpoint này.
+
+### POST /admin/users/{userId}/reactivate
+
+Auth: `ADMIN` hoặc `SUPER_ADMIN`.
+
+Mở khóa tài khoản bị `SUSPENDED` về `ACTIVE`.
+
+Yêu cầu:
+
+```json
+{
+  "reason": "Appeal approved."
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "userId": "uuid",
+  "status": "ACTIVE",
+  "auditLogId": "uuid"
+}
+```
+
+Ghi chú: session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
 
 ### POST /admin/restaurant-claims/{id}/decision
 

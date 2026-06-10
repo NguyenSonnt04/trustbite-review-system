@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: TrustBite MVP API
-  version: 1.1.0
+  version: 1.1.1
   description: Baseline OpenAPI contract for TrustBite MVP P0. Markdown specs remain the narrative source; this file is the
     machine-readable contract for development, mocks and contract tests.
 servers:
@@ -717,7 +717,13 @@ paths:
       tags:
       - Admin
       summary: Decide receipt verification case
-      description: Requires ADMIN or SUPER_ADMIN role. Decisions map to receipt status as follows: APPROVE_VERIFIED -> VERIFIED, MARK_REFERENCE_ONLY -> REFERENCE_ONLY, REJECT -> REJECTED unless keepReviewAsReference=true keeps the review reference-only, and REQUEST_MORE_REVIEW keeps the receipt in PENDING_ADMIN_REVIEW while writing an audit log/escalation marker so the admin queue can distinguish escalated cases from first-pass pending cases.
+      description: >
+        Requires ADMIN or SUPER_ADMIN role. Decisions map to receipt status as follows:
+        APPROVE_VERIFIED -> VERIFIED, MARK_REFERENCE_ONLY -> REFERENCE_ONLY,
+        REJECT -> REJECTED unless keepReviewAsReference=true keeps the review
+        reference-only, and REQUEST_MORE_REVIEW keeps the receipt in
+        PENDING_ADMIN_REVIEW while writing an audit log/escalation marker so the
+        admin queue can distinguish escalated cases from first-pass pending cases.
       operationId: adminDecideReceipt
       parameters:
       - $ref: '#/components/parameters/ReceiptVerificationId'
@@ -948,6 +954,76 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
         '409':
+          $ref: '#/components/responses/Error'
+  /admin/users/{userId}/suspend:
+    post:
+      tags:
+      - Admin
+      - Users
+      summary: Suspend a user account
+      description: Requires ADMIN or SUPER_ADMIN role. Sets users.status to SUSPENDED, revokes active sessions, and writes an audit log. This is account suspension, distinct from user_blocks, review restriction, and account deletion.
+      operationId: adminSuspendUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserStatusChangeRequest'
+      responses:
+        '200':
+          description: User suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSuspendUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/users/{userId}/reactivate:
+    post:
+      tags:
+      - Admin
+      - Users
+      summary: Reactivate a suspended user account
+      description: Requires ADMIN or SUPER_ADMIN role. Sets users.status from SUSPENDED back to ACTIVE and writes an audit log. Revoked sessions are not restored; the user must authenticate again.
+      operationId: adminReactivateUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserStatusChangeRequest'
+      responses:
+        '200':
+          description: User reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReactivateUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
           $ref: '#/components/responses/Error'
   /users/{userId}/block:
     post:
@@ -1744,6 +1820,10 @@ components:
               - INVALID_GPS_SIGNAL
               - INVALID_RECEIPT_DECISION_COMBINATION
               - INVALID_MODERATION_DECISION_COMBINATION
+              - USER_ALREADY_SUSPENDED
+              - USER_NOT_SUSPENDED
+              - CANNOT_SUSPEND_SELF
+              - CANNOT_REACTIVATE_DELETED_USER
             message:
               type: string
             details:
@@ -1785,6 +1865,51 @@ components:
           type: string
           format: date-time
           nullable: true
+    AdminUserStatusChangeRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 1000
+    AdminSuspendUserResponse:
+      type: object
+      required:
+      - userId
+      - status
+      - revokedSessions
+      - auditLogId
+      properties:
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          const: SUSPENDED
+        revokedSessions:
+          type: integer
+          minimum: 0
+        auditLogId:
+          type: string
+          format: uuid
+    AdminReactivateUserResponse:
+      type: object
+      required:
+      - userId
+      - status
+      - auditLogId
+      properties:
+        userId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          const: ACTIVE
+        auditLogId:
+          type: string
+          format: uuid
     BlockUserRequest:
       type: object
       properties:

@@ -100,7 +100,7 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `IDEMPOTENCY_CONFLICT` | Idempotency key được dùng lại với payload khác |
 | `REQUEST_IN_PROGRESS` | Request cùng idempotency key đang xử lý |
 | `REVIEW_VERIFICATION_EXPIRED` | Review SUBMITTED đã quá hạn upload và chuyển REFERENCE_ONLY |
-| `ADMIN_REASON_REQUIRED` | Quyết định admin thiếu reason |
+| `ADMIN_REASON_REQUIRED` | Hành động/quyết định admin bắt buộc reason nhưng request không cung cấp reason |
 
 ---
 
