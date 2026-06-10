@@ -167,6 +167,8 @@ paths:
                 $ref: '#/components/schemas/User'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
   /users/me/avatar-upload-url:
@@ -1874,6 +1876,7 @@ components:
           type: string
           minLength: 10
           maxLength: 1000
+          description: Must be at least 10 characters long so admin actions always include an actionable audit reason.
     AdminSuspendUserResponse:
       type: object
       required:

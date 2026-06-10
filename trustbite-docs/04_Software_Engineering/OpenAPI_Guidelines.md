@@ -101,6 +101,10 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `REQUEST_IN_PROGRESS` | Request cùng idempotency key đang xử lý |
 | `REVIEW_VERIFICATION_EXPIRED` | Review SUBMITTED đã quá hạn upload và chuyển REFERENCE_ONLY |
 | `ADMIN_REASON_REQUIRED` | Hành động/quyết định admin bắt buộc reason nhưng request không cung cấp reason |
+| `USER_ALREADY_SUSPENDED` | Tài khoản đã ở trạng thái SUSPENDED |
+| `USER_NOT_SUSPENDED` | Tài khoản hiện không ở trạng thái SUSPENDED |
+| `CANNOT_SUSPEND_SELF` | Không thể suspend chính mình |
+| `CANNOT_REACTIVATE_DELETED_USER` | Không thể reactivate user DELETED |
 
 ---
 

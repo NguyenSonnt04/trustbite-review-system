@@ -555,7 +555,7 @@ Yêu cầu:
 }
 ```
 
-`reason` bắt buộc. Thiếu reason trả `422 ADMIN_REASON_REQUIRED`.
+`reason` bắt buộc, dài tối thiểu 10 ký tự. Thiếu reason trả `422 ADMIN_REASON_REQUIRED`; reason ngắn hơn 10 ký tự cũng phải bị từ chối bằng cùng validation error để khớp với OpenAPI schema.
 
 Phản hồi:
 
@@ -618,7 +618,7 @@ Phản hồi:
 
 Ghi chú:
 
-- `reason` bắt buộc; thiếu reason trả `422 ADMIN_REASON_REQUIRED`.
+- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Backend phải revoke active sessions của user bị khóa.
 - User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó.
 - Không được suspend chính mình. Không được reactivate user `DELETED` bằng endpoint này.
