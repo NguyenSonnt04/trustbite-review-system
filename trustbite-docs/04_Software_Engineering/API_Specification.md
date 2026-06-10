@@ -150,6 +150,10 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- Endpoint này là protected endpoint; user `SUSPENDED` hoặc `DELETED` phải bị chặn trước khi trả profile, với `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` theo auth middleware.
+
 ### PATCH /users/me
 
 Yêu cầu:
@@ -658,8 +662,9 @@ Ghi chú:
 
 - `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
-- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`; sau đó nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`.
-- Không được reactivate chính mình (`403 CANNOT_REACTIVATE_SELF`).
+- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`.
+- Kiểm tra self-reactivate trước status check: nếu actor targets chính mình, trả `403 CANNOT_REACTIVATE_SELF`.
+- Nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`.
 
 ### POST /admin/restaurant-claims/{id}/decision
 
