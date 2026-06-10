@@ -65,6 +65,15 @@ This spawns:
 - **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
 - **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `admin_password`)
 
+Apply the TrustBite PostgreSQL schema after the database is running:
+
+```bash
+npm run db:migrate
+```
+
+The migration runner applies SQL files from `server/migrations/` and records
+applied versions in `schema_migrations`.
+
 ### 4. Run Development Servers
 Start both client and server concurrently:
 ```bash

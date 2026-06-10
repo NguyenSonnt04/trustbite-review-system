@@ -11,6 +11,7 @@
     "mobile:test": "cd mobile && flutter test",
     "client:build": "npm run build --prefix client",
     "server:build": "npm run build --prefix server",
+    "db:migrate": "npm run db:migrate --prefix server",
     "install:all": "npm install --prefix client && npm install --prefix server",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",

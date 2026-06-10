@@ -25,6 +25,21 @@
 - Dữ liệu nhạy cảm trong seed/test phải là dữ liệu giả, không dùng hóa đơn/số điện thoại/GPS thật.
 - Trạng thái DB phải đồng bộ với `02_Business_Analysis/Status_Mapping.md`.
 
+Migration thực thi trong repo nằm tại:
+
+```text
+server/migrations/
+server/scripts/migrate.js
+```
+
+Lệnh chạy migration local:
+
+```bash
+npm run db:migrate
+```
+
+Schema dùng `GEOGRAPHY(Point, 4326)`, vì vậy PostgreSQL local phải chạy image có PostGIS.
+
 ---
 
 ## 3. Thứ tự migration baseline P0
@@ -41,7 +56,7 @@
 | 008 | Idempotency | `idempotency_keys` và indexes liên quan. |
 | 009 | Moderation/fraud/audit | `moderation_reports`, `moderation_actions`, `fraud_flags`, `audit_logs`. |
 | 010 | Gamification/profile P0 | `users.exp_points`, `users.rank_code`; `user_badges` chỉ nếu cần. |
-| 011 | P1 optional tables | `favorites`, `review_votes`, `review_replies`, `notifications`, `push_tokens` chỉ khi feature flag/roadmap yêu cầu. |
+| 011 | P1 optional tables | `user_saved_lists`, `user_saved_list_restaurants`, `review_votes`, `review_replies`, `notifications`, `push_tokens` chỉ khi feature flag/roadmap yêu cầu. |
 
 Ghi chú: Nếu repo migration thực tế đã có file được đánh số, team có thể thêm migration privacy/safety dưới dạng migration nối tiếp thay vì đổi tên file cũ; bảng này thể hiện thứ tự logic mong muốn cho baseline mới.
 
