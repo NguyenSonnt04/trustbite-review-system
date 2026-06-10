@@ -21,7 +21,7 @@ Suspend:
 Reactivate:
 
 1. Authenticate admin/super admin.
-2. Validate target user is `SUSPENDED`, not `DELETED`, and reason is present.
+2. Validate target user is `SUSPENDED`, not `DELETED`, reason is present, and the actor is not reacting to their own account.
 3. In a DB transaction, update user status to `ACTIVE`, insert audit log.
 4. Return user id, status, audit log id.
 
