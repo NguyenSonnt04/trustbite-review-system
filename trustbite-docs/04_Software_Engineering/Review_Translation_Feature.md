@@ -80,11 +80,23 @@ Lỗi:
 - `429 TRANSLATION_RATE_LIMITED`
 - `503 TRANSLATION_PROVIDER_UNAVAILABLE`
 
-Stale cache không phải lỗi client. Nếu review text đổi, `sourceTextHash` đổi theo; backend coi đó là cache miss và gọi provider để tạo bản dịch mới.
+Rate limit đề xuất:
+
+- 30 translation requests / giờ / user đã xác thực.
+- Burst 5 requests / phút / user.
+- Secondary cap 120 requests / giờ / IP.
+- Cache hit vẫn tính vào burst protection nhưng không tiêu thụ quota gọi Google.
+
+Provider guardrail:
+
+- Nếu Google trả timeout hoặc 5xx liên tiếp 5 lần trong 5 phút, backend mở circuit breaker 60 giây.
+- Trong thời gian circuit mở, cache miss trả `503 TRANSLATION_PROVIDER_UNAVAILABLE` ngay; cache hit vẫn phục vụ bình thường.
+
+Stale cache không phải lỗi client. Nếu review text đổi, `originalTextHash` đổi theo; backend coi đó là cache miss và gọi provider để tạo bản dịch mới.
 
 ## 5. Data model
 
-Cache translation theo `reviewId + targetLocale + sourceTextHash`.
+Cache translation theo `reviewId + targetLocale + originalTextHash`.
 
 ```sql
 CREATE TABLE review_translations (
@@ -92,11 +104,11 @@ CREATE TABLE review_translations (
   review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
   target_locale VARCHAR(10) NOT NULL,
   source_locale VARCHAR(10),
-  source_text_hash VARCHAR(64) NOT NULL,
+  original_text_hash VARCHAR(64) NOT NULL, -- maps to API field originalTextHash
   translated_text TEXT NOT NULL,
   provider VARCHAR(40) NOT NULL DEFAULT 'GOOGLE_TRANSLATE',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (review_id, target_locale, source_text_hash)
+  UNIQUE (review_id, target_locale, original_text_hash)
 );
 
 CREATE INDEX idx_review_translations_review_locale_created

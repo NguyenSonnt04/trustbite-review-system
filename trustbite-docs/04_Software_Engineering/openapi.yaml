@@ -1036,7 +1036,7 @@ paths:
       tags:
       - Reviews
       summary: Translate a review comment on demand
-      description: Requires authentication and review visibility. The original review comment remains canonical; translated text is derived display data and must not affect trust score, fraud scoring, receipt verification, or moderation decisions.
+      description: Requires authentication and review visibility. The original review comment remains canonical; translated text is derived display data and must not affect trust score, fraud scoring, receipt verification, or moderation decisions. Rate limits: 30 translation requests/hour/user with 5 requests/minute burst, secondary 120 requests/hour/IP. If Google returns timeout or 5xx five times within five minutes, backend opens a 60-second circuit breaker; cache miss returns 503 while cache hit still serves normally.
       operationId: translateReviewComment
       parameters:
       - $ref: '#/components/parameters/ReviewId'

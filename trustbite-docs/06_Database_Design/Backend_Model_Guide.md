@@ -64,7 +64,7 @@ Quy uoc:
 | `auth/` | `otp_purposes`, `otp_verifications`, `user_sessions` |
 | `user/` | `users`, `roles`, `user_roles`, `rank_definitions`, `user_follows` |
 | `restaurant/` | `restaurants`, `restaurant_branches`, `menu_items`, `branch_menu_items`, `restaurant_operating_hours`, `restaurant_images`, `merchants`, `restaurant_merchants`, `restaurant_claims`, `restaurant_categories`, `restaurant_category_map`, `amenities`, `restaurant_amenities`, `payment_methods`, `restaurant_payment_methods` |
-| `review/` | `reviews`, `review_tags`, `review_replies`, `receipt_verifications`, `receipt_line_items`, `receipt_line_item_menu_maps`, `review_media`, `review_votes`, `price_history`, `review_summaries`, `tags` |
+| `review/` | `reviews`, `review_tags`, `review_replies`, `receipt_verifications`, `receipt_line_items`, `receipt_line_item_menu_maps`, `review_media`, `review_votes`, `review_translations`, `price_history`, `review_summaries`, `tags` |
 | `moderation/` | `moderation_reports`, `moderation_actions`, `fraud_flags`, `fraud_flag_entities`, `fraud_rule_configs`, `report_reason_codes` |
 | `gamification/` | `badge_definitions`, `user_badges`, `exp_transactions`, `user_saved_lists`, `user_saved_list_restaurants` |
 | `system/` | `notifications`, `notification_delivery_logs`, `push_tokens`, `idempotency_keys`, `audit_logs`, `account_deletion_requests`, `user_blocks`, `admin_queues`, `admin_queue_assignments` |

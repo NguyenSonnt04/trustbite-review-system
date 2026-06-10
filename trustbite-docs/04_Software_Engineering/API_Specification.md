@@ -350,8 +350,14 @@ Quy tắc:
 - Bản gốc `reviews.comment` vẫn là source of truth; bản dịch chỉ là dữ liệu hiển thị.
 - Bản dịch không được dùng cho trust score, fraud scoring, OCR verification hoặc moderation decision.
 - Backend gọi Google Cloud Translation qua service layer; client không gọi Google trực tiếp và không giữ credential.
-- Backend cache bản dịch theo `reviewId + targetLocale + sourceTextHash`.
-- Nếu review text thay đổi, `sourceTextHash` thay đổi; backend coi đó là cache miss và tự dịch lại, không trả lỗi stale cho client.
+- Backend cache bản dịch theo `reviewId + targetLocale + originalTextHash`.
+- Rate limit translation:
+  - 30 requests / giờ / user đã xác thực.
+  - Burst 5 requests / phút / user.
+  - Secondary cap 120 requests / giờ / IP.
+  - Cache hit vẫn tính vào burst protection nhưng không tiêu thụ quota gọi Google.
+- Provider guardrail: nếu Google trả timeout hoặc 5xx liên tiếp 5 lần trong 5 phút, backend mở circuit breaker 60 giây; trong thời gian này cache miss trả `503 TRANSLATION_PROVIDER_UNAVAILABLE`, cache hit vẫn phục vụ bình thường.
+- Nếu review text thay đổi, `originalTextHash` thay đổi; backend coi đó là cache miss và tự dịch lại, không trả lỗi stale cho client.
 
 Yêu cầu:
 

@@ -440,6 +440,22 @@ CREATE TABLE review_votes (
   UNIQUE(review_id, user_id, vote_type)
 );
 
+-- review_translations - cache bản dịch bình luận review
+CREATE TABLE review_translations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+  target_locale VARCHAR(10) NOT NULL,
+  source_locale VARCHAR(10),
+  original_text_hash VARCHAR(64) NOT NULL,
+  translated_text TEXT NOT NULL,
+  provider VARCHAR(40) NOT NULL DEFAULT 'GOOGLE_TRANSLATE',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (review_id, target_locale, original_text_hash)
+);
+
+CREATE INDEX idx_review_translations_review_locale_created
+  ON review_translations (review_id, target_locale, created_at DESC);
+
 -- price_history - lịch sử giá món ăn
 CREATE TABLE price_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

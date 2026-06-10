@@ -41,6 +41,7 @@
 | idempotency_keys | Chống tạo trùng request khi mobile retry | idempotency_key, user_id, endpoint, request_hash, status, resource_id, expires_at |
 | review_media | Ảnh/video của đánh giá | review_id, media_type, url, status |
 | review_votes | Bình chọn hữu ích | review_id, user_id, vote_type |
+| review_translations | Cache bản dịch bình luận review | review_id, target_locale, original_text_hash, translated_text, provider, created_at |
 | user_blocks | Danh sách người dùng bị chặn/hạn chế tương tác | blocker_user_id, blocked_user_id, reason_code, deleted_at |
 | review_replies | Phản hồi của chủ quán cho đánh giá | review_id, merchant_id, message, status |
 | badge_definitions | Định nghĩa huy hiệu dạng seed data | code, label, category |
