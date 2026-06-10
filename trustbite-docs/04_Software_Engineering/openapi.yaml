@@ -930,6 +930,8 @@ paths:
                 $ref: '#/components/schemas/AccountDeletionRequestResponse'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
         '422':
@@ -949,6 +951,8 @@ paths:
                 $ref: '#/components/schemas/AccountDeletionRequestResponse'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
   /users/me/deletion-request/cancel:
@@ -966,6 +970,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/AccountDeletionRequestResponse'
         '401':
+          $ref: '#/components/responses/Error'
+        '403':
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
