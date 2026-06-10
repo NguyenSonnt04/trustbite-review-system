@@ -66,7 +66,7 @@ Ghi chú triển khai:
 - Rate limit request phải dùng Redis: tối đa 3 request / 10 phút / phone number.
 - PostgreSQL `otp_verifications` lưu bằng chứng OTP dạng hash/trạng thái; không lưu OTP thô.
 - Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn; production dùng SMS provider đã được duyệt.
-- Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với lỗi provider/service unavailable, không được bypass rate limit.
+- Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass rate limit.
 
 ### POST /auth/otp/verify
 
@@ -457,6 +457,8 @@ Phản hồi:
 }
 ```
 
+Lỗi: `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản gửi report đang `SUSPENDED` hoặc `DELETED`, `409 REPORT_DUPLICATE`, `422 VALIDATION_ERROR`.
+
 ### POST /users/{userId}/block
 
 Auth: người dùng hiện tại. Dùng để hạn chế tương tác từ người dùng lạm dụng trong phạm vi TrustBite.
@@ -479,11 +481,13 @@ Phản hồi:
 }
 ```
 
-Lỗi: `400 CANNOT_BLOCK_SELF`, `409 USER_ALREADY_BLOCKED`.
+Lỗi: `400 CANNOT_BLOCK_SELF`, `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản thực hiện block đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`.
 
 ### DELETE /users/{userId}/block
 
 Bỏ chặn người dùng. Phản hồi `{ "success": true }`.
+
+Lỗi: `401 AUTH_REQUIRED`, `403 FORBIDDEN` nếu tài khoản thực hiện unblock đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`.
 
 ---
 
@@ -647,7 +651,10 @@ Phản hồi:
 }
 ```
 
-Ghi chú: session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
+Ghi chú:
+
+- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
+- Session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
 
 ### POST /admin/restaurant-claims/{id}/decision
 
