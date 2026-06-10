@@ -6,7 +6,7 @@
  * POST   /api/v1/restaurants              → create
  * GET    /api/v1/restaurants/:restaurantId → get by ID
  * PATCH  /api/v1/restaurants/:restaurantId → update
- * DELETE /api/v1/restaurants/:restaurantId → soft-delete (status = CLOSED)
+ * DELETE /api/v1/restaurants/:restaurantId → soft-delete (sets is_deleted = true)
  */
 
 import { Router } from 'express';
@@ -17,16 +17,17 @@ import {
   updateRestaurantHandler,
   deleteRestaurantHandler,
 } from '../controllers/restaurant.js';
+import { authMiddleware } from '../middlewares/auth.js';
 
 const router = Router();
 
-// Collection endpoints
+// Public endpoints — no auth required
 router.get('/', listRestaurantsHandler);
-router.post('/', createRestaurantHandler);
-
-// Item endpoints
 router.get('/:restaurantId', getRestaurantHandler);
-router.patch('/:restaurantId', updateRestaurantHandler);
-router.delete('/:restaurantId', deleteRestaurantHandler);
+
+// Mutating endpoints — require authentication
+router.post('/', authMiddleware, createRestaurantHandler);
+router.patch('/:restaurantId', authMiddleware, updateRestaurantHandler);
+router.delete('/:restaurantId', authMiddleware, deleteRestaurantHandler);
 
 export default router;

@@ -35,7 +35,8 @@ public visibility per BR-REST-001 and BR-REST-003.
   description, address, phone_number, latitude, longitude, status, category_ids);
   geo auto-updated when lat/lng change.
 - `DELETE /api/v1/restaurants/:restaurantId` soft-deletes by setting
-  `status = 'CLOSED'`.
+  `is_deleted = TRUE` and `deleted_at = NOW()`; restaurant `status` remains a
+  separate operational state.
 - All endpoints parse and validate input at the HTTP boundary before calling
   the service layer.
 - Error responses follow the standard `{ error: { code, message, requestId } }`
@@ -83,7 +84,7 @@ automated backend tests do not exist (see ARCHITECTURE.md Current Gaps).
 ## Evidence
 
 - Review fixes applied for public `ACTIVE`-only listing, snake_case request fields, strict pagination parsing, optional text validation, category ID validation, coordinate clearing, and slug collision retry.
-- Soft-delete logic refined: DELETE is now truly idempotent (returns success even if already closed).
+- Soft-delete logic refined: DELETE only applies when `is_deleted = FALSE`; idempotent re-delete returns 404.
 - `npm run harness -- query matrix` attempted; local Harness CLI binary was not installed.
 - Backend syntax/import smoke was run with `node --check` and a dynamic import of `server/src/app.js`.
 - Manual database-backed CRUD smoke remains required with Docker/Postgres because this repository currently has no automated backend test script.

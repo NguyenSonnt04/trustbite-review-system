@@ -85,6 +85,11 @@ export const listRestaurantsHandler = async (req, res, next) => {
     const { keyword, status, page, pageSize } = req.query;
     const requestId = buildRequestId(req);
 
+    // Validate keyword is a single string if provided
+    if (keyword !== undefined && typeof keyword !== 'string') {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'keyword must be a string.', requestId);
+    }
+
     // BR-REST-001: public listing is ACTIVE-only; reject any other status request.
     if (status !== undefined && !PUBLIC_ALLOWED_STATUSES.includes(status)) {
       return errorResponse(
@@ -247,6 +252,11 @@ export const updateRestaurantHandler = async (req, res, next) => {
 
     const body = req.body ?? {};
 
+    // BR-REST-001: reject empty PATCH body
+    if (body === null || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length === 0) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'At least one field must be provided for update.', requestId);
+    }
+
     // Read snake_case request fields per API contract.
     const {
       name,
@@ -340,10 +350,10 @@ export const updateRestaurantHandler = async (req, res, next) => {
 
     // --- categoryIds ---
     if (hasKey(body, 'category_ids')) {
-      if (categoryIds !== null && (!Array.isArray(categoryIds) || !categoryIds.every((c) => Number.isInteger(c) && c > 0))) {
+      if (!Array.isArray(categoryIds) || !categoryIds.every((c) => Number.isInteger(c) && c > 0)) {
         return errorResponse(res, 422, 'VALIDATION_ERROR', 'category_ids must be an array of positive integers.', requestId);
       }
-      updates.categoryIds = categoryIds ? [...new Set(categoryIds)] : [];
+      updates.categoryIds = [...new Set(categoryIds)];
     }
 
     const restaurant = await restaurantService.updateRestaurant(restaurantId, updates);
