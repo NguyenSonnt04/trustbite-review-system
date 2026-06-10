@@ -92,11 +92,10 @@ CREATE TABLE review_translations (
   review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
   target_locale VARCHAR(10) NOT NULL,
   source_locale VARCHAR(10),
-  source_text_hash TEXT NOT NULL,
+  source_text_hash VARCHAR(64) NOT NULL,
   translated_text TEXT NOT NULL,
   provider VARCHAR(40) NOT NULL DEFAULT 'GOOGLE_TRANSLATE',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (review_id, target_locale, source_text_hash)
 );
 
