@@ -81,6 +81,18 @@ function geoExpression(paramOffset) {
   return `ST_SetSRID(ST_MakePoint($${paramOffset}, $${paramOffset + 1}), 4326)`;
 }
 
+/** Common SELECT projection for a restaurant and its aggregated category IDs. */
+const RESTAURANT_SELECT_PROJECTION = `
+  SELECT
+    r.*,
+    COALESCE(
+      ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
+      '{}'::integer[]
+    ) AS category_ids
+  FROM restaurants r
+  LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
+`;
+
 /**
  * Map a DB row to a camelCase public-facing object.
  */
@@ -122,13 +134,8 @@ async function validateCategoryIds(client, categoryIds) {
   return ids;
 }
 
-async function replaceCategoryMappings(client, restaurantId, categoryIds) {
-  const ids = await validateCategoryIds(client, categoryIds);
-
-  await client.query('DELETE FROM restaurant_category_map WHERE restaurant_id = $1', [restaurantId]);
-
+async function bulkInsertCategoryMappings(client, restaurantId, ids) {
   if (ids.length === 0) return;
-
   const valuePlaceholders = ids.map((_, i) => `($1, $${i + 2})`).join(', ');
   await client.query(
     `INSERT INTO restaurant_category_map (restaurant_id, category_id) VALUES ${valuePlaceholders} ON CONFLICT DO NOTHING`,
@@ -136,15 +143,15 @@ async function replaceCategoryMappings(client, restaurantId, categoryIds) {
   );
 }
 
+async function replaceCategoryMappings(client, restaurantId, categoryIds) {
+  const ids = await validateCategoryIds(client, categoryIds);
+  await client.query('DELETE FROM restaurant_category_map WHERE restaurant_id = $1', [restaurantId]);
+  await bulkInsertCategoryMappings(client, restaurantId, ids);
+}
+
 async function insertCategoryMappings(client, restaurantId, categoryIds) {
   const ids = await validateCategoryIds(client, categoryIds);
-  if (ids.length === 0) return;
-
-  const valuePlaceholders = ids.map((_, i) => `($1, $${i + 2})`).join(', ');
-  await client.query(
-    `INSERT INTO restaurant_category_map (restaurant_id, category_id) VALUES ${valuePlaceholders} ON CONFLICT DO NOTHING`,
-    [restaurantId, ...ids],
-  );
+  await bulkInsertCategoryMappings(client, restaurantId, ids);
 }
 
 // ---------------------------------------------------------------------------
@@ -177,14 +184,7 @@ export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {})
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
 
   const dataQuery = `
-    SELECT
-      r.*,
-      COALESCE(
-        ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
-        '{}'::integer[]
-      ) AS category_ids
-    FROM restaurants r
-    LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
+    ${RESTAURANT_SELECT_PROJECTION}
     ${whereClause}
     GROUP BY r.id
     ORDER BY r.name ASC
@@ -223,14 +223,7 @@ export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {})
 export async function getRestaurantById(restaurantId) {
   const result = await pool.query(
     `
-    SELECT
-      r.*,
-      COALESCE(
-        ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
-        '{}'::integer[]
-      ) AS category_ids
-    FROM restaurants r
-    LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
+    ${RESTAURANT_SELECT_PROJECTION}
     WHERE r.id = $1
       AND r.is_deleted = FALSE
     GROUP BY r.id
@@ -243,34 +236,33 @@ export async function getRestaurantById(restaurantId) {
 
 async function createRestaurantAttempt({ name, description, address, phoneNumber, latitude, longitude, categoryIds = [] }) {
   const slug = generateSlug(name);
-  const hasGeo = latitude !== undefined && latitude !== null && longitude !== undefined && longitude !== null;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     let row;
-    if (hasGeo) {
-      const result = await client.query(
-        `
-        INSERT INTO restaurants (name, slug, description, address, phone_number, latitude, longitude, geo)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, ${geoExpression(8)})
-        RETURNING *
-        `,
-        [name, slug, description ?? null, address ?? null, phoneNumber ?? null, latitude, longitude, longitude, latitude],
-      );
-      row = result.rows[0];
-    } else {
-      const result = await client.query(
-        `
-        INSERT INTO restaurants (name, slug, description, address, phone_number)
-        VALUES ($1, $2, $3, $4, $5)
-        RETURNING *
-        `,
-        [name, slug, description ?? null, address ?? null, phoneNumber ?? null],
-      );
-      row = result.rows[0];
-    }
+    const result = await client.query(
+      `
+      INSERT INTO restaurants (name, slug, description, address, phone_number, latitude, longitude, geo)
+      VALUES ($1, $2, $3, $4, $5, $6, $7,
+        CASE WHEN $6::numeric IS NOT NULL AND $7::numeric IS NOT NULL
+             THEN ST_SetSRID(ST_MakePoint($7, $6), 4326)
+             ELSE NULL
+        END)
+      RETURNING *
+      `,
+      [
+        name,
+        slug,
+        description ?? null,
+        address ?? null,
+        phoneNumber ?? null,
+        latitude ?? null,
+        longitude ?? null,
+      ],
+    );
+    row = result.rows[0];
 
     await insertCategoryMappings(client, row.id, categoryIds);
 
@@ -329,6 +321,23 @@ export async function createRestaurant(data) {
  * @returns {Promise<object|null>} Updated restaurant or null if not found.
  */
 export async function updateRestaurant(restaurantId, updates) {
+  const { name } = updates;
+
+  for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt += 1) {
+    try {
+      return await updateRestaurantAttempt(restaurantId, updates);
+    } catch (err) {
+      if (!isSlugConflict(err) || name === undefined) throw err;
+      if (attempt === MAX_SLUG_ATTEMPTS) {
+        throw new ConflictError('Could not allocate a unique restaurant slug after renaming. Please try again.');
+      }
+    }
+  }
+
+  throw new ConflictError('Could not allocate a unique restaurant slug after renaming. Please try again.');
+}
+
+async function updateRestaurantAttempt(restaurantId, updates) {
   const { name, description, address, phoneNumber, latitude, longitude, clearGeo, status, categoryIds } = updates;
 
   const client = await pool.connect();
@@ -345,6 +354,8 @@ export async function updateRestaurant(restaurantId, updates) {
 
     if (name !== undefined) {
       setClauses.push(`name = ${addParam(name)}`);
+      const newSlug = generateSlug(name);
+      setClauses.push(`slug = ${addParam(newSlug)}`);
     }
     if (description !== undefined) {
       setClauses.push(`description = ${addParam(description)}`);
@@ -419,8 +430,8 @@ export async function deleteRestaurant(restaurantId) {
   const result = await pool.query(
     `
     UPDATE restaurants
-    SET is_deleted = TRUE, deleted_at = COALESCE(deleted_at, NOW())
-    WHERE id = $1
+    SET is_deleted = TRUE, deleted_at = NOW()
+    WHERE id = $1 AND is_deleted = FALSE
     RETURNING id
     `,
     [restaurantId],
