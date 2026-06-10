@@ -2,7 +2,7 @@
 
 ## Current Behavior
 
-Backend auth is a skeleton. Routes/controllers/services exist but do not request or verify OTP. Docker local infrastructure has PostgreSQL and LocalStack but not Redis.
+Backend auth is a skeleton. Routes/controllers/services exist but do not request or verify OTP. Docker local infrastructure now includes PostgreSQL, Redis, and LocalStack; backend OTP code still needs to wire Redis before this story can be implemented.
 
 ## Target Behavior
 

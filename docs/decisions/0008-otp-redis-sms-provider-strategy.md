@@ -41,11 +41,11 @@ Positive:
 
 Tradeoffs:
 
-- Local Docker must include Redis from the first OTP implementation.
+- Local Docker includes Redis so OTP implementation can validate rate-limit, lock, and fail-closed behavior before runtime code is marked complete.
 - Integration validation must include Redis availability and fail-closed behavior.
 
 ## Follow-Up
 
-- Add Redis to local infrastructure.
+- Wire backend Redis client/config to the local `redis` service during the OTP implementation story.
 - Document provider env vars before enabling real AWS SMS.
 - Keep OTP codes, tokens, full phone numbers, and sensitive provider payloads out of logs and analytics.

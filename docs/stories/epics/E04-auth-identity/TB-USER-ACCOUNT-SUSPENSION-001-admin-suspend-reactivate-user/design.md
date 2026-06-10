@@ -11,6 +11,8 @@
 
 ## Application Flow
 
+Validation order intentionally returns account-context errors before `reason` input errors. This preserves deterministic business error codes for deleted/self/already-suspended targets even when the request body also has an invalid reason, and matches the API spec contract.
+
 Suspend:
 
 1. Authenticate admin/super admin.

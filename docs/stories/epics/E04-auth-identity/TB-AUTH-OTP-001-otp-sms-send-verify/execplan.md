@@ -40,7 +40,7 @@ Hard gates:
 ## Work Phases
 
 1. Confirm docs and decision records.
-2. Add Redis local infrastructure and config, including startup env validation that fails closed when `OTP_CAPTURE_MODE=redis` is set outside `NODE_ENV=development|test`.
+2. Wire backend Redis config/client to the local `redis` docker-compose service, including startup env validation that fails closed when `OTP_CAPTURE_MODE=redis` is set outside `NODE_ENV=development|test`.
 3. Implement service/controller/routes behind `/api/v1/auth`.
 4. Validate Redis rate-limit/temp-lock behavior and unsafe OTP capture startup rejection.
 5. Validate DB insert/rollback, migration, and required `otp_purposes.LOGIN` seed.
