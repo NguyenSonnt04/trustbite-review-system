@@ -1031,6 +1031,42 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
+  /reviews/{reviewId}/translation:
+    post:
+      tags:
+      - Reviews
+      summary: Translate a review comment on demand
+      description: Requires authentication and review visibility. The original review comment remains canonical; translated text is derived display data and must not affect trust score, fraud scoring, receipt verification, or moderation decisions.
+      operationId: translateReviewComment
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewTranslationRequest'
+      responses:
+        '200':
+          description: Review translation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewTranslationResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -1744,6 +1780,12 @@ components:
               - INVALID_GPS_SIGNAL
               - INVALID_RECEIPT_DECISION_COMBINATION
               - INVALID_MODERATION_DECISION_COMBINATION
+              - REVIEW_NOT_VISIBLE
+              - REVIEW_TRANSLATION_STALE
+              - UNSUPPORTED_TARGET_LOCALE
+              - TRANSLATION_TEXT_EMPTY
+              - TRANSLATION_RATE_LIMITED
+              - TRANSLATION_PROVIDER_UNAVAILABLE
             message:
               type: string
             details:
@@ -1852,3 +1894,47 @@ components:
           type: number
           nullable: true
           description: Returned only for ADMIN and SUPER_ADMIN callers; omit on owner-facing responses to prevent adversarial calibration of GPS spoofing distance.
+    ReviewTranslationRequest:
+      type: object
+      required:
+      - targetLocale
+      properties:
+        targetLocale:
+          type: string
+          minLength: 2
+          maxLength: 10
+          description: BCP 47 target locale requested by the user, for example vi, en, ja, or ko.
+          example: vi
+    ReviewTranslationResponse:
+      type: object
+      required:
+      - reviewId
+      - targetLocale
+      - originalTextHash
+      - translatedText
+      - provider
+      - cached
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        sourceLocale:
+          type: string
+          nullable: true
+          description: Source locale detected or returned by the translation provider when available.
+          example: en
+        targetLocale:
+          type: string
+          example: vi
+        originalTextHash:
+          type: string
+          description: SHA-256 hash of the current canonical review comment used for cache validation.
+        translatedText:
+          type: string
+          maxLength: 10000
+        provider:
+          type: string
+          enum:
+          - GOOGLE_TRANSLATE
+        cached:
+          type: boolean

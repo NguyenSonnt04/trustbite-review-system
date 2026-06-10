@@ -339,6 +339,52 @@ Phản hồi:
 }
 ```
 
+### POST /reviews/{reviewId}/translation
+
+Auth: người dùng hiện tại. Dùng để dịch bình luận review theo yêu cầu của người dùng, tương tự nút `Dịch` / `Xem bản gốc` trên mạng xã hội.
+
+Quy tắc:
+
+- Chỉ dịch review mà người gọi có quyền xem.
+- Không dịch review `HIDDEN`, `DELETED`, private hoặc không được phép hiển thị cho người gọi.
+- Bản gốc `reviews.comment` vẫn là source of truth; bản dịch chỉ là dữ liệu hiển thị.
+- Bản dịch không được dùng cho trust score, fraud scoring, OCR verification hoặc moderation decision.
+- Backend gọi Google Cloud Translation qua service layer; client không gọi Google trực tiếp và không giữ credential.
+- Backend cache bản dịch theo `reviewId + targetLocale + sourceTextHash`.
+
+Yêu cầu:
+
+```json
+{
+  "targetLocale": "vi"
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "reviewId": "uuid",
+  "sourceLocale": "en",
+  "targetLocale": "vi",
+  "originalTextHash": "sha256...",
+  "translatedText": "Món ăn rất ngon, phục vụ nhanh.",
+  "provider": "GOOGLE_TRANSLATE",
+  "cached": true
+}
+```
+
+Lỗi:
+
+- `401 AUTH_REQUIRED`
+- `403 REVIEW_NOT_VISIBLE`
+- `404 REVIEW_NOT_FOUND`
+- `409 REVIEW_TRANSLATION_STALE`
+- `422 UNSUPPORTED_TARGET_LOCALE`
+- `422 TRANSLATION_TEXT_EMPTY`
+- `429 TRANSLATION_RATE_LIMITED`
+- `503 TRANSLATION_PROVIDER_UNAVAILABLE`
+
 ---
 
 ## 6. Hóa đơn
