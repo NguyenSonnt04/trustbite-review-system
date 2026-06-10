@@ -99,3 +99,4 @@ Observed results:
 - Durable story row `TB-DEV-002` was added and marked implemented with integration/platform proof.
 - Review fix: story wording was aligned with the actual workflow, where Flutter is installed in CI rather than pre-detected.
 - PR #4 fix: CI installs the pinned Harness CLI and initializes/imports brownfield Harness records before querying the matrix; CodeQL permissions include `actions: read`; dependency review and CodeQL upload remain visible but non-blocking when unsupported by repository security settings.
+- PR #13 fix: CodeQL action pin was refreshed from v4.35.1 to v4.36.2 after the older pin failed during feature-enable init with `Requires authentication`; `security.yml` actionlint validation continued to pass locally.

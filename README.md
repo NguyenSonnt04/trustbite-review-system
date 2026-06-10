@@ -62,6 +62,7 @@ npm run docker:up
 ```
 This spawns:
 - **Postgres Database** on `localhost:5432` (Credentials: `trustbite_user` / `trustbite_secure_password`, Database: `trustbite_db`)
+- **Redis** on `localhost:6379` for OTP rate limits, temporary locks, and local queue/cache workflows
 - **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
 - **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `admin_password`)
 

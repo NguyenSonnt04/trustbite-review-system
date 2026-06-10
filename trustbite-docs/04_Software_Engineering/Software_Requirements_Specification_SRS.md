@@ -59,11 +59,11 @@ Tài liệu này chuyển yêu cầu sản phẩm và phân tích nghiệp vụ 
 | Mục đích | Quản lý hồ sơ người dùng, trạng thái tài khoản, cấp hạng và quyền đánh giá. |
 | Tác nhân | Người dùng đã đăng ký, quản trị viên |
 | Yêu cầu chức năng | USER-001 xem hồ sơ; USER-002 cập nhật tên/avatar; USER-003 xem EXP/cấp hạng; USER-004 quản trị viên khóa/mở tài khoản; USER-005 yêu cầu xóa tài khoản; USER-006 xem trạng thái yêu cầu xóa tài khoản. |
-| Quy tắc nghiệp vụ | Người dùng `SUSPENDED` không được viết đánh giá; hành động của quản trị viên phải ghi audit log; yêu cầu xóa tài khoản phải revoke session và xóa/ẩn danh hóa PII theo retention. |
-| Phụ thuộc API | `GET /users/me`, `PATCH /users/me`, `POST /users/me/deletion-request`, `GET /users/me/deletion-request`, `POST /users/me/deletion-request/cancel`, `GET /users/{userId}` |
+| Quy tắc nghiệp vụ | Người dùng `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, viết đánh giá hoặc thực hiện mutation bằng tài khoản đó; hành động khóa/mở khóa của quản trị viên phải revoke session khi suspend và ghi audit log; yêu cầu xóa tài khoản là luồng riêng phải revoke session và xóa/ẩn danh hóa PII theo retention. |
+| Phụ thuộc API | `GET /users/me`, `PATCH /users/me`, `POST /admin/users/{userId}/suspend`, `POST /admin/users/{userId}/reactivate`, `POST /users/me/deletion-request`, `GET /users/me/deletion-request`, `POST /users/me/deletion-request/cancel`, `GET /users/{userId}` |
 | Phụ thuộc dữ liệu | `users`, `user_sessions`, `account_deletion_requests`, `user_badges`, `audit_logs` |
-| Xử lý ngoại lệ | Người dùng không tồn tại, dữ liệu không hợp lệ, thiếu quyền. |
-| Tiêu chí nghiệm thu | Người dùng đăng nhập xem được hồ sơ; khi quản trị viên khóa tài khoản thì người dùng không gửi được đánh giá; người dùng tự gửi được yêu cầu xóa tài khoản và thấy trạng thái xử lý rõ ràng. |
+| Xử lý ngoại lệ | Người dùng không tồn tại, dữ liệu không hợp lệ, thiếu quyền, tự suspend chính mình, user đã `DELETED`, tài khoản bị `SUSPENDED`. |
+| Tiêu chí nghiệm thu | Người dùng đăng nhập xem được hồ sơ; khi quản trị viên khóa tài khoản thì session bị revoke và người dùng không login/refresh/update profile/gửi đánh giá được; khi mở khóa, user phải đăng nhập lại để có session mới; người dùng tự gửi được yêu cầu xóa tài khoản và thấy trạng thái xử lý rõ ràng. |
 
 ### 3.3. Module khám phá quán
 

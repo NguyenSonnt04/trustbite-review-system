@@ -22,6 +22,24 @@ services:
       timeout: 5s
       retries: 5
 
+  # TrustBite Redis Service for OTP rate limits and local queues
+  redis:
+    image: redis:7-alpine
+    container_name: trustbite-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    networks:
+      - trustbite-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # TrustBite LocalStack (AWS mock)
   localstack:
     image: localstack/localstack:latest
@@ -56,6 +74,8 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
     driver: local
   localstack_data:
     driver: local
