@@ -10,6 +10,7 @@
   - `otp:lock:<phone>` for temporary phone lock.
   - optional local-only `otp:dev:last:<phone>` for safe test capture.
 - Local/dev OTP capture is enabled only when `OTP_CAPTURE_MODE=redis` and `NODE_ENV` is explicitly allowlisted as `development` or `test`; staging/QA/production must ignore/reject this mode and must not write plaintext OTP codes to Redis.
+- Startup must fail closed for unsafe OTP capture configuration: if `OTP_CAPTURE_MODE=redis` is set and `NODE_ENV` is not `development` or `test`, the process must emit a clear `SECURITY_WARNING` and exit before serving traffic. This startup assertion is required in addition to request-time guards so misconfigured staging/QA/beta environments cannot write plaintext OTP codes to Redis.
 
 ## Application Flow
 

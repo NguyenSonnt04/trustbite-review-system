@@ -11,6 +11,7 @@ In scope:
 - `POST /api/v1/auth/otp/request`.
 - `POST /api/v1/auth/otp/verify`.
 - Redis local service/config for OTP rate-limit, failed attempts, temporary phone locks, and local/dev message capture guarded by `OTP_CAPTURE_MODE=redis` and `NODE_ENV` in `development`/`test`.
+- Startup env validation for OTP capture: if `OTP_CAPTURE_MODE=redis` is set outside allowlisted `NODE_ENV` values (`development`/`test`), emit a clear `SECURITY_WARNING` and exit before serving traffic.
 - PostgreSQL `otp_verifications` records with hashed OTP.
 - Local fake SMS provider abstraction; production target documented as AWS End User Messaging SMS.
 
@@ -39,10 +40,10 @@ Hard gates:
 ## Work Phases
 
 1. Confirm docs and decision records.
-2. Add Redis local infrastructure and config.
+2. Add Redis local infrastructure and config, including startup env validation that fails closed when `OTP_CAPTURE_MODE=redis` is set outside `NODE_ENV=development|test`.
 3. Implement service/controller/routes behind `/api/v1/auth`.
-4. Validate Redis rate-limit/temp-lock behavior.
-5. Validate DB insert/rollback and migration.
+4. Validate Redis rate-limit/temp-lock behavior and unsafe OTP capture startup rejection.
+5. Validate DB insert/rollback, migration, and required `otp_purposes.LOGIN` seed.
 6. Update Harness evidence.
 
 ## Stop Conditions
