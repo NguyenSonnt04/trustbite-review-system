@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import apiRoutes from './routes/index.js';
+import { errorHandler } from './middlewares/error.js';
 
 const app = express();
 
@@ -15,8 +17,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// TODO: Mount routes here
-// import authRoutes from './routes/auth.routes.js';
-// app.use('/api/auth', authRoutes);
+// API v1 routes
+app.use('/api/v1', apiRoutes);
+
+// Centralised error handler (must be last)
+app.use(errorHandler);
 
 export default app;
