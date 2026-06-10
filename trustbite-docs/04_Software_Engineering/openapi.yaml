@@ -73,6 +73,8 @@ paths:
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
         '429':
           $ref: '#/components/responses/Error'
   /auth/refresh:
@@ -107,6 +109,8 @@ paths:
                     type: integer
                     example: 900
         '401':
+          $ref: '#/components/responses/Error'
+        '403':
           $ref: '#/components/responses/Error'
   /auth/logout:
     post:

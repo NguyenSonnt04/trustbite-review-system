@@ -100,7 +100,7 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `IDEMPOTENCY_CONFLICT` | Idempotency key được dùng lại với payload khác |
 | `REQUEST_IN_PROGRESS` | Request cùng idempotency key đang xử lý |
 | `REVIEW_VERIFICATION_EXPIRED` | Review SUBMITTED đã quá hạn upload và chuyển REFERENCE_ONLY |
-| `ADMIN_REASON_REQUIRED` | Hành động/quyết định admin bắt buộc reason nhưng request không cung cấp reason |
+| `ADMIN_REASON_REQUIRED` | Hành động/quyết định admin bắt buộc reason nhưng request không cung cấp reason hợp lệ (thiếu hoặc ngắn hơn 10 ký tự) |
 | `USER_ALREADY_SUSPENDED` | Tài khoản đã ở trạng thái SUSPENDED |
 | `USER_NOT_SUSPENDED` | Tài khoản hiện không ở trạng thái SUSPENDED |
 | `CANNOT_SUSPEND_SELF` | Không thể suspend chính mình |
