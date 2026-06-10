@@ -7,6 +7,7 @@
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Backend / Mobile / Product / Legal |
 | Ngày cập nhật | 2026-06-10 |
+| Traceability | `docs/stories/epics/E11-review-translation/TB-TRANS-001-google-review-translation/overview.md` |
 
 ---
 
@@ -20,6 +21,7 @@ Cho phép người dùng đọc review bằng ngôn ngữ phù hợp với họ 
 - Bản dịch chỉ là dữ liệu hiển thị.
 - Không tự động dịch toàn bộ comment khi load danh sách.
 - Chỉ dịch khi người dùng bấm `Dịch`.
+- Client không bắt buộc phải biết ngôn ngữ gốc trước khi hiện nút `Dịch`; `sourceLocale` là dữ liệu backend/provider trả về sau khi dịch.
 - Người dùng có thể quay về `Xem bản gốc` mà không gọi lại backend.
 - Bản dịch không được dùng cho trust score, fraud scoring, OCR, hay moderation.
 - Không dịch review hidden/deleted/không được phép xem.
@@ -73,11 +75,12 @@ Lỗi:
 - `401 AUTH_REQUIRED`
 - `403 REVIEW_NOT_VISIBLE`
 - `404 REVIEW_NOT_FOUND`
-- `409 REVIEW_TRANSLATION_STALE`
 - `422 UNSUPPORTED_TARGET_LOCALE`
 - `422 TRANSLATION_TEXT_EMPTY`
 - `429 TRANSLATION_RATE_LIMITED`
 - `503 TRANSLATION_PROVIDER_UNAVAILABLE`
+
+Stale cache không phải lỗi client. Nếu review text đổi, `sourceTextHash` đổi theo; backend coi đó là cache miss và gọi provider để tạo bản dịch mới.
 
 ## 5. Data model
 
@@ -96,6 +99,9 @@ CREATE TABLE review_translations (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (review_id, target_locale, source_text_hash)
 );
+
+CREATE INDEX idx_review_translations_review_locale_created
+  ON review_translations (review_id, target_locale, created_at DESC);
 ```
 
 ## 6. Provider
@@ -119,7 +125,7 @@ Khi người dùng bấm dịch, TrustBite có thể gửi nội dung bình lu�
 
 ## 8. Acceptance
 
-- Hiện nút `Dịch` khi review khác ngôn ngữ người dùng.
+- Hiện nút `Dịch` cho review/comment visible khi user/app có `targetLocale` được hỗ trợ; nếu client chưa biết ngôn ngữ gốc, backend/provider sẽ trả `sourceLocale` sau khi dịch.
 - Bấm `Dịch` trả text đã dịch từ backend.
 - `Xem bản gốc` quay về review gốc mà không gọi provider lại.
 - Cache hit không gọi Google lại.

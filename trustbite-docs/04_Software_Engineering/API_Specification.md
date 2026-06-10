@@ -351,6 +351,7 @@ Quy tắc:
 - Bản dịch không được dùng cho trust score, fraud scoring, OCR verification hoặc moderation decision.
 - Backend gọi Google Cloud Translation qua service layer; client không gọi Google trực tiếp và không giữ credential.
 - Backend cache bản dịch theo `reviewId + targetLocale + sourceTextHash`.
+- Nếu review text thay đổi, `sourceTextHash` thay đổi; backend coi đó là cache miss và tự dịch lại, không trả lỗi stale cho client.
 
 Yêu cầu:
 
@@ -379,7 +380,6 @@ Lỗi:
 - `401 AUTH_REQUIRED`
 - `403 REVIEW_NOT_VISIBLE`
 - `404 REVIEW_NOT_FOUND`
-- `409 REVIEW_TRANSLATION_STALE`
 - `422 UNSUPPORTED_TARGET_LOCALE`
 - `422 TRANSLATION_TEXT_EMPTY`
 - `429 TRANSLATION_RATE_LIMITED`
