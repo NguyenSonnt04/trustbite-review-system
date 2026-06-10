@@ -49,6 +49,7 @@
 | 04_Software_Engineering | Development_Guidelines.md | Quy chuẩn phát triển, Git workflow, commit và code review checklist | Engineering Lead | Đang rà soát |
 | 04_Software_Engineering | Mobile_App_Architecture.md | Kiến trúc mobile app | Mobile Lead | Đang rà soát |
 | 04_Software_Engineering | OpenAPI_Guidelines.md | Quy chuẩn API contract/OpenAPI | Backend/Mobile | Đang rà soát |
+| 04_Software_Engineering | Review_Translation_Feature.md | Dịch bình luận review theo yêu cầu người dùng bằng Google Cloud Translation | Backend/Mobile/Product/Legal | Đang rà soát |
 | 04_Software_Engineering | Idempotency_and_Retry_Design.md | Thiết kế chống tạo trùng request và retry mobile | Backend/Mobile/DBA | Đang rà soát |
 | 04_Software_Engineering | openapi.yaml | Contract OpenAPI 3.1 baseline cho MVP P0 | Backend/Mobile/QA | Đang rà soát |
 | 05_Security_Algorithms | Anti_Fraud_Specification.md | Đặc tả chống gian lận | Bảo mật/Dữ liệu | Đang rà soát |

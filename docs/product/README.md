@@ -16,7 +16,6 @@ Create focused product docs as stories are selected:
 | --- | --- | --- |
 | Restaurant discovery | `docs/product/restaurant-discovery.md` | Search, filters, details, menu/price signals |
 | Reviews | `docs/product/reviews.md` | Review creation, states, ownership, editing/deletion |
-| Review translation | `docs/product/review-translation.md` | On-demand machine translation for user reviews |
 | Verification / anti-fraud | `docs/product/verification.md` | Receipt hash, OCR, merchant match, timestamp, GPS, evidence |
 | Trust score | `docs/product/trust-score.md` | Score inputs, aggregation, visibility, recalculation |
 | Authentication | `docs/product/authentication.md` | Cognito sessions, protected actions, user identity |
