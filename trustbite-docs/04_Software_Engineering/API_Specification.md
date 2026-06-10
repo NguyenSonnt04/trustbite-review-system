@@ -657,7 +657,7 @@ Ghi chú:
 
 - `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
-- Nếu user chưa `SUSPENDED`, trả `400 USER_NOT_SUSPENDED`. Nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`.
+- Nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`. Nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`.
 - Không được reactivate chính mình (`403 CANNOT_REACTIVATE_SELF`).
 
 ### POST /admin/restaurant-claims/{id}/decision
