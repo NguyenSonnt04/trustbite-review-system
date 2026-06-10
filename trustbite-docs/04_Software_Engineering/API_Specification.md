@@ -627,12 +627,12 @@ Phản hồi:
 
 Ghi chú:
 
-- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 - Backend phải revoke active sessions của user bị khóa.
 - User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó; các endpoint auth/mutation bị chặn trả `403 ACCOUNT_SUSPENDED`. User `DELETED` bị chặn tương tự với `403 ACCOUNT_DELETED`.
-- Không được suspend chính mình (`403 CANNOT_SUSPEND_SELF`).
+- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_SUSPEND_DELETED_USER`.
+- Kiểm tra self-suspend trước status check: nếu actor targets chính mình, trả `403 CANNOT_SUSPEND_SELF`.
 - Nếu user đã `SUSPENDED`, trả `409 USER_ALREADY_SUSPENDED`.
-- Nếu user `DELETED`, trả `400 CANNOT_SUSPEND_DELETED_USER`.
+- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
 
 ### POST /admin/users/{userId}/reactivate
 

@@ -14,7 +14,11 @@
 Suspend:
 
 1. Authenticate admin/super admin.
-2. Validate target user, reason, and self-suspend guard.
+2. Validate request in this order:
+   - if target user is `DELETED`, return `400 CANNOT_SUSPEND_DELETED_USER`;
+   - if actor targets their own account, return `403 CANNOT_SUSPEND_SELF`;
+   - if target user is already `SUSPENDED`, return `409 USER_ALREADY_SUSPENDED`;
+   - if `reason` is missing or shorter than 10 characters, return `422 ADMIN_REASON_REQUIRED`.
 3. In a DB transaction, update user status to `SUSPENDED`, revoke active `user_sessions`, insert audit log.
 4. Return user id, status, revoked session count, audit log id.
 
