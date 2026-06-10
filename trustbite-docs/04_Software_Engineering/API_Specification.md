@@ -65,7 +65,7 @@ Ghi chú triển khai:
 - OTP gồm 6 chữ số, hết hạn sau 120 giây.
 - Rate limit request phải dùng Redis: tối đa 3 request / 10 phút / phone number.
 - PostgreSQL `otp_verifications` lưu bằng chứng OTP dạng hash/trạng thái; không lưu OTP thô.
-- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn; production dùng SMS provider đã được duyệt.
+- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn chỉ khi `OTP_CAPTURE_MODE=redis` và `NODE_ENV !== 'production'`; production dùng SMS provider đã được duyệt và không được capture OTP plaintext.
 - Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass rate limit.
 
 ### POST /auth/otp/verify
@@ -97,6 +97,7 @@ Ghi chú triển khai:
 
 - OTP sai tăng failed counter trên Redis và/hoặc request state; tối đa 5 lần sai trước khóa tạm.
 - Khóa tạm OTP là khóa theo phone number cho luồng xác thực, khác với account suspension.
+- Nếu Redis/rate-limit store không khả dụng trong bước verify, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass failed-attempt/lock checks.
 - Khi verify đúng, backend tạo user nếu phone chưa tồn tại, tạo session, trả access JWT và set refresh token dạng HttpOnly cookie.
 - User `SUSPENDED` hoặc `DELETED` không được nhận token mới.
 

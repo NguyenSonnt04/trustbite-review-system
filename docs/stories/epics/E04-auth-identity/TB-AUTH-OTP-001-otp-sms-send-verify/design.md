@@ -9,6 +9,7 @@
   - `otp:fail:<phone>` for failed verify count.
   - `otp:lock:<phone>` for temporary phone lock.
   - optional local-only `otp:dev:last:<phone>` for safe test capture.
+- Local/dev OTP capture is enabled only when `OTP_CAPTURE_MODE=redis` and `NODE_ENV !== 'production'`; production must ignore/reject this mode and must not write plaintext OTP codes to Redis.
 
 ## Application Flow
 
