@@ -16,7 +16,7 @@
 2. Service checks Redis lock and rate limit.
 3. Service creates OTP, hashes it, writes `otp_verifications` row, and calls SMS provider abstraction.
 4. Verify OTP validates phone/code format.
-5. Service checks Redis lock, loads latest pending OTP, verifies hash and expiry.
+5. Service checks Redis lock and failed counter. If Redis is unavailable, fail-closed with `503 PROVIDER_UNAVAILABLE` (same as `/auth/otp/request`). Otherwise loads latest pending OTP, verifies hash and expiry.
 6. Success marks OTP verified and hands off to session/user flow.
 7. Failure increments Redis failed counter and locks phone after threshold.
 

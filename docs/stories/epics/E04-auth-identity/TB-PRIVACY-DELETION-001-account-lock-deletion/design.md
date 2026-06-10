@@ -29,7 +29,7 @@ Processing job:
 1. Select due deletion requests.
 2. Revoke remaining sessions/push tokens.
 3. Delete or anonymize PII according to `Data_Retention_Policy.md`.
-4. Mark request `COMPLETED` and set `users.deleted_at`.
+4. Mark request `COMPLETED`, set `users.status = DELETED`, and set `users.deleted_at`. Setting `users.status = DELETED` is required so that auth middleware and session service reject new token issuance for deleted accounts (ref: `BR-AUTH-004`, decision 0007).
 5. Preserve audit/fraud/legal-minimum records only where policy allows.
 
 Web deletion path:
