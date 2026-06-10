@@ -25,6 +25,21 @@
 - Dữ liệu nhạy cảm trong seed/test phải là dữ liệu giả, không dùng hóa đơn/số điện thoại/GPS thật.
 - Trạng thái DB phải đồng bộ với `02_Business_Analysis/Status_Mapping.md`.
 
+Migration thực thi trong repo nằm tại:
+
+```text
+server/migrations/
+server/scripts/migrate.js
+```
+
+Lệnh chạy migration local:
+
+```bash
+npm run db:migrate
+```
+
+Schema dùng `GEOGRAPHY(Point, 4326)`, vì vậy PostgreSQL local phải chạy image có PostGIS.
+
 ---
 
 ## 3. Thứ tự migration baseline P0

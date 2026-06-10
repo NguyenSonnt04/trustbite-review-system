@@ -135,3 +135,5 @@ Truoc khi sua model:
 - Schema table count: 54.
 - Model file count: 54.
 - Model folder da bao phu cac bang trong schema v2.7.0.
+- Migration baseline thuc thi nam o `server/migrations/001_init_schema.sql`.
+- Chay `npm run db:migrate` de tao bang that trong PostgreSQL local.
