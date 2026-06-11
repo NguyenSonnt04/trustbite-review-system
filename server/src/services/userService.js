@@ -122,6 +122,12 @@ const getAdminActorRole = (actor) => {
   return null;
 };
 
+const ACCOUNT_DELETION_CONFIRMATION_TEXT = 'XÓA TÀI KHOẢN'.normalize('NFC');
+
+const normalizeConfirmationText = (value) => (
+  typeof value === 'string' ? value.normalize('NFC') : value
+);
+
 export class UserService {
   async getCurrentUser(userId) {
     const result = await pool.query('SELECT * FROM users WHERE id = $1', [userId]);
@@ -176,7 +182,7 @@ export class UserService {
   }
 
   async createDeletionRequest(userId, body) {
-    if (body.confirmationText !== 'XÓA TÀI KHOẢN') {
+    if (normalizeConfirmationText(body.confirmationText) !== ACCOUNT_DELETION_CONFIRMATION_TEXT) {
       throw createHttpError(422, 'VALIDATION_ERROR', 'confirmationText must match required deletion phrase');
     }
 

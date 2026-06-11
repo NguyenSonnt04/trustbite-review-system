@@ -145,6 +145,7 @@ export class CognitoIdentityProvider {
       phoneNumber: payload.phone_number || null,
       phoneNumberVerified: payload.phone_number_verified === true,
       tokenUse: payload.token_use,
+      roles: Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [],
       claims: payload
     };
   }

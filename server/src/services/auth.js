@@ -81,11 +81,39 @@ const findUserByIdentity = async (identity) => {
     }
   }
 
-  if (identity.phoneNumber && identity.phoneNumberVerified) {
-    return pool.query(
-      'SELECT * FROM users WHERE phone_number = $1 AND cognito_sub IS NULL',
-      [identity.phoneNumber]
-    );
+  if (identity.subject && identity.phoneNumber && identity.phoneNumberVerified) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const phoneResult = await client.query(
+        'SELECT * FROM users WHERE phone_number = $1 AND cognito_sub IS NULL FOR UPDATE',
+        [identity.phoneNumber]
+      );
+
+      if (phoneResult.rowCount === 0) {
+        await client.query('COMMIT');
+        return phoneResult;
+      }
+
+      const mappedResult = await client.query(
+        `UPDATE users
+         SET cognito_sub = $1
+         WHERE id = $2 AND cognito_sub IS NULL
+         RETURNING *`,
+        [identity.subject, phoneResult.rows[0].id]
+      );
+
+      await client.query('COMMIT');
+      return mappedResult;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      if (err.code === '23505') {
+        throw createUnmappedIdentityError();
+      }
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   throw createUnmappedIdentityError();
