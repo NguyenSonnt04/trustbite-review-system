@@ -22,7 +22,7 @@ Restaurant has two separate lifecycle concepts:
 - `GET /api/v1/restaurants/:restaurantId` returns 404 if the row is missing or `is_deleted = TRUE`.
 - `PATCH /api/v1/restaurants/:restaurantId` updates only rows where `is_deleted = FALSE`.
 - `DELETE /api/v1/restaurants/:restaurantId` sets `is_deleted = TRUE, deleted_at = NOW()` for an existing non-deleted row.
-- A repeated DELETE for an already soft-deleted row should remain idempotent and return success if the row exists.
+- A repeated DELETE for an already soft-deleted row returns `404 RESTAURANT_NOT_FOUND` because deleted rows are excluded from regular application flows.
 
 ## Interface Contract
 

@@ -41,9 +41,9 @@ curl -i -X DELETE http://localhost:5000/api/v1/restaurants/<ACTIVE_ID>
 # Expected: 200 { success: true, message: 'Restaurant has been soft-deleted.' }
 # DB check: is_deleted = true, deleted_at IS NOT NULL
 
-# Idempotent
+# Repeated delete
 curl -i -X DELETE http://localhost:5000/api/v1/restaurants/<ACTIVE_ID>
-# Expected: 404 RESTAURANT_NOT_FOUND (already deleted, not idempotent by design)
+# Expected: 404 RESTAURANT_NOT_FOUND (already deleted and excluded from regular flows)
 
 # GET after delete
 curl -i http://localhost:5000/api/v1/restaurants/<DELETED_ID>

@@ -85,6 +85,11 @@ const RESTAURANT_SELECT_PROJECTION = `
   LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
 `;
 
+const PUBLIC_RESTAURANT_CONDITION = `
+  r.status = 'ACTIVE'
+  AND r.is_deleted = FALSE
+`;
+
 /**
  * Map a DB row to a camelCase public-facing object.
  */
@@ -165,8 +170,8 @@ export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {})
   const safeSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
   const offset = (safePage - 1) * safeSize;
 
-  const params = ['ACTIVE'];
-  const conditions = ['r.status = $1', 'r.is_deleted = FALSE'];
+  const params = [];
+  const conditions = [PUBLIC_RESTAURANT_CONDITION];
 
   if (keyword && keyword.trim()) {
     params.push(`%${keyword.trim()}%`);
@@ -230,10 +235,9 @@ export async function publicRestaurantExists(restaurantId) {
   const result = await pool.query(
     `
     SELECT 1
-    FROM restaurants
-    WHERE id = $1
-      AND status = 'ACTIVE'
-      AND is_deleted = FALSE
+    FROM restaurants r
+    WHERE r.id = $1
+      AND ${PUBLIC_RESTAURANT_CONDITION}
     LIMIT 1
     `,
     [restaurantId],
@@ -440,8 +444,7 @@ export async function getRestaurantDetail(restaurantId) {
     `
     ${RESTAURANT_SELECT_PROJECTION}
     WHERE r.id = $1
-      AND r.status = 'ACTIVE'
-      AND r.is_deleted = FALSE
+      AND ${PUBLIC_RESTAURANT_CONDITION}
     GROUP BY r.id
     `,
     [restaurantId],

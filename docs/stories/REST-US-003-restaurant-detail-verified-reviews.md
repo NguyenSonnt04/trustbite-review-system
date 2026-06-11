@@ -36,7 +36,7 @@ Theo API_Specification.md và Traceability_Matrix.md; restaurant detail phải t
   - Public listing excludes unverified, hidden, rejected, deleted, and non-public visibility reviews.
   - `getRestaurantDetail` enforces `r.status = 'ACTIVE'` — DRAFT/SUSPENDED/CLOSED return 404.
   - `ratingBreakdown` counts only reviews with `status IN ('VERIFIED', 'REFERENCE_ONLY') AND public_visibility = 'PUBLIC'`.
-  - `/reviews` existence check uses `getRestaurantDetail` ensuring ACTIVE gate is consistent.
+  - `/reviews` existence check uses lightweight `publicRestaurantExists`, which shares the same ACTIVE/non-deleted public gate as `getRestaurantDetail`.
 - UI surfaces: Mobile app restaurant detail page.
 
 ## Validation
@@ -63,7 +63,7 @@ None.
   - Populates `ratingBreakdown` using only reviews where `status IN ('VERIFIED', 'REFERENCE_ONLY') AND public_visibility = 'PUBLIC'`.
   - Populates `ownerClaimStatus` from latest `restaurant_claims` row (null if none).
 - `GET /api/v1/restaurants/:restaurantId/reviews` implemented via `listPublicReviewsByRestaurant`:
-  - Existence check uses `getRestaurantDetail` so only ACTIVE restaurants pass.
+  - Existence check uses lightweight `publicRestaurantExists`, sharing the same public ACTIVE/non-deleted condition as `getRestaurantDetail`.
   - SQL WHERE clause: `restaurant_id = $1 AND <statusCondition> AND public_visibility = 'PUBLIC'`.
   - `statusCondition` is one of: `status = 'VERIFIED'`, `status = 'REFERENCE_ONLY'`, or `status IN ('VERIFIED', 'REFERENCE_ONLY')` for ALL.
   - `userId` omitted from public response per API spec.
