@@ -24,7 +24,7 @@ Protected routes must declare:
 
 - `Authorization: Bearer <Cognito access token>` unless otherwise specified,
 - required local account status and role/permission,
-- auth errors for missing, invalid, expired, wrong audience, wrong issuer, wrong token use, unmapped identity, suspended/deleted account, and insufficient permission.
+- auth errors for missing, invalid, expired, wrong client id, wrong issuer, wrong token use, unmapped identity, suspended/deleted account, and insufficient permission.
 
 Business route/controller/service shape remains normal Express. Provider logic must stay in auth middleware/config/services and not inside domain services.
 
@@ -37,17 +37,17 @@ authMiddleware
   -> AuthService maps identity to local user and enforces status/roles
 ```
 
-The normalized identity contains provider, subject, optional phone/email/local user id, token use, trusted roles, and original claims for boundary diagnostics.
+The normalized identity contains provider, subject, optional phone/email/local user id, phone verification state, token use, trusted roles, and original claims for boundary diagnostics.
 
 Cognito remains the production adapter. Future providers require an accepted decision update and provider-specific negative-path proof.
 
 ## Data Model
 
-Current migration has `users.phone_number` and `user_sessions`, but no Cognito identity mapping field. Future implementation should add an explicit Cognito identity mapping such as `users.cognito_sub` with uniqueness proof, or a separate identity table if a later decision requires multi-provider identity.
+The current schema stores local profile/account state in `users` and maps Cognito users through `users.cognito_sub`, a nullable stable subject with a uniqueness constraint when present. `users.phone_number` remains available for legacy/local mapping only when the provider reports a verified phone number and `users.cognito_sub` is still null during transition; Cognito `sub` is the preferred external identity key.
 
 `user_sessions.refresh_token_hash` must not be used for Cognito refresh-token storage by default. Cognito owns session/refresh lifecycle.
 
-Schema changes are out of scope for this docs alignment and require high-risk migration proof.
+Further identity schema changes require high-risk migration proof.
 
 ## UI / Platform Impact
 
@@ -59,7 +59,7 @@ Schema changes are out of scope for this docs alignment and require high-risk mi
 
 - Do not log raw access, ID, or refresh tokens.
 - Do not log OTP codes or full sensitive identity values.
-- Log auth failures using safe categories such as `missing_token`, `invalid_signature`, `expired_token`, `wrong_audience`, `unmapped_identity`, `suspended_user`, or `forbidden`.
+- Log auth failures using safe categories such as `missing_token`, `invalid_signature`, `expired_token`, `wrong_client_id`, `unmapped_identity`, `suspended_user`, or `forbidden`.
 - Audit product authorization and account-state decisions where product policy requires it.
 
 ## Alternatives Considered

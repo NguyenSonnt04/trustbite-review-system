@@ -40,13 +40,17 @@ const requireUser = async (client, userId, { forUpdate = false } = {}) => {
   return result.rows[0];
 };
 
-const validateCurrentUserCanMutate = (user) => {
+const validateCurrentUserCanRead = (user) => {
   if (user.status === 'SUSPENDED') {
     throw createHttpError(403, 'ACCOUNT_SUSPENDED', 'Account is suspended');
   }
   if (user.status === 'DELETED') {
     throw createHttpError(403, 'ACCOUNT_DELETED', 'Account is deleted');
   }
+};
+
+const validateCurrentUserCanMutate = (user) => {
+  validateCurrentUserCanRead(user);
 };
 
 const normalizeDisplayName = (value) => {
@@ -124,7 +128,7 @@ export class UserService {
     if (result.rowCount === 0) {
       throw createHttpError(404, 'USER_NOT_FOUND', 'User not found');
     }
-    validateCurrentUserCanMutate(result.rows[0]);
+    validateCurrentUserCanRead(result.rows[0]);
     return mapUserRow(result.rows[0]);
   }
 

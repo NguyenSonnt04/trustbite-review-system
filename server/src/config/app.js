@@ -17,16 +17,25 @@ const parseCsv = (value = '') => value
   .map((item) => item.trim())
   .filter(Boolean);
 
+const parseBoolean = (value = '') => value.trim().toLowerCase() === 'true';
+
+const env = process.env.NODE_ENV || 'development';
+
 const avatarAllowedHosts = parseCsv(process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS)
   .map((host) => host.toLowerCase());
 
 const corsOrigins = parseCsv(process.env.ALLOWED_ORIGINS);
 
+if (env === 'production' && corsOrigins.length === 0) {
+  throw new Error('[Config] ALLOWED_ORIGINS must be configured in production');
+}
+
 export default {
   port: parseInt(process.env.PORT, 10) || 5000,
-  env: process.env.NODE_ENV || 'development',
+  env,
   corsOrigins,
   avatarAllowedHosts,
+  trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
   auth: {
     provider: 'cognito',
     cognito: {

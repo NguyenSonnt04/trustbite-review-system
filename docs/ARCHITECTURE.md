@@ -135,7 +135,7 @@ These are not implemented yet and should not be claimed as complete without a st
 
 - server route mounting beyond health/basic skeleton,
 - real OCR/Textract processing,
-- real Cognito JWT middleware/authorizer enforcement and local user mapping,
+- full automated proof for Cognito JWT middleware/authorizer enforcement and local user mapping,
 - review persistence and schema migrations,
 - trust-score computation,
 - automated backend tests,

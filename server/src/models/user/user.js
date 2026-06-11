@@ -8,6 +8,7 @@ export class UserModel {
     this.phone_number = data.phone_number ?? null;
     this.display_name = data.display_name ?? null;
     this.avatar_url = data.avatar_url ?? null;
+    this.cognito_sub = data.cognito_sub ?? null;
     this.status = data.status ?? 'ACTIVE'; // 'ACTIVE' | 'SUSPENDED' | 'DELETED'
     this.exp_points = data.exp_points != null ? parseInt(data.exp_points, 10) : 0;
     this.rank_code = data.rank_code ?? 'NEWBIE';

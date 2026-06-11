@@ -13,12 +13,13 @@ In scope:
 - Story packet defining implementation expectations.
 - Harness matrix/durable row alignment.
 - Superseding prior backend-issued JWT/session strategy.
+- Cognito identity provider adapter and protected-route middleware behavior.
+- Local user mapping through `users.cognito_sub`.
 
 Out of scope:
 
-- Implementing Cognito JWT middleware.
 - Provisioning Cognito user pools/app clients.
-- Adding `users.cognito_sub` or equivalent schema migration.
+- Additional identity-provider schema beyond the `users.cognito_sub` local mapping field.
 - Building web/mobile login UI.
 - Implementing API Gateway authorizer configuration.
 

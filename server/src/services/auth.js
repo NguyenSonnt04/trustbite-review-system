@@ -27,7 +27,7 @@ const parseTrustedRoles = (rolesHeader = '') =>
     .filter(Boolean);
 
 const getTrustedDevelopmentIdentity = (req) => {
-  if (appConfig.env === 'production' || process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS !== 'true') {
+  if (appConfig.env === 'production' || !appConfig.trustedAuthHeaders) {
     return null;
   }
 
@@ -44,6 +44,7 @@ const getTrustedDevelopmentIdentity = (req) => {
     provider: 'trusted-local',
     subject: req.header('x-trustbite-subject') || req.header('x-trustbite-cognito-sub') || `local:${userId}`,
     phoneNumber: req.header('x-trustbite-phone-number') || null,
+    phoneNumberVerified: true,
     localUserId: userId,
     roles: parseTrustedRoles(req.header('x-trustbite-roles')),
     tokenUse: 'access',
@@ -65,7 +66,7 @@ const getIdentityProvider = () => {
   throw createHttpError(500, 'AUTH_PROVIDER_UNSUPPORTED', 'Configured auth provider is not supported');
 };
 
-const findUserByIdentity = (identity) => {
+const findUserByIdentity = async (identity) => {
   if (identity.localUserId) {
     if (!UUID_REGEX.test(identity.localUserId)) {
       throw createUnmappedIdentityError();
@@ -73,8 +74,18 @@ const findUserByIdentity = (identity) => {
     return pool.query('SELECT * FROM users WHERE id = $1', [identity.localUserId]);
   }
 
-  if (identity.phoneNumber) {
-    return pool.query('SELECT * FROM users WHERE phone_number = $1', [identity.phoneNumber]);
+  if (identity.subject) {
+    const subjectResult = await pool.query('SELECT * FROM users WHERE cognito_sub = $1', [identity.subject]);
+    if (subjectResult.rowCount > 0 || !identity.phoneNumber) {
+      return subjectResult;
+    }
+  }
+
+  if (identity.phoneNumber && identity.phoneNumberVerified) {
+    return pool.query(
+      'SELECT * FROM users WHERE phone_number = $1 AND cognito_sub IS NULL',
+      [identity.phoneNumber]
+    );
   }
 
   throw createUnmappedIdentityError();
@@ -94,7 +105,8 @@ const mapPublicIdentity = (identity) => ({
   provider: identity.provider,
   subject: identity.subject,
   tokenUse: identity.tokenUse,
-  phoneNumber: identity.phoneNumber || null
+  phoneNumber: identity.phoneNumber || null,
+  phoneNumberVerified: identity.phoneNumberVerified === true
 });
 
 const mapCognitoContext = (identity) => {
@@ -105,7 +117,8 @@ const mapCognitoContext = (identity) => {
   return {
     sub: identity.subject,
     tokenUse: identity.tokenUse,
-    phoneNumber: identity.phoneNumber || null
+    phoneNumber: identity.phoneNumber || null,
+    phoneNumberVerified: identity.phoneNumberVerified === true
   };
 };
 
@@ -150,6 +163,7 @@ export class AuthService {
       id: user.id,
       phoneNumber: user.phone_number,
       displayName: user.display_name,
+      cognitoSub: user.cognito_sub || null,
       status: user.status,
       roles: mergeRoles(roleResult.rows, providerRoles),
       identity: mapPublicIdentity(identity),

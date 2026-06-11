@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+in_progress
 
 ## Lane
 
@@ -33,9 +33,9 @@ Business APIs remain in the Express backend. Protected Express routes verify Cog
 ## Design Notes
 
 - Commands: Cognito login/signup/token flows are provider-owned; Express protected routes receive bearer JWTs.
-- Queries: local user lookup by Cognito subject, future schema field/table TBD by migration story.
+- Queries: local user lookup by Cognito subject via `users.cognito_sub`, with phone-number fallback only for verified-phone legacy/local rows that do not yet have a Cognito subject during transition.
 - API: protected routes require `Authorization: Bearer <Cognito access token>` unless explicitly documented otherwise.
-- Tables: future Cognito identity mapping likely requires `users.cognito_sub` or separate identity table; not implemented in this docs slice.
+- Tables: `users.cognito_sub` stores the stable Cognito subject and is unique when present.
 - Domain rules: `SUSPENDED` and `DELETED` local users are rejected even with valid Cognito tokens.
 - UI surfaces: future web/mobile auth screens must target Cognito token semantics.
 
@@ -47,7 +47,7 @@ When updating durable proof status, use numeric booleans:
 | Layer | Expected proof |
 | --- | --- |
 | Unit | Future Cognito claim parser/JWKS validation/local account-state rules |
-| Integration | Future Express middleware accepts valid Cognito JWT and rejects missing/invalid/expired/wrong issuer/wrong audience/wrong token use/unmapped/suspended/deleted users |
+| Integration | Future Express middleware accepts valid Cognito access JWT and rejects missing/invalid/expired/wrong issuer/wrong client id/wrong token use/unmapped/suspended/deleted users |
 | E2E | Future client/mobile obtains Cognito token and calls protected API |
 | Platform | Future LocalStack Cognito or explicit Cognito-compatible test double proof; production config from env |
 | Release | `npm run harness -- query matrix`; `npm run harness -- query decisions`; doc review |
@@ -69,4 +69,4 @@ npm run harness -- query matrix
 npm run harness -- query decisions
 ```
 
-Implementation proof: pending; no Cognito middleware or schema migration was implemented in this slice.
+Implementation proof: in progress; Cognito middleware/provider adapter and `users.cognito_sub` migration exist, but full Cognito positive/negative automated tests are still pending.

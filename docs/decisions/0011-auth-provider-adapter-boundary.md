@@ -32,6 +32,7 @@ Provider adapters return a normalized identity object:
 provider: stable provider key, e.g. cognito
 subject: provider subject/external user id
 phoneNumber/email: optional mapped identity attributes
+phoneNumberVerified: boolean indicating whether the provider verified the phone claim before it is used for transitional lookup
 localUserId: test/deployment-only shortcut when explicitly trusted
 roles: optional trusted roles from an authorizer/test double
 tokenUse: verified token type
@@ -41,7 +42,7 @@ claims: original parsed claims for boundary diagnostics only
 Rules:
 
 - Cognito remains the only production adapter for the current implementation.
-- Cognito-specific issuer, audience/client id, `token_use`, `exp`, `nbf`, `sub`, JWKS, and signature validation stay explicit inside the Cognito adapter.
+- Cognito-specific issuer, access-token `client_id`, `token_use`, `exp`, `nbf`, `sub`, JWKS, and signature validation stay explicit inside the Cognito adapter.
 - Domain services and account/profile APIs consume `req.user` and must not parse provider JWT claims directly.
 - Trusted local headers are a development/smoke-test adapter path only and remain disabled in production.
 - Replacing Cognito later requires a new accepted decision or an update to this decision, provider-specific negative-path proof, and updated product/story docs.

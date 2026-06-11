@@ -46,14 +46,14 @@ Express auth middleware/authorizer handling must validate:
 
 - JWT signature against Cognito JWKS or trusted authorizer claims,
 - issuer for the configured Cognito user pool,
-- audience/client id for the configured app client,
+- Cognito access-token `client_id` for the configured app client,
 - `token_use` expected for the protected API,
 - `exp`, `nbf`, and time-based validity,
 - required identity claims such as `sub`, and optional email/phone claims when used.
 
 Reject requests when:
 
-- the token is missing, malformed, expired, wrong issuer, wrong audience, wrong token use, or has an invalid signature,
+- the token is missing, malformed, expired, wrong issuer, wrong client id, wrong token use, or has an invalid signature,
 - the Cognito subject cannot be mapped to an allowed TrustBite user for routes that require a local account,
 - the local user has `status = SUSPENDED` or `status = DELETED`,
 - the user lacks the product role/permission for the requested action.
@@ -66,11 +66,12 @@ Cognito is the identity/session source of truth. PostgreSQL stores TrustBite pro
 
 Expected local user mapping:
 
-- store Cognito identity as a stable external subject, for example `users.cognito_sub`, once the schema story is selected,
+- store Cognito identity as a stable external subject in `users.cognito_sub`,
+- allow phone-number fallback only for transition rows with verified provider phone numbers and no existing `users.cognito_sub`,
 - keep product fields such as display name, avatar URL, rank, review restrictions, and account deletion state in PostgreSQL,
 - keep local status checks (`ACTIVE`, `SUSPENDED`, `DELETED`) in backend middleware/services because a Cognito token can remain valid until expiry.
 
-Existing schema fields must not be treated as final if they do not yet contain Cognito identity mapping. Schema changes require a high-risk story and migration proof.
+Schema changes require high-risk story coverage and migration proof.
 
 ## API Contract Rules
 
@@ -96,7 +97,7 @@ Standard auth errors should distinguish at least:
 
 Local development may use LocalStack Cognito where supported or an explicit Cognito-compatible test double. Test doubles must preserve Cognito claim semantics and must not become a production auth path.
 
-Auth implementation cannot be marked complete until proof covers positive and negative JWT cases, local account status rejection, no-token logging, and provider/local configuration safety.
+Auth implementation cannot be marked complete until proof covers positive and negative JWT cases, local account status rejection, Cognito subject mapping, no-token logging, and provider/local configuration safety.
 
 ## Source Of Truth
 
