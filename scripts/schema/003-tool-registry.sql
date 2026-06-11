@@ -8,7 +8,12 @@ CREATE TABLE tool (
     command        TEXT NOT NULL,
     description    TEXT NOT NULL,
     args           TEXT,
-    responsibility TEXT NOT NULL,
+    responsibility TEXT NOT NULL CHECK(responsibility IN (
+                       'Task specification','Context selection','Tool access',
+                       'Project memory','Task state','Observability',
+                       'Failure attribution','Verification','Permissions',
+                       'Entropy auditing','Intervention recording'
+                   )),
     since          TEXT NOT NULL DEFAULT 'registered'
 );
 

@@ -57,7 +57,9 @@ jobs:
       - name: Install Harness CLI
         run: |
           HARNESS_INSTALLER_REV=79c9bb2938e3b1669af83be59a05d4b1988bf0ca
+          HARNESS_INSTALLER_SHA256=a325858018b9e8bc06dc3032d876a68c2513099f4b68b0f206b2afffc0a2c958
           curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
+          echo "${HARNESS_INSTALLER_SHA256}  /tmp/install-harness.sh" | sha256sum --check --status
           HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}" bash /tmp/install-harness.sh --merge --yes
 
       - name: Query Harness matrix

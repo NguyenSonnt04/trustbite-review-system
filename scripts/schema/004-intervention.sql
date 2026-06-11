@@ -5,7 +5,7 @@ CREATE TABLE intervention (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
     trace_id    INTEGER REFERENCES trace(id),
-    story_id    TEXT,
+    story_id    TEXT REFERENCES story(id),
     type        TEXT NOT NULL CHECK(type IN ('correction','override','escalation','approval')),
     description TEXT NOT NULL,
     source      TEXT NOT NULL CHECK(source IN ('human','reviewer','ci','agent')),
