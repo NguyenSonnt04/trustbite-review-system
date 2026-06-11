@@ -428,17 +428,20 @@ async function updateRestaurantAttempt(restaurantId, updates) {
  * @returns {Promise<object|null>} RestaurantDetail object or null if not found/deleted.
  */
 export async function getRestaurantDetail(restaurantId) {
-  const [restaurantResult, ratingResult, claimResult] = await Promise.all([
-    pool.query(
-      `
-      ${RESTAURANT_SELECT_PROJECTION}
-      WHERE r.id = $1
-        AND r.status = 'ACTIVE'
-        AND r.is_deleted = FALSE
-      GROUP BY r.id
-      `,
-      [restaurantId],
-    ),
+  const restaurantResult = await pool.query(
+    `
+    ${RESTAURANT_SELECT_PROJECTION}
+    WHERE r.id = $1
+      AND r.status = 'ACTIVE'
+      AND r.is_deleted = FALSE
+    GROUP BY r.id
+    `,
+    [restaurantId],
+  );
+
+  if (restaurantResult.rows.length === 0) return null;
+
+  const [ratingResult, claimResult] = await Promise.all([
     pool.query(
       `
       SELECT
@@ -467,8 +470,6 @@ export async function getRestaurantDetail(restaurantId) {
       [restaurantId],
     ),
   ]);
-
-  if (restaurantResult.rows.length === 0) return null;
 
   const restaurant = toPublic(restaurantResult.rows[0]);
   const rRow = ratingResult.rows[0];
