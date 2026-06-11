@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Đặc tả API |
-| Phiên bản | v1.4.0 |
+| Phiên bản | v1.4.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | Trưởng nhóm Backend / Mobile Lead |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -60,6 +60,14 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- OTP gồm 6 chữ số, hết hạn sau 120 giây.
+- Rate limit request phải dùng Redis: tối đa 3 request / 10 phút / phone number.
+- PostgreSQL `otp_verifications` lưu bằng chứng OTP dạng hash/trạng thái; không lưu OTP thô.
+- Môi trường local/dev dùng SMS provider giả lập hoặc message capture an toàn chỉ khi `OTP_CAPTURE_MODE=redis` và `NODE_ENV` thuộc allowlist tường minh `development` hoặc `test`; staging/QA/production không được capture OTP plaintext.
+- Nếu Redis/rate-limit store không khả dụng, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass rate limit.
+
 ### POST /auth/otp/verify
 
 Yêu cầu:
@@ -75,7 +83,7 @@ Phản hồi:
 
 ```json
 {
-  "accessToken": "jwt-or-session-token",
+  "accessToken": "jwt-access-token",
   "user": {
     "id": "uuid",
     "displayName": "Nguyen Van A",
@@ -85,9 +93,17 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- OTP sai tăng failed counter trên Redis và/hoặc request state; tối đa 5 lần sai trước khóa tạm.
+- Khóa tạm OTP là khóa theo phone number cho luồng xác thực, khác với account suspension.
+- Nếu Redis/rate-limit store không khả dụng trong bước verify, API phải fail-closed với HTTP `503` và `PROVIDER_UNAVAILABLE`, không được bypass failed-attempt/lock checks.
+- Khi verify đúng, backend tạo user nếu phone chưa tồn tại, tạo session, trả access JWT và set refresh token dạng HttpOnly cookie.
+- User `SUSPENDED` hoặc `DELETED` không được nhận token mới; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` để mobile hiển thị đúng copy.
+
 ### POST /auth/refresh
 
-Yêu cầu phụ thuộc auth strategy. Mobile app dùng endpoint này hoặc session refresh tương đương khi access token hết hạn.
+Refresh token dùng cookie `refresh_token` HttpOnly Secure SameSite=Strict được phát hành khi OTP verify thành công; client không gửi refresh token trong JSON body.
 
 Phản hồi:
 
@@ -97,6 +113,13 @@ Phản hồi:
   "expiresInSeconds": 900
 }
 ```
+
+Ghi chú triển khai:
+
+- Access token là JWT ngắn hạn.
+- Refresh token là opaque random token; database chỉ lưu `user_sessions.refresh_token_hash`.
+- Refresh thành công phải rotate refresh token và cập nhật/revoke session theo chiến lược đã chốt.
+- Refresh với session revoked/expired trả `401`; user `SUSPENDED` hoặc `DELETED` trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` và không phát token mới.
 
 ### POST /auth/logout
 
@@ -127,6 +150,10 @@ Phản hồi:
 }
 ```
 
+Ghi chú triển khai:
+
+- Endpoint này là protected endpoint; user `SUSPENDED` hoặc `DELETED` phải bị chặn trước khi trả profile, với `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` theo auth middleware.
+
 ### PATCH /users/me
 
 Yêu cầu:
@@ -137,6 +164,13 @@ Yêu cầu:
   "avatarUrl": "https://..."
 }
 ```
+
+Ghi chú triển khai:
+
+- Chỉ cập nhật các cột có trong schema `users`: `display_name`, `avatar_url`.
+- `avatarUrl` phải là URL TrustBite-owned/allowlisted hoặc URL được tạo bởi avatar upload flow; không nhận arbitrary external URL.
+- User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED`.
+- User `REVIEW_RESTRICTED` vẫn được xem/cập nhật hồ sơ nếu không bị suspend/delete.
 
 ### POST /users/me/deletion-request
 
@@ -480,6 +514,8 @@ Phản hồi:
 }
 ```
 
+Lỗi: `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản gửi report đang `SUSPENDED` hoặc `DELETED`, `409 REPORT_DUPLICATE`, `422 VALIDATION_ERROR`.
+
 ### POST /users/{userId}/block
 
 Auth: người dùng hiện tại. Dùng để hạn chế tương tác từ người dùng lạm dụng trong phạm vi TrustBite.
@@ -502,11 +538,13 @@ Phản hồi:
 }
 ```
 
-Lỗi: `400 CANNOT_BLOCK_SELF`, `409 USER_ALREADY_BLOCKED`.
+Lỗi: `400 CANNOT_BLOCK_SELF`, `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản thực hiện block đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`.
 
 ### DELETE /users/{userId}/block
 
 Bỏ chặn người dùng. Phản hồi `{ "success": true }`.
+
+Lỗi: `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED` nếu tài khoản thực hiện unblock đang `SUSPENDED` hoặc `DELETED`, `404 NOT_FOUND`.
 
 ---
 
@@ -578,7 +616,7 @@ Yêu cầu:
 }
 ```
 
-`reason` bắt buộc. Thiếu reason trả `422 ADMIN_REASON_REQUIRED`.
+`reason` bắt buộc, dài tối thiểu 10 ký tự. Thiếu reason trả `422 ADMIN_REASON_REQUIRED`; reason ngắn hơn 10 ký tự cũng phải bị từ chối bằng cùng validation error để khớp với OpenAPI schema.
 
 Phản hồi:
 
@@ -609,6 +647,76 @@ Yêu cầu:
 ```
 
 `reason` bắt buộc với mọi action trừ `CLOSE_REPORT` kỹ thuật sau khi đã có action trước đó.
+
+### POST /admin/users/{userId}/suspend
+
+Auth: `ADMIN` hoặc `SUPER_ADMIN`.
+
+Khóa tài khoản người dùng ở mức account suspension. Đây là trạng thái `users.status = SUSPENDED`, khác với:
+
+- `users.review_restricted_until`: chỉ hạn chế viết review có thời hạn.
+- `user_blocks`: quan hệ user chặn user khác trong UGC.
+- account deletion: yêu cầu xóa/ẩn danh hóa dữ liệu theo privacy policy.
+
+Yêu cầu:
+
+```json
+{
+  "reason": "Repeated abuse and policy violation."
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "userId": "uuid",
+  "status": "SUSPENDED",
+  "revokedSessions": 3,
+  "auditLogId": "uuid"
+}
+```
+
+Ghi chú:
+
+- Backend phải revoke active sessions của user bị khóa.
+- User bị `SUSPENDED` không được login/refresh token, cập nhật profile/avatar, gửi review, upload receipt, report/block hoặc thực hiện mutation dưới danh nghĩa tài khoản đó; các endpoint auth/mutation bị chặn trả `403 ACCOUNT_SUSPENDED`. User `DELETED` bị chặn tương tự với `403 ACCOUNT_DELETED`.
+- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_SUSPEND_DELETED_USER`.
+- Kiểm tra self-suspend trước status check: nếu actor targets chính mình, trả `403 CANNOT_SUSPEND_SELF`.
+- Nếu user đã `SUSPENDED`, trả `409 USER_ALREADY_SUSPENDED`.
+- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
+
+### POST /admin/users/{userId}/reactivate
+
+Auth: `ADMIN` hoặc `SUPER_ADMIN`.
+
+Mở khóa tài khoản bị `SUSPENDED` về `ACTIVE`.
+
+Yêu cầu:
+
+```json
+{
+  "reason": "Appeal approved."
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "userId": "uuid",
+  "status": "ACTIVE",
+  "auditLogId": "uuid"
+}
+```
+
+Ghi chú:
+
+- `reason` bắt buộc và dài tối thiểu 10 ký tự; thiếu reason hoặc reason ngắn hơn 10 ký tự đều trả `422 ADMIN_REASON_REQUIRED`.
+- Session cũ đã revoke không được khôi phục; user phải đăng nhập lại.
+- Kiểm tra `DELETED` trước: nếu user `DELETED`, trả `400 CANNOT_REACTIVATE_DELETED_USER`.
+- Kiểm tra self-reactivate trước status check: nếu actor targets chính mình, trả `403 CANNOT_REACTIVATE_SELF`.
+- Nếu user chưa `SUSPENDED`, trả `409 USER_NOT_SUSPENDED`.
 
 ### POST /admin/restaurant-claims/{id}/decision
 

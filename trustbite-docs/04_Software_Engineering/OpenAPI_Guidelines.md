@@ -95,12 +95,20 @@ Error code phải ổn định để mobile mapping sang copy/localization.
 | `CLAIM_CONFLICT` | Claim quán xung đột |
 | `REPORT_DUPLICATE` | Báo cáo trùng |
 | `PROVIDER_UNAVAILABLE` | OCR/SMS/provider ngoài lỗi tạm thời |
+| `ACCOUNT_SUSPENDED` | Tài khoản bị khóa ở trạng thái SUSPENDED và không được thực hiện auth/mutation |
+| `ACCOUNT_DELETED` | Tài khoản ở trạng thái DELETED và không được thực hiện auth/mutation |
 | `IDEMPOTENCY_KEY_REQUIRED` | Thiếu Idempotency-Key ở endpoint bắt buộc |
 | `IDEMPOTENCY_KEY_INVALID` | Idempotency-Key sai định dạng |
 | `IDEMPOTENCY_CONFLICT` | Idempotency key được dùng lại với payload khác |
 | `REQUEST_IN_PROGRESS` | Request cùng idempotency key đang xử lý |
 | `REVIEW_VERIFICATION_EXPIRED` | Review SUBMITTED đã quá hạn upload và chuyển REFERENCE_ONLY |
-| `ADMIN_REASON_REQUIRED` | Quyết định admin thiếu reason |
+| `ADMIN_REASON_REQUIRED` | Hành động/quyết định admin bắt buộc reason nhưng request không cung cấp reason hợp lệ (thiếu hoặc ngắn hơn 10 ký tự) |
+| `USER_ALREADY_SUSPENDED` | Tài khoản đã ở trạng thái SUSPENDED |
+| `USER_NOT_SUSPENDED` | Tài khoản hiện không ở trạng thái SUSPENDED |
+| `CANNOT_SUSPEND_SELF` | Không thể suspend chính mình |
+| `CANNOT_SUSPEND_DELETED_USER` | Không thể suspend user đã DELETED |
+| `CANNOT_REACTIVATE_SELF` | Không thể reactivate chính mình |
+| `CANNOT_REACTIVATE_DELETED_USER` | Không thể reactivate user DELETED |
 
 ---
 
