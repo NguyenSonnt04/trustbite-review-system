@@ -1,7 +1,8 @@
 import { authService } from '../services/auth.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
-const normalizeRole = (role) => String(role).trim().toUpperCase();
+const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
+const normalizeRoleList = (roles = []) => [...new Set(roles.map(normalizeRole).filter(Boolean))];
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -16,8 +17,8 @@ export const requireRole = (...allowedRoles) => {
   const allowedRoleSet = new Set(allowedRoles.map(normalizeRole));
 
   return (req, res, next) => {
-    const roles = req.user?.roles || [];
-    const hasAllowedRole = roles.some((role) => allowedRoleSet.has(normalizeRole(role)));
+    const roles = normalizeRoleList(req.user?.roles || []);
+    const hasAllowedRole = roles.some((role) => allowedRoleSet.has(role));
 
     if (!hasAllowedRole) {
       next(createHttpError(403, 'FORBIDDEN', 'Required role is missing'));

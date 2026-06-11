@@ -10,6 +10,14 @@ const getBrowserStorage = () => {
 };
 
 class AuthService {
+  async login() {
+    throw new Error('Cognito client login is not implemented in this web slice');
+  }
+
+  async register() {
+    throw new Error('Cognito client registration is not implemented in this web slice');
+  }
+
   logout() {
     const storage = getBrowserStorage();
     if (!storage) {
@@ -18,6 +26,19 @@ class AuthService {
 
     storage.removeItem(AUTH_TOKEN_KEY);
     storage.removeItem(USER_STORAGE_KEY);
+  }
+
+  getCurrentUser() {
+    const userJson = getBrowserStorage()?.getItem(USER_STORAGE_KEY);
+    if (!userJson) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(userJson);
+    } catch {
+      return null;
+    }
   }
 
   getToken() {

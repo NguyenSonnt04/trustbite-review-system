@@ -5,6 +5,9 @@ import { createHttpError } from '../utils/httpErrors.js';
 const ACTIVE_DELETION_STATUSES = ['REQUESTED', 'PROCESSING'];
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 
+const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
+const normalizeRoleList = (roles = []) => [...new Set(roles.map(normalizeRole).filter(Boolean))];
+
 const mapUserRow = (row) => ({
   id: row.id,
   phoneNumber: row.phone_number,
@@ -103,19 +106,22 @@ const validateAdminReason = (reason) => {
   return reason.trim();
 };
 
+const getActorRoles = (actor) => normalizeRoleList(actor?.roles || []);
+
 const assertAdminActor = (actor) => {
-  const roles = actor?.roles || [];
+  const roles = getActorRoles(actor);
   if (!roles.some((role) => ADMIN_ROLES.includes(role))) {
     throw createHttpError(403, 'FORBIDDEN', 'Admin role required');
   }
 };
 
 const getAdminActorRole = (actor) => {
-  if (actor?.roles?.includes('SUPER_ADMIN')) {
+  const roles = getActorRoles(actor);
+  if (roles.includes('SUPER_ADMIN')) {
     return 'SUPER_ADMIN';
   }
 
-  if (actor?.roles?.includes('ADMIN')) {
+  if (roles.includes('ADMIN')) {
     return 'ADMIN';
   }
 
@@ -124,7 +130,7 @@ const getAdminActorRole = (actor) => {
 
 const getUserRoles = async (client, userId) => {
   const result = await client.query('SELECT role_id FROM user_roles WHERE user_id = $1', [userId]);
-  return result.rows.map((row) => row.role_id);
+  return normalizeRoleList(result.rows.map((row) => row.role_id));
 };
 
 const assertAdminCanTargetUser = async (client, actor, targetUserId) => {

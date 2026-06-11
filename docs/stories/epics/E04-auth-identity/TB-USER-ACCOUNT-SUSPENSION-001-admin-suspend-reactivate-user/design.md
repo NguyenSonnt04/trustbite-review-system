@@ -42,7 +42,7 @@ Reactivate:
 
 ## Data Model
 
-Uses existing `users`, `user_roles`, `roles`, and `audit_logs`. Existing `user_sessions` may be used only for local product session/device records where applicable; Cognito refresh/session ownership remains with Cognito. No schema fields added in this story.
+Uses existing `users`, `user_roles`, `roles`, and `audit_logs`. `user_roles` is the source of truth for product admin roles and tier checks; Cognito groups do not grant `ADMIN` or `SUPER_ADMIN` by default. Existing `user_sessions` may be used only for local product session/device records where applicable; Cognito refresh/session ownership remains with Cognito. No schema fields added in this story.
 
 ## UI / Platform Impact
 

@@ -37,7 +37,7 @@ authMiddleware
   -> AuthService maps identity to local user and enforces status/roles
 ```
 
-The normalized identity contains provider, subject, optional phone/email/local user id, phone verification state, token use, trusted roles, and original claims for boundary diagnostics.
+The normalized identity contains provider, subject, optional phone/email/local user id, phone verification state, token use, optional trusted local roles, provider diagnostics, and original claims for boundary diagnostics. Cognito groups are diagnostics only in this slice; TrustBite-local `user_roles` remains the product-role source of truth for `req.user.roles` and admin authorization.
 
 Cognito remains the production adapter. Future providers require an accepted decision update and provider-specific negative-path proof.
 

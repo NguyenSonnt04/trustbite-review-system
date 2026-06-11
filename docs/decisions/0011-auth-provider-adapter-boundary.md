@@ -34,7 +34,8 @@ subject: provider subject/external user id
 phoneNumber/email: optional mapped identity attributes
 phoneNumberVerified: boolean indicating whether the provider verified the phone claim before it is used for transitional lookup
 localUserId: test/deployment-only shortcut when explicitly trusted
-roles: optional trusted roles from an authorizer/test double
+roles: optional trusted roles from an explicitly enabled non-production test/development path
+providerGroups: provider group claims for diagnostics only unless a separate decision maps them to product roles
 tokenUse: verified token type
 claims: original parsed claims for boundary diagnostics only
 ```
@@ -44,6 +45,7 @@ Rules:
 - Cognito remains the only production adapter for the current implementation.
 - Cognito-specific issuer, access-token `client_id`, `token_use`, `exp`, `nbf`, `sub`, JWKS, and signature validation stay explicit inside the Cognito adapter.
 - Domain services and account/profile APIs consume `req.user` and must not parse provider JWT claims directly.
+- TrustBite-local `user_roles` is the default source of truth for product roles; provider group claims do not grant product authorization unless a later accepted decision defines synchronization/mapping rules.
 - Trusted local headers are a development/smoke-test adapter path only and remain disabled in production.
 - Replacing Cognito later requires a new accepted decision or an update to this decision, provider-specific negative-path proof, and updated product/story docs.
 - This boundary does not revive backend-owned OTP, access-token, refresh-token, or session issuance. Those remain retired unless a later accepted decision explicitly replaces Cognito/provider-owned auth.

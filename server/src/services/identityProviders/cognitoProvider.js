@@ -4,6 +4,7 @@ import { createHttpError } from '../../utils/httpErrors.js';
 
 let cachedJwks = null;
 let cachedAt = 0;
+let pendingJwksFetch = null;
 const JWKS_TTL_MS = 60 * 60 * 1000;
 
 const base64UrlDecode = (value) => {
@@ -27,12 +28,7 @@ const parseJsonPart = (value, partName) => {
   return parsed;
 };
 
-const fetchJwks = async ({ forceRefresh = false } = {}) => {
-  const now = Date.now();
-  if (!forceRefresh && cachedJwks && now - cachedAt < JWKS_TTL_MS) {
-    return cachedJwks;
-  }
-
+const loadJwksFromProvider = async () => {
   let response;
   try {
     response = await fetch(appConfig.auth.cognito.jwksUri);
@@ -56,8 +52,23 @@ const fetchJwks = async ({ forceRefresh = false } = {}) => {
   }
 
   cachedJwks = jwks;
-  cachedAt = now;
+  cachedAt = Date.now();
   return jwks;
+};
+
+const fetchJwks = async ({ forceRefresh = false } = {}) => {
+  const now = Date.now();
+  if (!forceRefresh && cachedJwks && now - cachedAt < JWKS_TTL_MS) {
+    return cachedJwks;
+  }
+
+  if (!pendingJwksFetch) {
+    pendingJwksFetch = loadJwksFromProvider().finally(() => {
+      pendingJwksFetch = null;
+    });
+  }
+
+  return pendingJwksFetch;
 };
 
 const verifySignature = async (token, header) => {
@@ -145,7 +156,8 @@ export class CognitoIdentityProvider {
       phoneNumber: payload.phone_number || null,
       phoneNumberVerified: payload.phone_number_verified === true,
       tokenUse: payload.token_use,
-      roles: Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [],
+      roles: [],
+      providerGroups: Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [],
       claims: payload
     };
   }

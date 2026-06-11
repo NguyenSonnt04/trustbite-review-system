@@ -12,7 +12,7 @@ This story remains in progress until automated proof covers Cognito JWT middlewa
 | Integration | Pending automated proof: protected Express route accepts valid Cognito access JWT and rejects missing, expired, invalid signature, wrong issuer, wrong client id, wrong token use, unmapped identity, suspended/deleted account. |
 | E2E | Future: client/mobile obtains Cognito token and calls protected review/profile API. |
 | Platform | Future: LocalStack Cognito or explicit Cognito-compatible test double; production config uses real Cognito provider values from env. |
-| Performance | Future: JWKS cache does not fetch on every request. |
+| Performance | Future: JWKS cache does not fetch on every request and concurrent stale-cache requests share one in-flight JWKS refresh. |
 | Logs/Audit | Future: no raw token, refresh token, OTP code, or full sensitive identity values in logs; account-state decisions auditable where required. |
 
 ## Fixtures

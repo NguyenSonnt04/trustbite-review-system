@@ -73,6 +73,10 @@ Expected local user mapping:
 
 Schema changes require high-risk story coverage and migration proof.
 
+## Role Source Of Truth
+
+TrustBite-local `user_roles` is the source of truth for product roles that authorize business API actions such as `ADMIN` and `SUPER_ADMIN`. Cognito groups may be preserved as provider diagnostics, but they do not grant product roles by default. Trusted local smoke-test headers may add roles only when explicitly enabled outside production.
+
 ## API Contract Rules
 
 Business APIs remain normal Express routes/controllers/services. Auth is a boundary concern, not a reason to move business logic into Cognito.
@@ -103,5 +107,6 @@ Auth implementation cannot be marked complete until proof covers positive and ne
 
 - Decision: `docs/decisions/0010-cognito-first-auth-boundary.md`.
 - Provider adapter boundary: `docs/decisions/0011-auth-provider-adapter-boundary.md`.
+- Admin role source of truth: `docs/decisions/0012-admin-roles-source-of-truth.md`.
 - Primary story: `docs/stories/epics/E04-auth-identity/TB-AUTH-001-cognito-auth-contract/`.
 - Architecture boundary: `docs/ARCHITECTURE.md`.

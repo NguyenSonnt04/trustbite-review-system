@@ -27,7 +27,7 @@ Express business APIs remain normal backend services. Auth integration happens a
 
 Implementation must keep provider-specific validation explicit: issuer, access-token client id, token use, expiry, signature/JWKS, required claims, and local status mapping.
 
-Cognito verification lives behind the identity provider adapter boundary accepted in `docs/decisions/0011-auth-provider-adapter-boundary.md`. Business services consume normalized `req.user` state rather than provider JWT claims directly.
+Cognito verification lives behind the identity provider adapter boundary accepted in `docs/decisions/0011-auth-provider-adapter-boundary.md`. Business services consume normalized `req.user` state rather than provider JWT claims directly. TrustBite-local `user_roles` remains the product-role source of truth; Cognito groups are diagnostics unless a future accepted decision defines role synchronization.
 
 ## LocalStack And Test Doubles
 

@@ -18,13 +18,10 @@ const getBearerToken = (authorizationHeader) => {
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-const normalizeRole = (role) => String(role).trim().toUpperCase();
+const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
+const normalizeRoleList = (roles = []) => [...new Set(roles.map(normalizeRole).filter(Boolean))];
 
-const parseTrustedRoles = (rolesHeader = '') =>
-  rolesHeader
-    .split(',')
-    .map(normalizeRole)
-    .filter(Boolean);
+const parseTrustedRoles = (rolesHeader = '') => normalizeRoleList(rolesHeader.split(','));
 
 const getTrustedDevelopmentIdentity = (req) => {
   if (appConfig.env === 'production' || !appConfig.trustedAuthHeaders) {
@@ -91,8 +88,12 @@ const findUserByIdentity = async (identity) => {
       );
 
       if (phoneResult.rowCount === 0) {
+        const remappedResult = await client.query(
+          'SELECT * FROM users WHERE cognito_sub = $1',
+          [identity.subject]
+        );
         await client.query('COMMIT');
-        return phoneResult;
+        return remappedResult;
       }
 
       const mappedResult = await client.query(
@@ -150,9 +151,14 @@ const mapCognitoContext = (identity) => {
   };
 };
 
-const mergeRoles = (databaseRoleRows, providerRoles = []) => {
-  const databaseRoles = databaseRoleRows.map((row) => row.role_id);
-  return [...new Set([...databaseRoles, ...providerRoles].map(normalizeRole).filter(Boolean))];
+const mapDatabaseRoles = (databaseRoleRows) => normalizeRoleList(databaseRoleRows.map((row) => row.role_id));
+
+const mapProviderRoles = (identity) => {
+  if (identity.provider !== 'trusted-local') {
+    return [];
+  }
+
+  return Array.isArray(identity.roles) ? normalizeRoleList(identity.roles) : [];
 };
 
 export class AuthService {
@@ -185,7 +191,8 @@ export class AuthService {
       [user.id]
     );
 
-    const providerRoles = Array.isArray(identity.roles) ? identity.roles : [];
+    const databaseRoles = mapDatabaseRoles(roleResult.rows);
+    const providerRoles = mapProviderRoles(identity);
 
     return {
       id: user.id,
@@ -193,7 +200,9 @@ export class AuthService {
       displayName: user.display_name,
       cognitoSub: user.cognito_sub || null,
       status: user.status,
-      roles: mergeRoles(roleResult.rows, providerRoles),
+      roles: normalizeRoleList([...databaseRoles, ...providerRoles]),
+      databaseRoles,
+      providerRoles,
       identity: mapPublicIdentity(identity),
       cognito: mapCognitoContext(identity)
     };
