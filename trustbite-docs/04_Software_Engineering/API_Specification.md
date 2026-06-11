@@ -373,6 +373,58 @@ Phản hồi:
 }
 ```
 
+### POST /reviews/{reviewId}/translation
+
+Auth: người dùng hiện tại. Dùng để dịch bình luận review theo yêu cầu của người dùng, tương tự nút `Dịch` / `Xem bản gốc` trên mạng xã hội.
+
+Quy tắc:
+
+- Chỉ dịch review mà người gọi có quyền xem.
+- Không dịch review `HIDDEN`, `DELETED`, private hoặc không được phép hiển thị cho người gọi.
+- Bản gốc `reviews.comment` vẫn là source of truth; bản dịch chỉ là dữ liệu hiển thị.
+- Bản dịch không được dùng cho trust score, fraud scoring, OCR verification hoặc moderation decision.
+- Backend gọi Google Cloud Translation qua service layer; client không gọi Google trực tiếp và không giữ credential.
+- Backend cache bản dịch theo `reviewId + targetLocale + originalTextHash`.
+- Rate limit translation:
+  - 30 requests / giờ / user đã xác thực.
+  - Burst 5 requests / phút / user.
+  - Secondary cap 120 requests / giờ / IP.
+  - Cache hit vẫn tính vào burst protection nhưng không tiêu thụ quota gọi Google.
+- Provider guardrail: nếu Google trả timeout hoặc 5xx liên tiếp 5 lần trong 5 phút, backend mở circuit breaker 60 giây; trong thời gian này cache miss trả `503 TRANSLATION_PROVIDER_UNAVAILABLE`, cache hit vẫn phục vụ bình thường.
+- Nếu review text thay đổi, `originalTextHash` thay đổi; backend coi đó là cache miss và tự dịch lại, không trả lỗi stale cho client.
+
+Yêu cầu:
+
+```json
+{
+  "targetLocale": "vi"
+}
+```
+
+Phản hồi:
+
+```json
+{
+  "reviewId": "uuid",
+  "sourceLocale": "en",
+  "targetLocale": "vi",
+  "originalTextHash": "sha256...",
+  "translatedText": "Món ăn rất ngon, phục vụ nhanh.",
+  "provider": "GOOGLE_TRANSLATE",
+  "cached": true
+}
+```
+
+Lỗi:
+
+- `401 AUTH_REQUIRED`
+- `403 REVIEW_NOT_VISIBLE`
+- `404 REVIEW_NOT_FOUND`
+- `422 UNSUPPORTED_TARGET_LOCALE`
+- `422 TRANSLATION_TEXT_EMPTY`
+- `429 TRANSLATION_RATE_LIMITED`
+- `503 TRANSLATION_PROVIDER_UNAVAILABLE`
+
 ---
 
 ## 6. Hóa đơn

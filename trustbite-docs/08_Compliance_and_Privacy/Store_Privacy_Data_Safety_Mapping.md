@@ -102,6 +102,7 @@ Khi trả lời trong App Store Connect, Release Manager phải kiểm tra tối
 |---|---|---|---|
 | SMS/OTP | Có | Số điện thoại, OTP metadata | DPA/contract, retention, masking log |
 | OCR | Có | Ảnh hóa đơn/OCR text | Không dùng dữ liệu để train ngoài phạm vi cho phép; retention rõ |
+| Machine translation | Có nếu bật dịch bình luận | Nội dung review/comment người dùng chủ động yêu cầu dịch | Không gửi PII ngoài comment; khai báo provider Google Cloud Translation; cache/retention theo review |
 | Map/geocoding | Có nếu dùng | Vị trí, query địa điểm | Không gửi user ID nếu không cần |
 | Analytics | Có nếu dùng | App events | Không gửi số điện thoại, OCR text, GPS gốc, token |
 | Crash reporting | Có nếu dùng | Crash logs, device diagnostics | Scrub PII/secrets; dSYM/source map upload an toàn |

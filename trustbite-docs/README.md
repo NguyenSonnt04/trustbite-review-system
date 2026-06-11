@@ -59,6 +59,7 @@ trustbite-docs/
 │   ├── Development_Guidelines.md
 │   ├── Mobile_App_Architecture.md
 │   ├── OpenAPI_Guidelines.md
+│   ├── Review_Translation_Feature.md
 │   ├── Idempotency_and_Retry_Design.md
 │   └── openapi.yaml
 │
