@@ -131,19 +131,21 @@ Ignored local Harness files:
 After cloning, install or refresh the Harness CLI from the pinned Harness installer revision below. Inspect the downloaded script before executing it.
 
 ```bash
-# macOS/Linux/Git Bash
-HARNESS_INSTALLER_REV=d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4
+# macOS/Linux
+HARNESS_INSTALLER_REV=79c9bb2938e3b1669af83be59a05d4b1988bf0ca
 curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
 less /tmp/install-harness.sh
-bash /tmp/install-harness.sh --merge --yes
+HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}" \
+  bash /tmp/install-harness.sh --merge --yes
 ```
 
 ```powershell
 # Windows PowerShell
-$HarnessInstallerRev = "d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4"
+$HarnessInstallerRev = "79c9bb2938e3b1669af83be59a05d4b1988bf0ca"
 $Installer = "$env:TEMP\install-harness.ps1"
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
 Get-Content $Installer
+$env:HARNESS_SOURCE_BASE_URL = "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev"
 & $Installer -Merge -Yes
 ```
 

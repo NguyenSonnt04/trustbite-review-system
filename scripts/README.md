@@ -53,18 +53,27 @@ npm run harness -- intake ...
 npm run harness -- story add ...
 npm run harness -- story update ...
 npm run harness -- story verify ...
+npm run harness -- story verify-all
 npm run harness -- decision add ...
 npm run harness -- decision verify ...
 npm run harness -- backlog add ...
 npm run harness -- backlog close ...
+npm run harness -- tool register ...
+npm run harness -- tool remove ...
+npm run harness -- intervention add ...
 npm run harness -- trace ...
 npm run harness -- score-trace
+npm run harness -- score-context <trace-id>
+npm run harness -- audit
+npm run harness -- propose
 npm run harness -- query matrix
 npm run harness -- query backlog
 npm run harness -- query decisions
 npm run harness -- query intakes
 npm run harness -- query traces
 npm run harness -- query friction
+npm run harness -- query tools
+npm run harness -- query interventions
 npm run harness -- query stats
 npm run harness -- query sql ...
 ```
@@ -129,17 +138,17 @@ By default the installer also downloads the prebuilt Rust Harness CLI for the
 current platform into `scripts/bin/harness-cli` on macOS/Linux or
 `scripts/bin/harness-cli.exe` on Windows, then verifies its `.sha256` checksum.
 A source branch can pin the release used by the installer through
-`scripts/harness-cli-release-tag`; Phase 3 pins `harness-cli-v0.1.4` so branch
-installs receive a Phase 3-built CLI. Set `HARNESS_CLI_RELEASE_TAG` to override
-that tag, or set `HARNESS_CLI_BASE_URL` to point at an alternate artifact
-directory, such as a local `file:///.../dist` directory created by
+`scripts/harness-cli-release-tag`; this repository currently pins
+`harness-cli-v0.1.9`. Set `HARNESS_CLI_RELEASE_TAG` to override that tag, or
+set `HARNESS_CLI_BASE_URL` to point at an alternate artifact directory, such as
+a local `file:///.../dist` directory created by
 `scripts/build-harness-cli-release.sh`.
 
 ## Schema Migrations
 
 Migration files live under `scripts/schema/` and are named `NNN-description.sql`
-where `NNN` is a zero-padded version number. Run `scripts/bin/harness-cli migrate` to
-apply pending migrations.
+where `NNN` is a zero-padded version number. Run `npm run harness -- migrate`
+to apply pending migrations.
 
 ## Future Command Contract
 

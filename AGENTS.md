@@ -11,11 +11,12 @@ TrustBite is a reliable food review platform. The product goal is to restore tru
 - PostgreSQL as the application database,
 - LocalStack for local AWS simulation.
 
-Current implementation is a JavaScript monorepo:
+Current implementation is a JavaScript monorepo plus a Flutter mobile app:
 
 - `client/`: Next.js App Router, React, vanilla CSS modules.
 - `server/`: Node.js + Express using native ES modules.
-- `docker-compose.yml`: PostgreSQL, LocalStack, and pgAdmin.
+- `mobile/`: Flutter/Dart mobile app and tests.
+- `docker-compose.yml`: PostgreSQL, Redis, LocalStack, and pgAdmin.
 
 ## Required Start Of Work
 
@@ -41,6 +42,11 @@ Before changing code or product docs:
 - Keep anti-fraud rules explicit and testable: OCR match threshold, receipt age limit, duplicate hash policy, GPS distance threshold, and trust-score effects must be documented before implementation.
 - Keep client UI state separate from server trust decisions. The client may simulate flows, but final verification/trust outcomes must come from backend rules once implemented.
 - Prefer small vertical slices: route + service/domain rule + validation evidence + UI only when the story needs it.
+- Treat tests as executable product contracts, not confirmations of whatever the current implementation happens to do.
+- For normal and high-risk implementation work, follow TDD where practical: write or update the failing test/contract proof from the product doc, story acceptance criteria, schema, and boundary rules before changing production code; then make the smallest implementation change; then refactor with tests still passing.
+- Do not write post-hoc tests that merely mirror implementation details to increase coverage. Avoid testing private internals, brittle snapshots, excessive mocks, happy-path-only assertions, rewritten-code assertions, and tests whose expected values come from the function under test.
+- Negative paths and abuse cases are required when the story touches auth, authorization, validation, anti-fraud rules, providers, public APIs, or persistence.
+- If the repo lacks the needed test runner or local dependency for a story, add the smallest appropriate test harness when practical; otherwise document the blocker and do not claim automated proof.
 - If behavior, schema, API contract, validation expectation, or provider boundary changes, update `docs/product/*`, `docs/stories/*`, decisions when needed, and the Harness matrix/CLI records in the same change.
 
 ## Validation Commands
@@ -49,13 +55,14 @@ Use the smallest relevant set:
 
 ```bash
 npm run client:build
-npm run server:build # currently unavailable unless added by a story
-npm run dev          # manual smoke for both apps
-npm run docker:up    # infrastructure smoke
-npm run db:migrate   # local PostgreSQL schema proof for DB-affecting work
+npm run server:build  # syntax check, not a test suite
+npm run mobile:test   # Flutter widget tests
+npm run dev           # manual smoke for client and server
+npm run docker:up     # infrastructure smoke
+npm run db:migrate    # local PostgreSQL schema proof for DB-affecting work
 ```
 
-Current package scripts have no automated server test/lint/build command. If a story depends on backend proof, add or document the missing validation path instead of claiming proof that does not exist. DB stories also need local insert/update plus rollback evidence against migrated PostgreSQL, or an explicit blocker if local infrastructure is unavailable.
+Current package scripts still have no automated server test/lint command; `npm run server:build` exists as a syntax check, not a test suite. If a story depends on backend proof, add or document the missing validation path instead of claiming proof that does not exist. DB stories also need local insert/update plus rollback evidence against migrated PostgreSQL, or an explicit blocker if local infrastructure is unavailable.
 
 <!-- HARNESS:BEGIN -->
 ## Harness

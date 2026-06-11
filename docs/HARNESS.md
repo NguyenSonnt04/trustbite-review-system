@@ -123,19 +123,21 @@ be captured in version-controlled markdown and schema files instead:
 After cloning the repository, install or refresh the local Harness CLI from the pinned Harness installer revision below. Inspect the downloaded script before executing it.
 
 ```bash
-# macOS/Linux/Git Bash
-HARNESS_INSTALLER_REV=d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4
+# macOS/Linux
+HARNESS_INSTALLER_REV=79c9bb2938e3b1669af83be59a05d4b1988bf0ca
 curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
 less /tmp/install-harness.sh
-bash /tmp/install-harness.sh --merge --yes
+HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}" \
+  bash /tmp/install-harness.sh --merge --yes
 ```
 
 ```powershell
 # Windows PowerShell
-$HarnessInstallerRev = "d1a7bea0c6fce5c5fae0fd3aa29c0ea57e0bd2d4"
+$HarnessInstallerRev = "79c9bb2938e3b1669af83be59a05d4b1988bf0ca"
 $Installer = "$env:TEMP\install-harness.ps1"
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
 Get-Content $Installer
+$env:HARNESS_SOURCE_BASE_URL = "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev"
 & $Installer -Merge -Yes
 ```
 
@@ -153,12 +155,18 @@ scripts/bin/harness-cli story   add --id <id> --title <text> --lane <lane>
 scripts/bin/harness-cli story   update --id <id> --status <status>
 scripts/bin/harness-cli story   update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0
 scripts/bin/harness-cli story   verify <id>
+scripts/bin/harness-cli story   verify-all
 scripts/bin/harness-cli decision add --id <id> --title <text> --doc docs/decisions/<file>.md
 scripts/bin/harness-cli trace   --summary <text> --outcome <outcome>
 scripts/bin/harness-cli score-trace
+scripts/bin/harness-cli score-context <trace-id>
+scripts/bin/harness-cli audit
+scripts/bin/harness-cli propose
 scripts/bin/harness-cli query   matrix
 scripts/bin/harness-cli query   matrix --numeric
 scripts/bin/harness-cli query   backlog
+scripts/bin/harness-cli query   tools --summary
+scripts/bin/harness-cli query   interventions
 scripts/bin/harness-cli query   stats
 scripts/bin/harness-cli --version
 ```
