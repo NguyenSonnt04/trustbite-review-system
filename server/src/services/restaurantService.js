@@ -73,14 +73,6 @@ function generateSlug(name) {
   return `${base}-${suffix}`;
 }
 
-/**
- * Build the PostGIS point expression for a parameterised query.
- * Returns a SQL fragment using the two parameter positions [longitude, latitude].
- */
-function geoExpression(paramOffset) {
-  return `ST_SetSRID(ST_MakePoint($${paramOffset}, $${paramOffset + 1}), 4326)`;
-}
-
 /** Common SELECT projection for a restaurant and its aggregated category IDs. */
 const RESTAURANT_SELECT_PROJECTION = `
   SELECT
