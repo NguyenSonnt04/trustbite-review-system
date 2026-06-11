@@ -234,6 +234,22 @@ export async function getRestaurantById(restaurantId) {
   return result.rows.length > 0 ? toPublic(result.rows[0]) : null;
 }
 
+export async function publicRestaurantExists(restaurantId) {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM restaurants
+    WHERE id = $1
+      AND status = 'ACTIVE'
+      AND is_deleted = FALSE
+    LIMIT 1
+    `,
+    [restaurantId],
+  );
+
+  return result.rows.length > 0;
+}
+
 async function createRestaurantAttempt({ name, description, address, phoneNumber, latitude, longitude, categoryIds = [] }) {
   const slug = generateSlug(name);
 

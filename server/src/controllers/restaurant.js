@@ -184,8 +184,8 @@ export const listRestaurantReviewsHandler = async (req, res, next) => {
     }
 
     // First check if restaurant exists and is public (ACTIVE)
-    const restaurant = await restaurantService.getRestaurantDetail(restaurantId);
-    if (!restaurant) {
+    const restaurantExists = await restaurantService.publicRestaurantExists(restaurantId);
+    if (!restaurantExists) {
       return errorResponse(res, 404, 'NOT_FOUND', 'Restaurant not found.', requestId);
     }
 
