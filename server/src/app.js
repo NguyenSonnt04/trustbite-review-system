@@ -2,22 +2,28 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import appConfig from './config/app.js';
+import apiRoutes from './routes/index.js';
+import { errorMiddleware, notFoundMiddleware } from './middlewares/error.js';
 
 const app = express();
+const corsOptions = appConfig.corsOrigins.includes('*')
+  ? { origin: '*' }
+  : appConfig.corsOrigins.length > 0
+    ? { origin: appConfig.corsOrigins }
+    : undefined;
 
-// Security & parsing
 app.use(helmet());
-app.use(cors({ origin: appConfig.corsOrigin }));
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-// TODO: Mount routes here
-// import authRoutes from './routes/auth.routes.js';
-// app.use('/api/auth', authRoutes);
+app.use('/api/v1', apiRoutes);
+
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 export default app;

@@ -25,10 +25,10 @@ TrustBite uses Cognito from the start as the authentication and token-issuance s
 
 JWT middleware requirements:
 
-- Validate issuer, audience/client id, token use, expiry, and signature against Cognito JWKS or trusted authorizer claims.
+- Validate issuer, access-token client id, token use, expiry, and signature against Cognito JWKS or trusted authorizer claims.
 - Parse and validate unknown Cognito/JWT claims at the HTTP boundary.
 - Map the Cognito subject to a local user record before protected business logic runs.
-- Reject missing, invalid, expired, wrong-audience, wrong-token-use, suspended, or deleted users.
+- Reject missing, invalid, expired, wrong-client-id, wrong-token-use, suspended, or deleted users.
 - Never log raw access, ID, or refresh tokens.
 
 ## Alternatives Considered

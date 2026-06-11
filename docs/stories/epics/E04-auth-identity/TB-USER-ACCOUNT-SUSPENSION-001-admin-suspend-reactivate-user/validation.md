@@ -8,8 +8,8 @@ Prove admin authorization, status transitions, audit log writes, local product s
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Status transition validation, self-suspend guard, self-reactivate guard, deleted-user suspend/reactivation guards, suspend validation order (`DELETED` before self before already-`SUSPENDED` before reason), and reactivate validation order (`DELETED` before self before not-`SUSPENDED` before reason). |
-| Integration | Admin suspends active user; local session/token state invalidated where applicable; audit log inserted; suspended user cannot update profile or perform protected mutations with an otherwise valid Cognito token; admin reactivates user; old local blocked session/token state is not restored. |
+| Unit | Status transition validation, self-suspend guard, self-reactivate guard, deleted-user suspend/reactivation guards, admin tier check uses normalized `user_roles` and runs before target status-specific errors, suspend validation order for authorized actors (`DELETED` before self before already-`SUSPENDED` before reason), and reactivate validation order for authorized actors (`DELETED` before self before not-`SUSPENDED` before reason). |
+| Integration | Admin suspends active user using TrustBite-local `user_roles`; Cognito groups alone do not grant admin actions; local session/token state invalidated where applicable; audit log inserted; suspended user cannot update profile or perform protected mutations with an otherwise valid Cognito token; admin reactivates user; old local blocked session/token state is not restored. |
 | E2E | API smoke through admin bearer token. |
 | Platform | None beyond local DB. |
 | Performance | Not required. |

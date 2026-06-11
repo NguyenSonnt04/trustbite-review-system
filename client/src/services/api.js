@@ -1,60 +1,58 @@
 import config from '@/config/config';
 import { authService } from './auth.service';
 
-/**
- * Enterprise API client wrapper.
- * Automatically injects authorization token and handles errors.
- */
+const API_PREFIX = '/api/v1';
+
+const normalizeApiBaseUrl = (apiUrl) => {
+  const baseUrl = apiUrl.replace(/\/+$/u, '');
+  const pathname = new URL(baseUrl, 'http://trustbite.local').pathname.replace(/\/+$/u, '');
+  return pathname === API_PREFIX ? baseUrl : `${baseUrl}${API_PREFIX}`;
+};
+
+const readErrorMessage = async (response) => {
+  const body = await response.json().catch(() => null);
+  return body?.error?.message || body?.message || `HTTP error! status: ${response.status}`;
+};
+
 class ApiClient {
   constructor() {
-    this.baseUrl = config.apiUrl;
+    this.baseUrl = normalizeApiBaseUrl(config.apiUrl);
   }
 
   async request(path, options = {}) {
-    const url = `${this.baseUrl}${path}`;
-    const token = authService.getToken();
+    if (!path.startsWith('/')) {
+      throw new Error('API path must start with /');
+    }
 
+    const token = authService.getToken();
     const headers = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...options.headers
     };
 
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers.Authorization = `Bearer ${token}`;
     }
 
-    const configOptions = {
+    const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,
-      headers,
-    };
+      headers
+    });
 
-    try {
-      const response = await fetch(url, configOptions);
-
-      // Handle token expiration or unauthorized
-      if (response.status === 401) {
-        authService.logout();
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
-        throw new Error('Session expired. Please login again.');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-      }
-
-      // Check if response is empty (e.g. 204 No Content)
-      if (response.status === 204) {
-        return null;
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`API Request failed for: ${path}`, error);
-      throw error;
+    if (response.status === 401) {
+      authService.logout();
+      throw new Error('Authentication required. Please sign in again.');
     }
+
+    if (!response.ok) {
+      throw new Error(await readErrorMessage(response));
+    }
+
+    if (response.status === 204) {
+      return null;
+    }
+
+    return response.json();
   }
 
   get(path, options = {}) {
@@ -65,7 +63,7 @@ class ApiClient {
     return this.request(path, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     });
   }
 
@@ -73,7 +71,7 @@ class ApiClient {
     return this.request(path, {
       ...options,
       method: 'PUT',
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
     });
   }
 
