@@ -2,11 +2,12 @@
  * restaurant.js — Routes
  * Mounts restaurant CRUD endpoints under /api/v1/restaurants.
  *
- * GET    /api/v1/restaurants              → list (public; defaults to ACTIVE)
- * POST   /api/v1/restaurants              → create
- * GET    /api/v1/restaurants/:restaurantId → get by ID
- * PATCH  /api/v1/restaurants/:restaurantId → update
- * DELETE /api/v1/restaurants/:restaurantId → soft-delete (sets is_deleted = true)
+ * GET    /api/v1/restaurants                          → list (public; defaults to ACTIVE)
+ * POST   /api/v1/restaurants                          → create
+ * GET    /api/v1/restaurants/:restaurantId            → get by ID with ratingBreakdown + ownerClaimStatus
+ * GET    /api/v1/restaurants/:restaurantId/reviews    → list verified/reference reviews (public)
+ * PATCH  /api/v1/restaurants/:restaurantId            → update
+ * DELETE /api/v1/restaurants/:restaurantId            → soft-delete (sets is_deleted = true)
  */
 
 import { Router } from 'express';
@@ -14,6 +15,7 @@ import {
   listRestaurantsHandler,
   createRestaurantHandler,
   getRestaurantHandler,
+  listRestaurantReviewsHandler,
   updateRestaurantHandler,
   deleteRestaurantHandler,
 } from '../controllers/restaurant.js';
@@ -23,6 +25,7 @@ const router = Router();
 
 // Public endpoints — no auth required
 router.get('/', listRestaurantsHandler);
+router.get('/:restaurantId/reviews', listRestaurantReviewsHandler);
 router.get('/:restaurantId', getRestaurantHandler);
 
 // Mutating endpoints — require authentication

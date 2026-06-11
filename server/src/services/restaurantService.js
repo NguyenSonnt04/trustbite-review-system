@@ -421,6 +421,73 @@ async function updateRestaurantAttempt(restaurantId, updates) {
 }
 
 /**
+ * Get a single restaurant by ID with detail fields:
+ * - ratingBreakdown: averages of food/price/service/ambience for VERIFIED + REFERENCE_ONLY reviews.
+ * - ownerClaimStatus: latest claim status from restaurant_claims (null if none exists).
+ *
+ * @param {string} restaurantId - UUID
+ * @returns {Promise<object|null>} RestaurantDetail object or null if not found/deleted.
+ */
+export async function getRestaurantDetail(restaurantId) {
+  const [restaurantResult, ratingResult, claimResult] = await Promise.all([
+    pool.query(
+      `
+      ${RESTAURANT_SELECT_PROJECTION}
+      WHERE r.id = $1
+        AND r.status = 'ACTIVE'
+        AND r.is_deleted = FALSE
+      GROUP BY r.id
+      `,
+      [restaurantId],
+    ),
+    pool.query(
+      `
+      SELECT
+        AVG(food_rating) AS avg_food,
+        AVG(price_rating) AS avg_price,
+        AVG(service_rating) AS avg_service,
+        AVG(ambience_rating) AS avg_ambience,
+        AVG(average_rating) AS avg_overall,
+        COUNT(*) AS review_count
+      FROM reviews
+      WHERE restaurant_id = $1
+        AND status IN ('VERIFIED', 'REFERENCE_ONLY')
+        AND public_visibility = 'PUBLIC'
+      `,
+      [restaurantId],
+    ),
+    pool.query(
+      `
+      SELECT rc.status
+      FROM restaurant_claims rc
+      JOIN merchants m ON m.id = rc.merchant_id
+      WHERE rc.restaurant_id = $1
+      ORDER BY rc.created_at DESC
+      LIMIT 1
+      `,
+      [restaurantId],
+    ),
+  ]);
+
+  if (restaurantResult.rows.length === 0) return null;
+
+  const restaurant = toPublic(restaurantResult.rows[0]);
+  const rRow = ratingResult.rows[0];
+  const ratingBreakdown = {
+    avgFood: rRow.avg_food !== null ? parseFloat(rRow.avg_food) : null,
+    avgPrice: rRow.avg_price !== null ? parseFloat(rRow.avg_price) : null,
+    avgService: rRow.avg_service !== null ? parseFloat(rRow.avg_service) : null,
+    avgAmbience: rRow.avg_ambience !== null ? parseFloat(rRow.avg_ambience) : null,
+    avgOverall: rRow.avg_overall !== null ? parseFloat(rRow.avg_overall) : null,
+    reviewCount: parseInt(rRow.review_count, 10),
+  };
+
+  const ownerClaimStatus = claimResult.rows.length > 0 ? claimResult.rows[0].status : null;
+
+  return { ...restaurant, ratingBreakdown, ownerClaimStatus };
+}
+
+/**
  * Soft-delete a restaurant by setting is_deleted = TRUE.
  *
  * @param {string} restaurantId - UUID

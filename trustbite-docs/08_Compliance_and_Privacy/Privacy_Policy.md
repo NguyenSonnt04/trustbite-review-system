@@ -23,6 +23,7 @@ TrustBite xử lý dữ liệu cá nhân để xác thực đánh giá và chố
 | Số điện thoại | Đăng nhập OTP, định danh tài khoản | Bắt buộc với người dùng đã đăng ký. |
 | Ảnh hóa đơn | Xác minh đánh giá | Lưu riêng tư theo mặc định. |
 | Văn bản OCR | Đối chiếu tên quán/thời gian | Dùng cho xác minh. |
+| Nội dung review | Hiển thị đánh giá, kiểm duyệt UGC, và dịch bình luận theo yêu cầu người dùng | Bản gốc là source of truth; bản dịch chỉ dùng để hiển thị. |
 | Tọa độ GPS | Tín hiệu xác minh tùy chọn | Cần sự đồng ý của người dùng; không theo dõi liên tục. |
 | Hash IP/user-agent | Giới hạn tần suất và bảo mật | Chỉ lưu ngắn hạn. |
 | Audit log | Trách nhiệm giải trình vận hành | Chỉ người có quyền mới được truy cập. |
@@ -62,6 +63,8 @@ TrustBite xử lý dữ liệu cá nhân để xác thực đánh giá và chố
 ## 6. Chia sẻ dữ liệu
 
 TrustBite không bán hoặc chia sẻ dữ liệu hóa đơn, số điện thoại, GPS cho chủ quán hoặc bên quảng cáo. Chủ quán chỉ được xem thông tin cần thiết để phản hồi/quản lý quán, không được xem ảnh hóa đơn gốc của người dùng.
+
+Khi người dùng chủ động bấm dịch bình luận, TrustBite có thể gửi nội dung bình luận cần dịch tới Google Cloud Translation. Luồng này không gửi số điện thoại, token, GPS, ảnh hóa đơn, OCR text đầy đủ hoặc audit log. Bản dịch chỉ dùng để hiển thị cho người đọc và không thay thế nội dung review gốc.
 
 ---
 
@@ -115,6 +118,12 @@ TrustBite có thể dùng nhà cung cấp OCR để đọc thông tin cần thi�
 Bạn có thể yêu cầu xóa tài khoản hoặc dữ liệu cá nhân. Một số bản ghi audit, bảo mật hoặc chống gian lận có thể được giữ lại trong thời gian giới hạn nếu cần cho nghĩa vụ pháp lý hoặc bảo vệ hệ thống.
 ```
 
+### 8.5. Dịch bình luận
+
+```text
+Khi bạn bấm dịch một bình luận, TrustBite có thể gửi nội dung bình luận đó tới nhà cung cấp dịch máy để tạo bản dịch. Bản dịch chỉ giúp bạn đọc nội dung dễ hơn và không thay thế bình luận gốc.
+```
+
 ---
 
 ## 9. Yêu cầu trước public beta
@@ -124,6 +133,7 @@ Bạn có thể yêu cầu xóa tài khoản hoặc dữ liệu cá nhân. Một
 - Có đường dẫn/form yêu cầu xóa tài khoản và dữ liệu.
 - OCR/SMS/analytics/crash provider phải được rà soát vendor/privacy.
 - Store metadata phải khai báo số điện thoại, ảnh hóa đơn, GPS tùy chọn, analytics/crash nếu dùng.
+- Nếu bật dịch bình luận bằng Google Cloud Translation, store/privacy metadata phải khai báo nhà cung cấp dịch máy xử lý nội dung review theo yêu cầu người dùng.
 - Mobile/admin không log OTP, token, GPS gốc, OCR text đầy đủ hoặc số điện thoại đầy đủ.
 
 

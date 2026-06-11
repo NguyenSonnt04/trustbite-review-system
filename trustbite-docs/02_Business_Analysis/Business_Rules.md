@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Quy tắc nghiệp vụ |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.6.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | BA |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -15,8 +15,9 @@
 | ID | Quy tắc | Mức ưu tiên |
 |---|---|---|
 | BR-AUTH-001 | OTP gồm 6 chữ số và hết hạn sau 120 giây. | P0 |
-| BR-AUTH-002 | Tối đa 3 lần gửi OTP trong 10 phút cho cùng số điện thoại. | P0 |
-| BR-AUTH-003 | Tối đa 5 lần nhập sai OTP trước khi khóa tạm thời (Khóa 15 phút cho lần đầu, 24 giờ nếu tiếp tục vi phạm trong ngày). | P0 |
+| BR-AUTH-002 | Tối đa 3 lần gửi OTP trong 10 phút cho cùng số điện thoại. Trạng thái rate limit phải lưu trên Redis. | P0 |
+| BR-AUTH-003 | Tối đa 5 lần nhập sai OTP trước khi khóa tạm thời theo phone number (Khóa 15 phút cho lần đầu, 24 giờ nếu tiếp tục vi phạm trong ngày). Trạng thái khóa tạm phải lưu trên Redis và khác với khóa tài khoản `SUSPENDED`. | P0 |
+| BR-AUTH-004 | User `SUSPENDED` hoặc `DELETED` không được nhận access token, refresh token hoặc session mới; refresh session hiện có phải bị từ chối. | P0 |
 
 ## 2. Quy tắc quán
 
@@ -70,6 +71,7 @@
 | BR-ADM-003 | Trường hợp closed không được xử lý lại trừ khi Siêu quản trị override. | P1 |
 | BR-ADM-004 | Admin portal là bắt buộc trong MVP cho receipt/moderation queue; merchant portal đầy đủ không chặn MVP. | P0 |
 | BR-ADM-005 | Mọi quyết định admin phải cập nhật trạng thái entity liên quan theo bảng mapping trong State Machines. | P0 |
+| BR-ADM-006 | Khóa/mở khóa tài khoản user dùng `users.status = SUSPENDED`/`ACTIVE`, bắt buộc reason, audit log và revoke session khi suspend. Không được dùng `user_blocks` hoặc account deletion để biểu diễn account suspension. | P0 |
 
 ## 7. Quy tắc quyền riêng tư
 
@@ -110,7 +112,7 @@
 |---|---|---|
 | BR-SAFE-001 | Review/user-generated content phải có lọc nội dung tối thiểu trước khi hiển thị hoặc đưa vào hàng đợi kiểm duyệt nếu nghi ngờ vi phạm. | P0 |
 | BR-SAFE-002 | Người dùng và chủ quán có quyền báo cáo review/người dùng vi phạm từ bề mặt nội dung liên quan. | P0 |
-| BR-SAFE-003 | Người dùng phải có cách chặn hoặc hạn chế tương tác từ người dùng lạm dụng trong phạm vi tính năng cộng đồng của TrustBite. | P0 |
+| BR-SAFE-003 | Người dùng phải có cách chặn hoặc hạn chế tương tác từ người dùng lạm dụng trong phạm vi tính năng cộng đồng của TrustBite. `user_blocks` chỉ là quan hệ user chặn user khác, không phải khóa tài khoản. | P0 |
 | BR-SAFE-004 | App phải hiển thị hoặc liên kết rõ ràng tới kênh liên hệ support/privacy cho vấn đề nội dung, tài khoản và an toàn. | P0 |
 | BR-STORE-001 | Trước khi submit store, Release Manager phải hoàn tất mapping App Privacy/Data Safety, content rating, age rating, permission declaration và reviewer notes. | P0 |
 | BR-STORE-002 | Reviewer phải có tài khoản demo, dữ liệu seed hoặc hướng dẫn truy cập đủ để kiểm tra OTP, review, receipt, report/block và xóa tài khoản. | P0 |

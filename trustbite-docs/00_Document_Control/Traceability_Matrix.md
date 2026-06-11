@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Ma trận truy vết yêu cầu |
-| Phiên bản | v1.1.0 |
+| Phiên bản | v1.1.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | PO / BA / Engineering Lead / QA Lead |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -34,6 +34,7 @@ Quy tắc production-ready: một dòng P0 chỉ được đánh dấu sẵn sà
 | Moderation report/action | `MOD-001` | `MOD-US-001`, `MOD-US-002`, `ADM-US-005` | moderation state, content policy | `MOB-009`, `ADM-004` | `POST /moderation/reports`, `GET /admin/moderation/reports`, decision endpoint | `moderation_reports`, `moderation_actions`, `audit_logs`, `reviews` | `MOD-TC-001`, UAT-005 | Cần reason codes chuẩn |
 | Claim tối thiểu beta | `MERCH-CLAIM-MVP` | `ADM-US-007` | claim state, role matrix | `ADM-005` | `POST /merchant/claims` hoặc admin/manual intake, `POST /admin/restaurant-claims/{id}/decision` | `merchants`, `restaurant_claims`, `audit_logs` | P1/MVP feature-flag test, UAT-006 | Feature flag; không chặn MVP nếu không bật |
 | EXP/rank cơ bản | `GAME-001` | `GAME-US-001`, `GAME-US-002` | gamification rules, trust weight | `MOB-008` | `GET /gamification/me`, `GET /users/me` | `users.exp_points`, `users.rank_code`, optional `user_badges` | Profile/game test | Cần job recalculation rule chi tiết nếu launch công khai |
+| User profile and account suspension | `USER-001` → `USER-004` | `USER-US-001` → `USER-US-003` | `BR-AUTH-004`, `BR-ADM-006`, user state | Profile/account settings, admin user tools | `GET /users/me`, `PATCH /users/me`, `POST /admin/users/{userId}/suspend`, `POST /admin/users/{userId}/reactivate` | `users.status`, `users.display_name`, `users.avatar_url`, `user_sessions`, `audit_logs` | Auth/profile integration, suspend/reactivate audit and session revoke proof | Cần OpenAPI/admin auth proof |
 | Privacy receipt/GPS/log redaction | Privacy policy | Cross-cutting | `BR-PRIV-001` → `BR-PRIV-004` | receipt/admin masking requirements | Signed URL/admin endpoints | private storage URLs, `redacted_file_url`, audit metadata | `PRIV-TC-001`, mobile release checklist, security DoD | Cần Legal/Security sign-off |
 | Account deletion | `PRIV-001` | `PRIV-US-001`, `PRIV-US-002` | `BR-PRIV-005`, `Data_Retention_Policy.md` | `MOB-010`, account deletion copy | `POST /users/me/deletion-request`, web deletion form/API | `account_deletion_requests`, `users.deletion_requested_at`, audit metadata | `PRIV-TC-002`, `MOB-PRIV-001`, UAT-007 | Store-blocking P0 trước public beta |
 | UGC report/block safety | `SAFETY-001`, `MOD-001` | `SAFETY-US-001`, `SAFETY-US-002`, `MOD-US-001` | `Content_Moderation_Policy.md`, moderation state | `MOB-009`, review/user action menu | `POST /moderation/reports`, `POST /users/{userId}/block`, `DELETE /users/{userId}/block` | `moderation_reports`, `moderation_actions`, `user_blocks`, `audit_logs` | `MOD-TC-001`, `SAFETY-TC-001`, UAT-008 | Store-blocking P0 trước public beta |

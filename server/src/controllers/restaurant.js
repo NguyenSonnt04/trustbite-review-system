@@ -15,6 +15,7 @@
  */
 
 import * as restaurantService from '../services/restaurantService.js';
+import { listPublicReviewsByRestaurant } from '../services/reviewService.js';
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -138,13 +139,63 @@ export const getRestaurantHandler = async (req, res, next) => {
       return errorResponse(res, 400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.', requestId);
     }
 
-    const restaurant = await restaurantService.getRestaurantById(restaurantId);
+    const restaurant = await restaurantService.getRestaurantDetail(restaurantId);
 
     if (!restaurant) {
       return errorResponse(res, 404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found.', requestId);
     }
 
     return res.status(200).json(restaurant);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/restaurants/:restaurantId/reviews
+// ---------------------------------------------------------------------------
+
+/**
+ * List public reviews for a restaurant.
+ * Unauthenticated public listing. Responses must omit reviewer userId values.
+ * Query params: status (VERIFIED | REFERENCE_ONLY | ALL), page, pageSize
+ */
+export const listRestaurantReviewsHandler = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const { status, page, pageSize } = req.query;
+    const requestId = buildRequestId(req);
+
+    if (!isValidUUID(restaurantId)) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.', requestId);
+    }
+
+    if (status !== undefined && !['VERIFIED', 'REFERENCE_ONLY', 'ALL'].includes(status)) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'status must be VERIFIED, REFERENCE_ONLY, or ALL.', requestId);
+    }
+
+    const parsedPage = parsePositiveInt(page);
+    if (parsedPage.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'page must be a positive integer.', requestId);
+    }
+    const parsedSize = parsePositiveInt(pageSize);
+    if (parsedSize.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be a positive integer.', requestId);
+    }
+
+    // First check if restaurant exists and is public (ACTIVE)
+    const restaurant = await restaurantService.getRestaurantDetail(restaurantId);
+    if (!restaurant) {
+      return errorResponse(res, 404, 'NOT_FOUND', 'Restaurant not found.', requestId);
+    }
+
+    const result = await listPublicReviewsByRestaurant(restaurantId, {
+      status: status ?? 'ALL',
+      page: parsedPage.value ?? 1,
+      pageSize: parsedSize.value ?? 20,
+    });
+
+    return res.status(200).json(result);
   } catch (err) {
     next(err);
   }

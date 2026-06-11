@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Backlog triển khai MVP |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.6.1 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | BA / Product Owner |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-06-10 |
 
 ---
 
@@ -133,10 +133,17 @@ Một story P0 hoàn tất khi:
 
 ---
 
+## 10. Epic USER/ADMIN - Hồ sơ và trạng thái tài khoản
+
+| Story ID | Priority | User story | Acceptance criteria | Dependency |
+|---|---|---|---|---|
+| USER-US-001 | P0 | Là người dùng đã xác thực, tôi muốn xem và cập nhật tên/avatar hồ sơ. | `GET /users/me` trả profile hiện tại; `PATCH /users/me` chỉ cập nhật `displayName` và `avatarUrl` theo allowlist; user `SUSPENDED`/`DELETED` không cập nhật được. | Auth/session |
+| USER-US-002 | P0 | Là quản trị viên, tôi muốn khóa tài khoản user vi phạm để họ không đăng nhập hoặc tương tác tiếp. | Admin/Super admin gọi suspend kèm reason; `users.status` chuyển `SUSPENDED`; active sessions bị revoke; audit log ghi actor/reason/previous/new status; user bị suspend không login/refresh/update profile/gửi mutation được. | Admin auth, audit logs |
+| USER-US-003 | P0 | Là quản trị viên, tôi muốn mở khóa tài khoản đã suspend khi khiếu nại hợp lệ. | Admin/Super admin gọi reactivate kèm reason; user `SUSPENDED` chuyển `ACTIVE`; audit log được ghi; session cũ không khôi phục và user phải đăng nhập lại. | USER-US-002 |
 
 ---
 
-## 10. Epic PRIV/SAFETY - Store readiness, xóa tài khoản và an toàn UGC
+## 11. Epic PRIV/SAFETY - Store readiness, xóa tài khoản và an toàn UGC
 
 | Story ID | Priority | User story | Acceptance criteria | Dependency |
 |---|---|---|---|---|
@@ -146,7 +153,7 @@ Một story P0 hoàn tất khi:
 | SAFETY-US-002 | P0 | Là người dùng, tôi muốn block user gây phiền toái. | Block có hiệu lực ngay; nội dung của blocked user bị ẩn/giảm hiển thị; có unblock nếu UX chốt. | User/block API |
 | STORE-US-001 | P0 | Là Release Manager, tôi muốn có checklist store để không bị reject vì metadata/privacy/reviewer access. | Store checklist pass 100%; App Privacy/Data Safety/Content Rating/App Access có owner sign-off; evidence lưu trong release folder. | Mobile release checklist |
 
-## 11. Epic NOTIF/MERCH P1
+## 12. Epic NOTIF/MERCH P1
 
 | Story ID | Priority | User story | Acceptance criteria | Dependency |
 |---|---|---|---|---|
