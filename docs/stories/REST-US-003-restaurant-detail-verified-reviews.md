@@ -70,3 +70,6 @@ None.
 - Route import cleanup: `listPublicReviewsByRestaurant` import moved to top of controller file (line 18).
 - Syntax check: `node --check` passes on all four changed files (controller, restaurantService, reviewService, routes).
 - Handlers wired in `server/src/routes/restaurant.js`.
+- Backend test runner added with Vitest/Supertest and reusable helpers under `server/tests/helpers/`.
+- Unit proof added for REST-US-003 controller boundary parsing and public review service filtering in `server/tests/unit/restaurant/`.
+- Integration smoke proof currently covers `/health` only; DB-backed REST-US-003 integration proof remains pending until Postgres fixture tests are added and run.
