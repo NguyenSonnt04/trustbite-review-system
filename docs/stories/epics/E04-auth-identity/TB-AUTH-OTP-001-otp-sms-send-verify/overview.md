@@ -1,5 +1,9 @@
 # Overview
 
+## Status
+
+Retired by `docs/decisions/0010-cognito-first-auth-boundary.md`. Cognito owns authentication and OTP/MFA flows where configured. Do not implement this backend OTP flow as the default auth path unless a later accepted decision replaces Cognito.
+
 ## Current Behavior
 
 Backend auth is a skeleton. Routes/controllers/services exist but do not request or verify OTP. Docker local infrastructure now includes PostgreSQL, Redis, and LocalStack; backend OTP code still needs to wire Redis before this story can be implemented.

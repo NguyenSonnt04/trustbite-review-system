@@ -1,8 +1,12 @@
 # Exec Plan
 
+## Status
+
+Retired by `docs/decisions/0010-cognito-first-auth-boundary.md`. Cognito owns authentication and OTP/MFA flows where configured. This backend OTP flow is no longer the default auth implementation path.
+
 ## Goal
 
-Implement backend OTP SMS request/verify with Redis-backed abuse controls and PostgreSQL OTP evidence.
+Do not implement this older backend OTP SMS request/verify slice unless a later accepted decision replaces Cognito. Historical goal was: implement backend OTP SMS request/verify with Redis-backed abuse controls and PostgreSQL OTP evidence.
 
 ## Scope
 
@@ -19,7 +23,7 @@ Out of scope:
 
 - UI/mobile changes.
 - Real AWS SMS delivery setup/registration.
-- Cognito-owned custom auth.
+- Active implementation as the default TrustBite auth path.
 
 ## Risk Classification
 
@@ -50,6 +54,7 @@ Hard gates:
 
 Pause for human confirmation if:
 
+- This retired backend OTP flow is requested as production auth without superseding decision 0010.
 - Real SMS provider credentials/registration are required.
 - Redis fail-open behavior is requested.
 - Schema fields beyond current migration are needed.

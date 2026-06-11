@@ -57,6 +57,8 @@ domain schema, CRUD behavior, auth, authorization, provider integration, or
 data migration. A health endpoint in a new benchmark or scaffolded project is
 smoke proof, not a public contract escalation by itself.
 
+Before coding any database-backed work, read the accepted schema/model docs and the existing server model files. Do not add fields outside the schema or treat model properties as implicit truth.
+
 Requirements:
 
 - Patch directly.

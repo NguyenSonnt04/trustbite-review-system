@@ -61,10 +61,20 @@ Start the local environment containing PostgreSQL and LocalStack AWS emulator:
 npm run docker:up
 ```
 This spawns:
-- **Postgres Database** on `localhost:5432` (Credentials: `trustbite_user` / `trustbite_secure_password`, Database: `trustbite_db`)
+- **Postgres Database** on `localhost:5432` by default (container port `5432`; Credentials: `trustbite_user` / `your-local-db-password`, Database: `trustbite_db`)
 - **Redis** on `localhost:6379` for OTP rate limits, temporary locks, and local queue/cache workflows
 - **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
-- **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `admin_password`)
+- **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `your-local-pgadmin-password`)
+
+If another local PostgreSQL instance already owns port `5432`, keep the repository defaults unchanged and override only your local ignored env files:
+
+```env
+# .env at repository root, consumed by docker compose
+POSTGRES_HOST_PORT=15432
+
+# server/.env, consumed by the Express server and migration runner
+DATABASE_PORT=15432
+```
 
 Apply the TrustBite PostgreSQL schema after the database is running:
 
@@ -156,7 +166,7 @@ PORT=5000
 DATABASE_HOST=localhost
 DATABASE_PORT=5432
 DATABASE_USER=trustbite_user
-DATABASE_PASSWORD=bietthicunglamduoccaichogi
+DATABASE_PASSWORD=your-local-db-password
 DATABASE_NAME=trustbite_db
 
 AWS_REGION=ap-southeast-1
@@ -164,7 +174,11 @@ AWS_ACCESS_KEY_ID=mock-key
 AWS_SECRET_ACCESS_KEY=mock-secret
 AWS_S3_BUCKET_NAME=trustbite-invoices
 AWS_SES_SENDER_EMAIL=noreply@trustbite.com
+AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
+AWS_COGNITO_CLIENT_ID=local-cognito-client
 ```
+
+If a temporary JWT fallback is ever needed for isolated test doubles, keep it out of the default runtime path and document the exception in a decision record.
 
 ### Client Settings (`/client/.env.local`)
 ```env

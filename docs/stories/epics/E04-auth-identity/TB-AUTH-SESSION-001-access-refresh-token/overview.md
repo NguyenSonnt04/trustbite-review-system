@@ -1,12 +1,18 @@
 # Overview
 
+## Status
+
+Superseded by `docs/decisions/0010-cognito-first-auth-boundary.md` and `docs/stories/epics/E04-auth-identity/TB-AUTH-001-cognito-auth-contract/`.
+
 ## Current Behavior
 
-Backend auth/session code is placeholder only. No JWT issuance, refresh token rotation, middleware, or logout revocation exists.
+Backend auth/session code is placeholder only. No Cognito JWT verification middleware, local Cognito identity mapping, or protected-route enforcement exists.
+
+Earlier notes in this packet described backend-issued JWT access tokens, opaque refresh cookies, and PostgreSQL `user_sessions` refresh-token rotation. That direction is no longer the TrustBite auth source of truth.
 
 ## Target Behavior
 
-OTP verification creates or loads a user, issues a short-lived access JWT, sets an opaque refresh token in a HttpOnly Secure SameSite cookie, and stores only a refresh-token hash in `user_sessions`. Refresh rotates the token. Logout and account suspension revoke sessions.
+Use Cognito from the start. Cognito owns authentication, token issuance, and refresh/session lifecycle. Express remains the business API backend and verifies Cognito JWTs in middleware or through a Cognito authorizer boundary, then enforces local user mapping, account status, and business authorization.
 
 ## Affected Users
 
@@ -16,13 +22,13 @@ OTP verification creates or loads a user, issues a short-lived access JWT, sets 
 
 ## Affected Product Docs
 
-- `trustbite-docs/04_Software_Engineering/API_Specification.md`
-- `trustbite-docs/04_Software_Engineering/openapi.yaml`
-- `trustbite-docs/02_Business_Analysis/Business_Rules.md`
-- `docs/decisions/0007-auth-session-token-strategy.md`
+- `docs/product/authentication.md`
+- `docs/product/provider-integrations.md`
+- `docs/decisions/0010-cognito-first-auth-boundary.md`
+- `docs/stories/epics/E04-auth-identity/TB-AUTH-001-cognito-auth-contract/`
 
 ## Non-Goals
 
-- No UI changes.
-- No refresh token in JSON response body.
-- No Cognito-owned session flow in this slice.
+- Do not implement backend-issued production JWT/refresh-token sessions.
+- Do not use `user_sessions.refresh_token_hash` as a Cognito refresh-token store by default.
+- Do not treat this superseded packet as implementation guidance unless a later accepted decision replaces Cognito.

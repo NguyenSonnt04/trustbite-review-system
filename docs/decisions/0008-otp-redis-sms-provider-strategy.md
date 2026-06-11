@@ -4,11 +4,13 @@ Date: 2026-06-10
 
 ## Status
 
-Accepted
+Superseded by `0010-cognito-first-auth-boundary.md` for default TrustBite authentication. Retained only as historical/provider design if a later accepted decision reintroduces backend-owned OTP.
 
 ## Context
 
-TrustBite OTP login is P0. Product docs require OTP rate-limit state and temporary phone locks to be kept in Redis, while PostgreSQL remains the application database for users, OTP evidence, and sessions. Production SMS provider selection must support OTP delivery without coupling route/controller code directly to provider SDKs.
+TrustBite OTP login was previously treated as a backend-owned auth slice. Product docs required OTP rate-limit state and temporary phone locks to be kept in Redis, while PostgreSQL remained the application database for users, OTP evidence, and sessions. Production SMS provider selection needed to support OTP delivery without coupling route/controller code directly to provider SDKs.
+
+Decision `0010-cognito-first-auth-boundary.md` now makes Cognito the auth and token-issuance source of truth from day one, including OTP/MFA behavior where configured. This decision is no longer the default implementation direction for TrustBite authentication.
 
 ## Decision
 
@@ -46,6 +48,6 @@ Tradeoffs:
 
 ## Follow-Up
 
-- Wire backend Redis client/config to the local `redis` service during the OTP implementation story.
-- Document provider env vars before enabling real AWS SMS.
+- Do not implement backend-owned OTP as the default auth path unless a later accepted decision replaces Cognito or scopes backend OTP to a non-auth notification use case.
+- If reintroduced, wire backend Redis client/config to the local `redis` service during that implementation story.
 - Keep OTP codes, tokens, full phone numbers, and sensitive provider payloads out of logs and analytics.

@@ -1,10 +1,30 @@
 // App configuration — sensitive values loaded strictly from .env
+const requireEnv = (name) => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`[Config] Missing required environment variable: ${name}`);
+  }
+
+  return value;
+};
+
+const cognitoUserPoolId = requireEnv('AWS_COGNITO_USER_POOL_ID');
+const cognitoClientId = requireEnv('AWS_COGNITO_CLIENT_ID');
+const cognitoRegion = requireEnv('AWS_REGION');
+
 export default {
   port: parseInt(process.env.PORT, 10) || 5000,
   env: process.env.NODE_ENV || 'development',
   corsOrigin: process.env.ALLOWED_ORIGINS,
-  jwt: {
-    secret: process.env.JWT_SECRET,
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d'
+  auth: {
+    provider: 'cognito',
+    cognito: {
+      userPoolId: cognitoUserPoolId,
+      clientId: cognitoClientId,
+      audience: cognitoClientId,
+      region: cognitoRegion,
+      issuer: `https://cognito-idp.${cognitoRegion}.amazonaws.com/${cognitoUserPoolId}`,
+      jwksUri: `https://cognito-idp.${cognitoRegion}.amazonaws.com/${cognitoUserPoolId}/.well-known/jwks.json`
+    }
   }
 };

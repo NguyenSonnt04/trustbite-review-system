@@ -1,8 +1,9 @@
 import 'dotenv/config';
 import app from './app.js';
+import appConfig from './config/app.js';
 import { connectDB, disconnectDB } from './config/db.js';
 
-const PORT = parseInt(process.env.PORT, 10) || 5000;
+const PORT = appConfig.port;
 
 const start = async () => {
   try {

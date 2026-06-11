@@ -6,7 +6,7 @@ Docs mention admin account lock/unlock and user state `SUSPENDED`, but backend h
 
 ## Target Behavior
 
-Admins can suspend a user account with reason. Suspension sets `users.status = SUSPENDED`, revokes sessions, records an audit log, and prevents login/refresh/profile mutation/protected mutations. Admins can reactivate a suspended user to `ACTIVE`; old sessions remain revoked.
+Admins can suspend a user account with reason. Suspension sets `users.status = SUSPENDED`, records an audit log, and prevents profile mutation/protected mutations. Cognito remains the auth/session source of truth; TrustBite must also revoke or invalidate local product session/push-token state where applicable and rely on Express middleware/local account checks to reject still-valid Cognito tokens. Admins can reactivate a suspended user to `ACTIVE`; previously blocked tokens/sessions are not restored.
 
 ## Affected Users
 

@@ -4,11 +4,13 @@ Date: 2026-06-10
 
 ## Status
 
-Accepted
+Superseded by `0010-cognito-first-auth-boundary.md`
 
 ## Context
 
 TrustBite Phase 2 auth requires OTP login, access token, refresh/session lifecycle, profile APIs, and account safety controls. The product docs require secure session/refresh behavior, stable mobile API contracts, PostgreSQL-backed session revocation, and no logging of OTP/token secrets.
+
+This decision was superseded because TrustBite now treats Cognito as the auth and token-issuance source of truth from day one. Express remains the business API backend and verifies Cognito JWTs in auth middleware/authorizer boundaries instead of issuing generic backend JWTs first.
 
 ## Decision
 
@@ -27,7 +29,7 @@ Refresh tokens are not JWTs and are not returned in JSON response bodies.
 
 1. Refresh token as JWT in JSON response body: easier for client testing, but higher exposure risk and weaker server-side revocation semantics.
 2. Access and refresh as opaque server sessions only: simpler revocation, but less aligned with existing Bearer access-token API contract.
-3. Cognito-owned session lifecycle: future-compatible, but current selected backend slice implements Express/PostgreSQL session behavior first.
+3. Cognito-owned session lifecycle: originally deferred by this decision, but later accepted by decision 0010 as the TrustBite source of truth.
 
 ## Consequences
 
@@ -44,5 +46,5 @@ Tradeoffs:
 
 ## Follow-Up
 
-- Add implementation validation for refresh rotation, logout, account suspension revocation, and deleted/suspended user rejection.
-- Revisit strategy only if Cognito becomes the source of truth for auth sessions.
+- Do not implement this backend-issued JWT/PostgreSQL refresh-session path unless a later accepted decision explicitly replaces Cognito.
+- Use `docs/decisions/0010-cognito-first-auth-boundary.md` and the TB-AUTH-001 story packet for new auth work.

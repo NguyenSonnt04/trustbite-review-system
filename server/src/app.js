@@ -1,12 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import appConfig from './config/app.js';
 
 const app = express();
 
 // Security & parsing
 app.use(helmet());
-app.use(cors({ origin: process.env.ALLOWED_ORIGINS }));
+app.use(cors({ origin: appConfig.corsOrigin }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

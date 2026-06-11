@@ -26,16 +26,22 @@ Before changing code or product docs:
 3. Run `npm run harness -- query matrix` when the local Harness CLI exists.
 4. For normal/high-risk work, read `docs/ARCHITECTURE.md`, `docs/CONTEXT_RULES.md`, and relevant `docs/product/*` / `docs/stories/*`.
 5. For auth, authorization, data model, audit/security, AWS provider behavior, or public API changes, treat the task as high-risk unless the human explicitly narrows scope.
+6. Before coding, read the relevant product doc, story packet, architecture rules, and existing code/model files for the affected domain. Do not implement from memory when docs or schema exist.
 
 ## Project-Specific Engineering Rules
 
 - Do not hardcode secrets, credentials, tokens, bucket names, user IDs, or database passwords in source files. Use `.env`, `.env.local`, or documented examples only.
 - Keep AWS integrations behind `server/src/services/` or `server/src/config/`; controllers/routes should not instantiate provider clients directly.
+- Use Cognito as the authentication and token-issuance source of truth from day one. Do not build a generic/backend-issued auth, JWT, refresh-token, or session layer first and attach Cognito later.
+- Keep business APIs in the Express backend. Protected routes must verify Cognito JWTs in Express auth middleware or a deployment authorizer boundary, then enforce TrustBite-local user status and business authorization before services run.
 - Parse and validate unknown input at HTTP/API boundaries before passing it to services or domain logic.
+- For database-backed work, treat `server/migrations/` as the schema source of truth. Server models, services, SQL, DTO mapping, and validation must match existing table/column names, constraints, enum/check values, nullability, generated columns, and relationships.
+- Do not add, assume, or write fields outside the accepted schema. New tables/columns/indexes/constraints require a high-risk story, migration, rollback/reset proof, and updated product/story docs before implementation is claimed complete.
+- For DB-affecting work, run `npm run db:migrate` against the local PostgreSQL environment, then prove inserts/updates occur inside transactions and can be rolled back without residue. Document any missing local DB/env blocker instead of claiming proof.
 - Keep anti-fraud rules explicit and testable: OCR match threshold, receipt age limit, duplicate hash policy, GPS distance threshold, and trust-score effects must be documented before implementation.
 - Keep client UI state separate from server trust decisions. The client may simulate flows, but final verification/trust outcomes must come from backend rules once implemented.
 - Prefer small vertical slices: route + service/domain rule + validation evidence + UI only when the story needs it.
-- If behavior changes, update `docs/product/*`, `docs/stories/*`, and the Harness matrix/CLI records in the same change.
+- If behavior, schema, API contract, validation expectation, or provider boundary changes, update `docs/product/*`, `docs/stories/*`, decisions when needed, and the Harness matrix/CLI records in the same change.
 
 ## Validation Commands
 
@@ -46,9 +52,10 @@ npm run client:build
 npm run server:build # currently unavailable unless added by a story
 npm run dev          # manual smoke for both apps
 npm run docker:up    # infrastructure smoke
+npm run db:migrate   # local PostgreSQL schema proof for DB-affecting work
 ```
 
-Current package scripts have no automated server test/lint/build command. If a story depends on backend proof, add or document the missing validation path instead of claiming proof that does not exist.
+Current package scripts have no automated server test/lint/build command. If a story depends on backend proof, add or document the missing validation path instead of claiming proof that does not exist. DB stories also need local insert/update plus rollback evidence against migrated PostgreSQL, or an explicit blocker if local infrastructure is unavailable.
 
 <!-- HARNESS:BEGIN -->
 ## Harness
