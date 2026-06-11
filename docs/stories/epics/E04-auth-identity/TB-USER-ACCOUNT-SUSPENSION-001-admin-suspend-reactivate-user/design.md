@@ -11,12 +11,13 @@
 
 ## Application Flow
 
-Validation order intentionally returns account-context errors before `reason` input errors. This preserves deterministic business error codes for deleted/self/already-suspended targets even when the request body also has an invalid reason, and matches the API spec contract.
+Validation order intentionally runs admin tier authorization before target status-specific errors so an `ADMIN` actor cannot infer `SUPER_ADMIN` target account state from error codes. For actors allowed to target the account, account-context errors still return before `reason` input errors. This preserves deterministic business error codes for authorized actors even when the request body also has an invalid reason.
 
 Suspend:
 
 1. Authenticate admin/super admin.
-2. Validate request in this order:
+2. Validate request in this order after loading the target row:
+   - if actor tier cannot target the account, return `403 INSUFFICIENT_ADMIN_TIER` before status-specific errors;
    - if target user is `DELETED`, return `400 CANNOT_SUSPEND_DELETED_USER`;
    - if actor targets their own account, return `403 CANNOT_SUSPEND_SELF`;
    - if target user is already `SUSPENDED`, return `409 USER_ALREADY_SUSPENDED`;
@@ -27,7 +28,8 @@ Suspend:
 Reactivate:
 
 1. Authenticate admin/super admin.
-2. Validate request in this order:
+2. Validate request in this order after loading the target row:
+   - if actor tier cannot target the account, return `403 INSUFFICIENT_ADMIN_TIER` before status-specific errors;
    - if target user is `DELETED`, return `400 CANNOT_REACTIVATE_DELETED_USER`;
    - if actor targets their own account, return `403 CANNOT_REACTIVATE_SELF`;
    - if target user is not `SUSPENDED`, return `409 USER_NOT_SUSPENDED`;

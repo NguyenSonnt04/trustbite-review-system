@@ -303,6 +303,7 @@ export class UserService {
     try {
       await client.query('BEGIN');
       const target = await requireUser(client, targetUserId, { forUpdate: true });
+      await assertAdminCanTargetUser(client, actor, target.id);
 
       if (target.status === 'DELETED') {
         throw createHttpError(400, 'CANNOT_SUSPEND_DELETED_USER', 'Deleted user cannot be suspended');
@@ -313,7 +314,6 @@ export class UserService {
       if (target.status === 'SUSPENDED') {
         throw createHttpError(409, 'USER_ALREADY_SUSPENDED', 'User is already suspended');
       }
-      await assertAdminCanTargetUser(client, actor, target.id);
 
       const reason = validateAdminReason(reasonInput);
 
@@ -359,6 +359,7 @@ export class UserService {
     try {
       await client.query('BEGIN');
       const target = await requireUser(client, targetUserId, { forUpdate: true });
+      await assertAdminCanTargetUser(client, actor, target.id);
 
       if (target.status === 'DELETED') {
         throw createHttpError(400, 'CANNOT_REACTIVATE_DELETED_USER', 'Deleted user cannot be reactivated');
@@ -369,7 +370,6 @@ export class UserService {
       if (target.status !== 'SUSPENDED') {
         throw createHttpError(409, 'USER_NOT_SUSPENDED', 'User is not suspended');
       }
-      await assertAdminCanTargetUser(client, actor, target.id);
 
       const reason = validateAdminReason(reasonInput);
 
