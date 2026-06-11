@@ -21,8 +21,8 @@ Suspend:
    - if actor targets their own account, return `403 CANNOT_SUSPEND_SELF`;
    - if target user is already `SUSPENDED`, return `409 USER_ALREADY_SUSPENDED`;
    - if `reason` is missing or shorter than 10 characters, return `422 ADMIN_REASON_REQUIRED`.
-3. In a DB transaction, update user status to `SUSPENDED`, revoke active `user_sessions`, insert audit log.
-4. Return user id, status, revoked session count, audit log id.
+3. In a DB transaction, update user status to `SUSPENDED`, invalidate/revoke local product session or push-token state where applicable, insert audit log.
+4. Return user id, status, invalidated local session/token count where applicable, audit log id.
 
 Reactivate:
 
@@ -42,7 +42,7 @@ Reactivate:
 
 ## Data Model
 
-Uses existing `users`, `user_sessions`, `user_roles`, `roles`, and `audit_logs`. No schema fields added.
+Uses existing `users`, `user_roles`, `roles`, and `audit_logs`. Existing `user_sessions` may be used only for local product session/device records where applicable; Cognito refresh/session ownership remains with Cognito. No schema fields added in this story.
 
 ## UI / Platform Impact
 

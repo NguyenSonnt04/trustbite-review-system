@@ -1,50 +1,38 @@
 # Exec Plan
 
+## Status
+
+Superseded by decision `0010-cognito-first-auth-boundary` and the TB-AUTH-001 Cognito contract story.
+
 ## Goal
 
-Implement backend access JWT and refresh/session lifecycle using opaque HttpOnly refresh tokens and PostgreSQL session revocation.
+Do not implement the old backend-issued JWT/refresh-session path as the default auth design.
 
 ## Scope
 
 In scope:
 
-- Access JWT issuance and verification.
-- Opaque refresh token cookie.
-- `user_sessions.refresh_token_hash` persistence.
-- Refresh rotation.
-- Logout/session revoke.
-- Rejection for `SUSPENDED` and `DELETED` users.
+- Mark the older backend-session slice as superseded.
+- Point future auth work to Cognito-first docs and story packets.
 
 Out of scope:
 
-- UI/mobile secure storage work.
-- Cognito session ownership.
-- Password/social auth.
+- Backend-issued access JWT/refresh-token/session implementation.
+- `user_sessions.refresh_token_hash`-based auth ownership.
+- Any migration that depends on the superseded backend-session model.
 
 ## Risk Classification
 
 Risk flags:
 
 - Auth.
-- Data model.
-- Audit/security.
 - Public contracts.
 - Weak proof.
 
 Hard gates:
 
 - Auth.
-- Audit/security.
-
-## Work Phases
-
-1. Confirm token strategy decision.
-2. Add auth config/env validation.
-3. Implement session service and middleware.
-4. Integrate OTP verify, refresh, and logout.
-5. Validate DB migration and rollback proof.
-6. Validate suspended/deleted user rejection.
 
 ## Stop Conditions
 
-Pause if refresh token is requested in JSON body, if refresh JWT is required, or if schema fields outside current tables become necessary.
+Pause if this superseded packet is proposed as the active source of truth again without a new accepted decision.

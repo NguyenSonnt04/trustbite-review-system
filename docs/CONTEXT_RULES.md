@@ -88,7 +88,8 @@ Read to leave useful evidence for the next agent and for benchmark scoring.
 
 | Trigger Condition | Action |
 | --- | --- |
-| Task touches database schema, durable records, or migrations | Read `docs/decisions/0004-sqlite-durable-layer.md`, `scripts/schema/`, and relevant CLI code before planning. |
+| Task touches Harness durable records or CLI migrations | Read `docs/decisions/0004-sqlite-durable-layer.md`, `scripts/schema/`, and relevant CLI code before planning. |
+| Task touches TrustBite product database schema, persistence, repositories, seed data, or server models | Read `docs/ARCHITECTURE.md`, the relevant product/story docs, `server/migrations/`, and the affected `server/src/models/**` files before coding; verify code matches existing table/column names and constraints. |
 | Task touches CLI command behavior or installer distribution | Read `docs/decisions/0005-prebuilt-rust-harness-cli.md`, `scripts/README.md`, relevant `crates/harness-cli/*` code, CLI help output, and installer docs. |
 | Task touches auth, authorization, audit/security, data loss, or external providers | Treat as high-risk, read `docs/templates/high-risk-story/*`, and check prior decisions before implementation. |
 | Task changes public API shape, product behavior, or user-visible workflow | Read relevant `docs/product/*`, story packets, and validation expectations before editing. |
@@ -127,6 +128,7 @@ Before implementation:
 - Lane is chosen from `docs/FEATURE_INTAKE.md`.
 - Relevant product docs or story packets are identified.
 - Any high-risk trigger has been handled.
+- For database-backed work, `server/migrations/` and affected `server/src/models/**` files have been read, and the implementation plan does not add fields outside the accepted schema.
 
 Before final response:
 

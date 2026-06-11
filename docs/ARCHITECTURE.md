@@ -61,6 +61,8 @@ Rules:
 - Browser code must never read server secrets or provider credentials.
 - Controllers should parse input and call services; they should not contain provider-specific logic.
 - Services may use database/provider clients, but anti-fraud and trust-score rules should stay explicit and testable.
+- Cognito is the auth/token source of truth from the first auth implementation. Do not build backend-issued generic JWT/refresh/session auth first and attach Cognito later.
+- Business APIs remain in Express. Protected routes verify Cognito JWTs in auth middleware or a deployment authorizer boundary, then enforce local TrustBite account status and product authorization before controllers/services run.
 - Configuration modules may read `process.env`; domain/rule functions should receive values as parameters or typed config.
 
 ## Boundary Inputs To Parse First
@@ -104,8 +106,12 @@ Public API changes are at least `normal` lane. Auth, authorization, security, da
 ## Data And Migration Rules
 
 - PostgreSQL is the application store. Do not use Harness SQLite (`harness.db`) for product data.
-- Schema-changing work requires a story packet and a durable decision if it changes ownership, retention, uniqueness, or deletion semantics.
+- `server/migrations/` is the implementation schema source of truth for backend code until a later decision replaces it with a generated schema/type system.
+- Server models, SQL queries, DTO mapping, validation, and seed data must match the existing schema exactly: table names, column names, constraints, check/enum values, nullability, generated columns, defaults, indexes, and relationships.
+- Do not add, assume, or write fields outside the accepted schema. If code needs a field that does not exist, stop and create/update the high-risk schema story instead of silently extending a model object.
+- Schema-changing work requires a story packet and a durable decision if it changes ownership, retention, uniqueness, deletion semantics, auth identity mapping, audit/security records, or public API shape.
 - Data loss, migration, or rollback behavior is high-risk.
+- DB-affecting work must run `npm run db:migrate` against local PostgreSQL when infrastructure is available, then prove insert/update behavior inside a transaction and rollback/reset proof with no leftover rows. Document local DB/env blockers instead of claiming proof.
 - Keep audit/security records distinct from operational logs.
 
 ## Observability Contract
@@ -129,7 +135,7 @@ These are not implemented yet and should not be claimed as complete without a st
 
 - server route mounting beyond health/basic skeleton,
 - real OCR/Textract processing,
-- real Cognito authentication enforcement,
+- real Cognito JWT middleware/authorizer enforcement and local user mapping,
 - review persistence and schema migrations,
 - trust-score computation,
 - automated backend tests,

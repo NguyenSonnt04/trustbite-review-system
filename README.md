@@ -61,7 +61,7 @@ Start the local environment containing PostgreSQL and LocalStack AWS emulator:
 npm run docker:up
 ```
 This spawns:
-- **Postgres Database** on `localhost:5432` (Credentials: `trustbite_user` / `trustbite_secure_password`, Database: `trustbite_db`)
+- **Postgres Database** on `localhost:15432` (container port `5432`; Credentials: `trustbite_user` / `bietthicunglamduoccaichogi`, Database: `trustbite_db`)
 - **Redis** on `localhost:6379` for OTP rate limits, temporary locks, and local queue/cache workflows
 - **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
 - **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `admin_password`)
@@ -154,7 +154,7 @@ Use `docs/`, `docs/stories/`, `docs/decisions/`, and `scripts/schema/` as the sh
 ```env
 PORT=5000
 DATABASE_HOST=localhost
-DATABASE_PORT=5432
+DATABASE_PORT=15432
 DATABASE_USER=trustbite_user
 DATABASE_PASSWORD=bietthicunglamduoccaichogi
 DATABASE_NAME=trustbite_db
@@ -164,7 +164,11 @@ AWS_ACCESS_KEY_ID=mock-key
 AWS_SECRET_ACCESS_KEY=mock-secret
 AWS_S3_BUCKET_NAME=trustbite-invoices
 AWS_SES_SENDER_EMAIL=noreply@trustbite.com
+AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
+AWS_COGNITO_CLIENT_ID=local-cognito-client
 ```
+
+If a temporary JWT fallback is ever needed for isolated test doubles, keep it out of the default runtime path and document the exception in a decision record.
 
 ### Client Settings (`/client/.env.local`)
 ```env
