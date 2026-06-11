@@ -61,10 +61,10 @@ Start the local environment containing PostgreSQL and LocalStack AWS emulator:
 npm run docker:up
 ```
 This spawns:
-- **Postgres Database** on `localhost:15432` (container port `5432`; Credentials: `trustbite_user` / `bietthicunglamduoccaichogi`, Database: `trustbite_db`)
+- **Postgres Database** on `localhost:15432` (container port `5432`; Credentials: `trustbite_user` / `your-local-db-password`, Database: `trustbite_db`)
 - **Redis** on `localhost:6379` for OTP rate limits, temporary locks, and local queue/cache workflows
 - **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
-- **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `admin_password`)
+- **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `your-local-pgadmin-password`)
 
 Apply the TrustBite PostgreSQL schema after the database is running:
 
@@ -156,7 +156,7 @@ PORT=5000
 DATABASE_HOST=localhost
 DATABASE_PORT=15432
 DATABASE_USER=trustbite_user
-DATABASE_PASSWORD=bietthicunglamduoccaichogi
+DATABASE_PASSWORD=your-local-db-password
 DATABASE_NAME=trustbite_db
 
 AWS_REGION=ap-southeast-1
