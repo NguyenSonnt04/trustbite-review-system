@@ -375,12 +375,11 @@ async function updateRestaurantAttempt(restaurantId, updates) {
       setClauses.push('longitude = NULL');
       setClauses.push('geo = NULL');
     } else if (latitude !== undefined && longitude !== undefined) {
-      setClauses.push(`latitude = ${addParam(latitude)}`);
-      setClauses.push(`longitude = ${addParam(longitude)}`);
-      params.push(longitude, latitude);
-      const lngIdx = params.length - 1;
-      const latIdx = params.length;
-      setClauses.push(`geo = ST_SetSRID(ST_MakePoint($${lngIdx}, $${latIdx}), 4326)`);
+      const latParam = addParam(latitude);
+      const lngParam = addParam(longitude);
+      setClauses.push(`latitude = ${latParam}`);
+      setClauses.push(`longitude = ${lngParam}`);
+      setClauses.push(`geo = ST_SetSRID(ST_MakePoint(${lngParam}, ${latParam}), 4326)`);
     }
 
     if (setClauses.length === 0 && categoryIds === undefined) {
