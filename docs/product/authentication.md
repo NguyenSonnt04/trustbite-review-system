@@ -15,9 +15,10 @@ Cognito owns:
 TrustBite Express owns:
 
 - business APIs for restaurants, reviews, verification, trust score, profiles, moderation, and account state,
-- Cognito JWT verification at the auth boundary when API Gateway is not already enforcing it,
-- defensive consumption of trusted Cognito claims when an API Gateway Cognito authorizer is used,
-- local user mapping and account status checks,
+- provider-specific JWT verification at the auth boundary when API Gateway is not already enforcing it,
+- defensive consumption of trusted authorizer claims when API Gateway enforces Cognito,
+- mapping normalized external identities to local TrustBite users,
+- local account status checks,
 - product authorization and audit/security rules.
 
 ## Auth Boundary
@@ -28,13 +29,16 @@ Protected API requests use this boundary:
 Client authenticates with Cognito
   -> Client receives Cognito JWTs
   -> Client calls TrustBite Express API with Authorization: Bearer <Cognito access token>
-  -> Express auth middleware or deployed authorizer verifies Cognito JWT
-  -> Express maps Cognito identity to a local TrustBite user
+  -> Express auth middleware or deployed authorizer verifies Cognito JWT through the configured identity provider adapter
+  -> Express normalizes provider claims into an external identity
+  -> Express maps external identity to a local TrustBite user
   -> Express checks local account status and business authorization
   -> Controllers/services run product logic
 ```
 
 The backend must not issue production access/refresh tokens for TrustBite users unless a later accepted decision explicitly replaces Cognito as the authentication source of truth.
+
+The current production identity provider adapter is Cognito. `docs/decisions/0011-auth-provider-adapter-boundary.md` documents the adapter boundary so profile and account services do not parse Cognito claims directly.
 
 ## JWT Verification Requirements
 
@@ -97,5 +101,6 @@ Auth implementation cannot be marked complete until proof covers positive and ne
 ## Source Of Truth
 
 - Decision: `docs/decisions/0010-cognito-first-auth-boundary.md`.
+- Provider adapter boundary: `docs/decisions/0011-auth-provider-adapter-boundary.md`.
 - Primary story: `docs/stories/epics/E04-auth-identity/TB-AUTH-001-cognito-auth-contract/`.
 - Architecture boundary: `docs/ARCHITECTURE.md`.

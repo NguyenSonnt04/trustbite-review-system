@@ -1,8 +1,14 @@
-// TODO: Request SMS OTP and register verified phone-numbers using Cognito.
-export const sendOtp = async (req, res, next) => {
-  // SMS OTP gateway route placeholder
+import { createHttpError } from '../utils/httpErrors.js';
+
+const createCognitoFlowNotImplementedError = (message) =>
+  createHttpError(501, 'COGNITO_FLOW_NOT_IMPLEMENTED', message);
+
+export const sendOtp = () => {
+  const message = 'OTP delivery is owned by Cognito and is not implemented as a backend-issued OTP flow';
+  throw createCognitoFlowNotImplementedError(message);
 };
 
-export const verifyOtp = async (req, res, next) => {
-  // Validate token placeholder
+export const verifyOtp = () => {
+  const message = 'OTP verification/token issuance is owned by Cognito and is not implemented as a backend-issued JWT flow';
+  throw createCognitoFlowNotImplementedError(message);
 };

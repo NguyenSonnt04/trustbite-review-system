@@ -28,6 +28,19 @@ Protected routes must declare:
 
 Business route/controller/service shape remains normal Express. Provider logic must stay in auth middleware/config/services and not inside domain services.
 
+Auth implementation uses a provider adapter boundary:
+
+```text
+authMiddleware
+  -> AuthService.authenticateRequest()
+  -> configured identity provider adapter verifies token and returns normalized identity
+  -> AuthService maps identity to local user and enforces status/roles
+```
+
+The normalized identity contains provider, subject, optional phone/email/local user id, token use, trusted roles, and original claims for boundary diagnostics.
+
+Cognito remains the production adapter. Future providers require an accepted decision update and provider-specific negative-path proof.
+
 ## Data Model
 
 Current migration has `users.phone_number` and `user_sessions`, but no Cognito identity mapping field. Future implementation should add an explicit Cognito identity mapping such as `users.cognito_sub` with uniqueness proof, or a separate identity table if a later decision requires multi-provider identity.
@@ -54,3 +67,4 @@ Schema changes are out of scope for this docs alignment and require high-risk mi
 1. Backend-issued JWT and PostgreSQL refresh sessions first: rejected by decision 0010 because it duplicates Cognito and creates migration debt.
 2. Generic auth abstraction before provider integration: rejected because Cognito is already selected and provider-specific JWT validation must be explicit.
 3. API Gateway authorizer only: insufficient for current Express/local architecture and local account status checks.
+4. Provider-neutral adapter boundary while keeping Cognito explicit: accepted by `docs/decisions/0011-auth-provider-adapter-boundary.md` because it keeps Cognito validation testable while limiting future provider replacement blast radius.

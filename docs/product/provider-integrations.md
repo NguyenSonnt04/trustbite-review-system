@@ -8,7 +8,7 @@ Planned provider responsibilities:
 
 | Provider | Product use | Boundary |
 | --- | --- | --- |
-| Cognito | Authentication, token issuance, JWT signing keys, configured signup/login/OTP/MFA behavior | Express auth middleware/authorizer plus auth service/config |
+| Cognito | Authentication, token issuance, JWT signing keys, configured signup/login/OTP/MFA behavior | Express auth middleware/authorizer plus identity provider adapter/auth service/config |
 | S3 | Receipt/media object storage | `server/src/services/` and `server/src/config/` |
 | Textract | Receipt OCR extraction | OCR/provider service |
 | SES / AWS messaging | Email or notification delivery where selected | Messaging/provider service |
@@ -26,6 +26,8 @@ Express business APIs remain normal backend services. Auth integration happens a
 - backend still enforces local user status and product authorization before business services mutate state.
 
 Implementation must keep provider-specific validation explicit: issuer, audience/client id, token use, expiry, signature/JWKS, required claims, and local status mapping.
+
+Cognito verification lives behind the identity provider adapter boundary accepted in `docs/decisions/0011-auth-provider-adapter-boundary.md`. Business services consume normalized `req.user` state rather than provider JWT claims directly.
 
 ## LocalStack And Test Doubles
 
