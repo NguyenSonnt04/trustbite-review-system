@@ -122,6 +122,23 @@ const getAdminActorRole = (actor) => {
   return null;
 };
 
+const getUserRoles = async (client, userId) => {
+  const result = await client.query('SELECT role_id FROM user_roles WHERE user_id = $1', [userId]);
+  return result.rows.map((row) => row.role_id);
+};
+
+const assertAdminCanTargetUser = async (client, actor, targetUserId) => {
+  const actorRole = getAdminActorRole(actor);
+  if (actorRole === 'SUPER_ADMIN') {
+    return;
+  }
+
+  const targetRoles = await getUserRoles(client, targetUserId);
+  if (targetRoles.includes('SUPER_ADMIN')) {
+    throw createHttpError(403, 'INSUFFICIENT_ADMIN_TIER', 'ADMIN cannot modify SUPER_ADMIN accounts');
+  }
+};
+
 const ACCOUNT_DELETION_CONFIRMATION_TEXT = 'XÓA TÀI KHOẢN'.normalize('NFC');
 
 const normalizeConfirmationText = (value) => (
@@ -290,6 +307,7 @@ export class UserService {
       if (target.status === 'SUSPENDED') {
         throw createHttpError(409, 'USER_ALREADY_SUSPENDED', 'User is already suspended');
       }
+      await assertAdminCanTargetUser(client, actor, target.id);
 
       const reason = validateAdminReason(reasonInput);
 
@@ -345,6 +363,7 @@ export class UserService {
       if (target.status !== 'SUSPENDED') {
         throw createHttpError(409, 'USER_NOT_SUSPENDED', 'User is not suspended');
       }
+      await assertAdminCanTargetUser(client, actor, target.id);
 
       const reason = validateAdminReason(reasonInput);
 
