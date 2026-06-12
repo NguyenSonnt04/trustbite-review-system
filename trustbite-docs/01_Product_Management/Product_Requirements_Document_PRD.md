@@ -283,7 +283,7 @@ Mỗi tính năng sử dụng định dạng chuẩn:
   - Không chỉ dùng email thủ công; mobile phải có luồng trong Settings > Account > Delete account.
   - Backend phải xóa hoặc ẩn danh hóa dữ liệu cá nhân theo `Data_Retention_Policy.md`.
   - Audit/fraud/security records có thể giữ trong thời hạn giới hạn nếu cần bảo vệ hệ thống hoặc nghĩa vụ pháp lý.
-  - Sau khi request được xác nhận, refresh/session token bị revoke; nếu có grace period, trạng thái tài khoản là `DELETION_REQUESTED`.
+  - Sau khi request được xác nhận, refresh/session token bị revoke; nếu có grace period, trạng thái deletion request là `REQUESTED` và protected mutations phải bị chặn bằng guard backend. Không tạo giá trị `users.status = DELETION_REQUESTED`; schema hiện tại chỉ cho phép `ACTIVE`, `SUSPENDED`, `DELETED`. Khi processor claim request, deletion request chuyển `PROCESSING` và không còn user-cancellable.
 - Tiêu chí nghiệm thu:
   - Bối cảnh người dùng đăng nhập, khi xác nhận xóa tài khoản, thì API tạo deletion request, revoke session và mobile hiển thị trạng thái/ước tính xử lý.
   - Bối cảnh người dùng chưa đăng nhập, khi mở web deletion link, thì có form xác minh danh tính và gửi request hợp lệ.
