@@ -100,6 +100,8 @@ async function persistOcrResult(client, receipt, struct) {
     ],
   );
 
+  await client.query('DELETE FROM receipt_line_items WHERE receipt_verification_id = $1', [receipt.id]);
+
   const items = Array.isArray(struct.lineItems) ? struct.lineItems : [];
   for (const item of items) {
     if (!item?.name) continue;

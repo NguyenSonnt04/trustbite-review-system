@@ -13,8 +13,8 @@ let textractClient = null;
 function clientConfig() {
   const cfg = { region: awsConfig.region };
   // Local/dev may point at LocalStack via AWS_ENDPOINT_URL; absent in prod.
-  if (process.env.AWS_ENDPOINT_URL) {
-    cfg.endpoint = process.env.AWS_ENDPOINT_URL;
+  if (awsConfig.endpointUrl) {
+    cfg.endpoint = awsConfig.endpointUrl;
     cfg.forcePathStyle = true;
   }
   if (awsConfig.accessKeyId && awsConfig.secretAccessKey) {

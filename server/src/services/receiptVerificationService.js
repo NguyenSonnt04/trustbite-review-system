@@ -230,6 +230,8 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
       : null;
 
     // --- Hard rule: duplicate transaction hash vs a prior VERIFIED receipt ---
+    // Intentional per TB-RECEIPT-VERIFY-001: REFERENCE_ONLY receipts do not block
+    // resubmission unless/until a prior receipt is promoted to VERIFIED.
     if (transactionHash) {
       const dupResult = await client.query(
         `SELECT id FROM receipt_verifications

@@ -24,6 +24,7 @@ const startOcrWorker = () => {
     console.log('[Server] Receipt OCR worker started');
   } catch (err) {
     console.error('[Server] Failed to start OCR worker:', err.message);
+    throw err;
   }
 };
 
