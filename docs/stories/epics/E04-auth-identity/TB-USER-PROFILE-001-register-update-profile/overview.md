@@ -2,11 +2,11 @@
 
 ## Current Behavior
 
-No backend user registration/profile API exists beyond model classes and schema.
+`GET /api/v1/users/me` and `PATCH /api/v1/users/me` exist behind the Express auth middleware. They read and update schema-backed TrustBite profile fields for the already-mapped local user. Cognito signup/login/password recovery remains provider-owned and is not part of this story.
 
 ## Target Behavior
 
-OTP verification creates a user with phone number if needed. Authenticated users can read profile and update display name/avatar URL using only schema-backed fields. Suspended/deleted users cannot update profile.
+After a Cognito-authenticated request is accepted, Express maps the verified external identity to a TrustBite-local `users` row by `users.cognito_sub`, with verified-phone fallback only for transition rows that do not yet have a Cognito subject. Authenticated users can read profile and update display name/avatar URL using only schema-backed fields. Suspended/deleted users and users with active deletion requests cannot mutate profile.
 
 ## Affected Users
 
@@ -26,3 +26,4 @@ OTP verification creates a user with phone number if needed. Authenticated users
 - No UI work.
 - No avatar upload URL implementation in this story.
 - No new fields beyond `users` schema.
+- No Cognito signup, login, forgot-password, OTP, or token issuance implementation; those are covered by `TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery`.

@@ -21,6 +21,8 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | Story | Title | Lane | Status | File |
 | --- | --- | --- | --- | --- |
 | TB-HARNESS-001 | Install and adopt repository harness | normal | implemented | `docs/stories/TB-HARNESS-001-install-repository-harness.md` |
+| TB-AUTH-CLIENT-001 | Cognito signup/login/forgot-password integration | high-risk | planned | `docs/stories/epics/E04-auth-identity/TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery/overview.md` |
+| TB-USER-PROFILE-001 | Register and update user profile | high-risk | in_progress | `docs/stories/epics/E04-auth-identity/TB-USER-PROFILE-001-register-update-profile/overview.md` |
 
 ## Suggested Next Slices
 
