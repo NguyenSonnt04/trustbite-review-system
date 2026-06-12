@@ -33,8 +33,12 @@ Desktop.ini
 # ─── IDE ─────────────────────────────────────────────
 .vscode/
 .idea/
+.kiro/
 *.swp
 *.swo
+
+# ─── API client (local) ──────────────────────────────
+.postman.json
 
 # ─── Docker volumes ──────────────────────────────────
 postgres_data/
