@@ -2,19 +2,22 @@
 
 ## Goal
 
-Implement backend user registration through OTP verification and current-user profile read/update APIs.
+Implement TrustBite-local user profile read/update and local user mapping for Cognito-authenticated requests.
 
 ## Scope
 
 In scope:
 
-- Create user on OTP verify if phone does not exist.
+- Map Cognito-authenticated identities to local `users` rows by `users.cognito_sub`.
+- Preserve verified-phone fallback only for transition users without `cognito_sub`.
 - `GET /api/v1/users/me`.
 - `PATCH /api/v1/users/me` for `displayName` and `avatarUrl` only.
-- Reject profile update for `SUSPENDED` and `DELETED` users.
+- Reject profile update for `SUSPENDED`, `DELETED`, and active deletion-request users.
 
 Out of scope:
 
+- Cognito signup/login/forgot-password UX or provider commands; tracked by `TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery`.
+- Backend-issued OTP, access token, or refresh token flows.
 - Avatar upload URL endpoint.
 - UI/mobile changes.
 - Additional profile fields outside schema.
@@ -35,11 +38,12 @@ Hard gates:
 
 ## Work Phases
 
-1. Confirm schema/model fields.
-2. Implement user repository/service mapping snake_case DB columns to API response.
-3. Bind users route and auth middleware.
-4. Validate DB insert/rollback and suspended-user behavior.
-5. Update Harness evidence.
+1. Done: Confirm schema/model fields including `users.cognito_sub`.
+2. Done/partial: Bind users route behind auth middleware.
+3. Done/partial: Implement user service mapping snake_case DB columns to API response.
+4. Pending: Add automated proof for Cognito subject mapping, verified-phone transition fallback, unmapped identity rejection, and active deletion-request profile mutation rejection.
+5. Pending: Validate DB insert/update rollback and suspended/deleted user behavior against migrated PostgreSQL.
+6. Pending: Update Harness evidence when automated proof is complete.
 
 ## Stop Conditions
 
