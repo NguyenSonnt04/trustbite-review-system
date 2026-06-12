@@ -113,6 +113,19 @@ describe('UserService account deletion guards', () => {
     expect(mockClient.release).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects deletion reasons longer than 500 characters before opening a transaction', async () => {
+    const service = new UserService();
+
+    await expect(service.createDeletionRequest(USER_ID, {
+      confirmationText: 'XÓA TÀI KHOẢN',
+      reason: 'x'.repeat(501),
+    }))
+      .rejects
+      .toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
   it('writes an audit record when creating a deletion request without copying the deletion reason', async () => {
     mockClient.query
       .mockResolvedValueOnce({})
@@ -164,6 +177,7 @@ describe('UserService account deletion guards', () => {
   it('writes an audit record when cancelling a deletion request', async () => {
     mockClient.query
       .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow()] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [deletionRequestRow()] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [deletionRequestRow({ status: 'CANCELLED', cancelled_at: new Date('2026-06-01T00:10:00.000Z') })] })
       .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow()] })
@@ -193,5 +207,25 @@ describe('UserService account deletion guards', () => {
       ],
     );
     expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('rejects deletion request cancellation for suspended users', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ status: 'SUSPENDED' })] })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service.cancelDeletionRequest(USER_ID))
+      .rejects
+      .toMatchObject({ statusCode: 403, code: 'ACCOUNT_SUSPENDED' });
+
+    expect(mockClient.query).not.toHaveBeenCalledWith(
+      expect.stringContaining('SELECT * FROM account_deletion_requests'),
+      expect.any(Array),
+    );
+    expect(mockClient.query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(mockClient.release).toHaveBeenCalledTimes(1);
   });
   });

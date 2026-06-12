@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const ACTIVE_DELETION_STATUSES = ['REQUESTED', 'PROCESSING'];
+const ACCOUNT_DELETION_REASON_MAX_LENGTH = 500;
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 
 const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
@@ -222,6 +223,10 @@ export class UserService {
     }
 
     const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : null;
+    if (reason !== null && reason.length > ACCOUNT_DELETION_REASON_MAX_LENGTH) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'reason must be at most 500 characters');
+    }
+
     const client = await pool.connect();
 
     try {
@@ -294,6 +299,9 @@ export class UserService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      const user = await requireUser(client, userId, { forUpdate: true });
+      validateCurrentUserCanMutate(user);
+
       const current = await client.query(
         'SELECT * FROM account_deletion_requests WHERE user_id = $1 AND status = $2 ORDER BY requested_at DESC LIMIT 1 FOR UPDATE',
         [userId, 'REQUESTED']

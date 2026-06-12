@@ -142,10 +142,6 @@ describe('user account deletion request API', () => {
       expect(cancelled.rows[0].cancelled_at).toBeTruthy();
       expect(cancelled.rows[0].audit_reason).toBeNull();
     } finally {
-      await query('DELETE FROM audit_logs WHERE actor_id = $1 OR entity_id IN (SELECT id FROM account_deletion_requests WHERE user_id = $1)', [user.id]);
-      await query('DELETE FROM account_deletion_requests WHERE user_id = $1', [user.id]);
-      await query('DELETE FROM user_sessions WHERE id = $1', [session.rows[0].id]);
-      await query('DELETE FROM push_tokens WHERE id = $1', [pushToken.rows[0].id]);
       await cleanupUser(user.id);
     }
   });
