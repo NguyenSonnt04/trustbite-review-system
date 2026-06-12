@@ -1,0 +1,89 @@
+import { pool } from '../config/db.js';
+
+const REVIEW_SELECT_PROJECTION = `
+  SELECT
+    r.id,
+    r.user_id AS "userId",
+    r.restaurant_id AS "restaurantId",
+    r.branch_id AS "branchId",
+    r.food_rating AS "foodRating",
+    r.price_rating AS "priceRating",
+    r.service_rating AS "serviceRating",
+    r.ambience_rating AS "ambienceRating",
+    r.average_rating AS "averageRating",
+    r.comment,
+    r.status,
+    r.verification_status AS "verificationStatus",
+    r.trust_label AS "trustLabel",
+    r.public_visibility AS "publicVisibility",
+    r.trust_weight_bucket AS "trustWeightBucket",
+    r.visited_at AS "visitedAt",
+    r.created_at AS "createdAt",
+    r.updated_at AS "updatedAt"
+  FROM reviews r
+`;
+
+function toPublicReview(row) {
+  return {
+    id: row.id,
+    restaurantId: row.restaurantId,
+    branchId: row.branchId,
+    // Omit userId per OpenAPI spec for unauthenticated public listing
+    foodRating: row.foodRating,
+    priceRating: row.priceRating,
+    serviceRating: row.serviceRating,
+    ambienceRating: row.ambienceRating,
+    averageRating: row.averageRating !== null ? parseFloat(row.averageRating) : null,
+    comment: row.comment,
+    status: row.status,
+    verificationStatus: row.verificationStatus,
+    trustLabel: row.trustLabel,
+    visitedAt: row.visitedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export async function listPublicReviewsByRestaurant(restaurantId, { status = 'ALL', page = 1, pageSize = 20 } = {}) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
+  const offset = (safePage - 1) * safeSize;
+
+  const params = [restaurantId];
+  let statusCondition = "r.status IN ('VERIFIED', 'REFERENCE_ONLY')";
+  
+  if (status === 'VERIFIED') {
+    statusCondition = "r.status = 'VERIFIED'";
+  } else if (status === 'REFERENCE_ONLY') {
+    statusCondition = "r.status = 'REFERENCE_ONLY'";
+  }
+
+  // HIDDEN, REJECTED, and DELETED are excluded
+  // Only public visibility reviews should be listed
+  const whereClause = `WHERE r.restaurant_id = $1 AND ${statusCondition} AND r.public_visibility = 'PUBLIC'`;
+
+  const dataQuery = `
+    ${REVIEW_SELECT_PROJECTION}
+    ${whereClause}
+    ORDER BY r.created_at DESC
+    LIMIT $2 OFFSET $3
+  `;
+
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM reviews r
+    ${whereClause}
+  `;
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(dataQuery, [...params, safeSize, offset]),
+    pool.query(countQuery, params),
+  ]);
+
+  return {
+    items: dataResult.rows.map(toPublicReview),
+    page: safePage,
+    pageSize: safeSize,
+    total: parseInt(countResult.rows[0].total, 10),
+  };
+}
