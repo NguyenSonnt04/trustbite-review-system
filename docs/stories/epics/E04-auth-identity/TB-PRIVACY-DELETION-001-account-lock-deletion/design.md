@@ -26,6 +26,8 @@ Status/cancel flow:
 
 Processing job:
 
+The dedicated processing slice is tracked in `docs/stories/epics/E04-auth-identity/TB-PRIVACY-RETENTION-JOB-001-deletion-anonymization-processing/`.
+
 1. Select due deletion requests.
 2. Revoke remaining sessions/push tokens.
 3. Delete or anonymize PII according to `Data_Retention_Policy.md`.
@@ -56,6 +58,8 @@ Uses existing planned schema:
 - `users.deleted_at`
 - `user_sessions.revoked_at`
 - audit metadata where required by the retention policy
+
+The deletion/anonymization worker details live in `TB-PRIVACY-RETENTION-JOB-001-deletion-anonymization-processing`.
 
 Schema-changing work is high-risk and must include migration/rollback proof before implementation is marked complete.
 

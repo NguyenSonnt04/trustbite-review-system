@@ -241,7 +241,6 @@ Ghi chú phân biệt:
 REQUESTED
 → PROCESSING
   → COMPLETED
-  → CANCELLED
 
 REQUESTED
 → CANCELLED
@@ -252,7 +251,9 @@ REQUESTED
 | REQUESTED | Người dùng đã xác nhận yêu cầu xóa tài khoản. |
 | PROCESSING | Hệ thống/Ops đang revoke session và xóa/ẩn danh hóa dữ liệu. |
 | COMPLETED | Yêu cầu đã hoàn tất theo retention/legal policy. |
-| CANCELLED | Người dùng hủy trong grace period hoặc request bị hủy hợp lệ theo quy trình. |
+| CANCELLED | Người dùng hủy khi request còn ở `REQUESTED` trong grace period/chưa được processor claim; không phải trạng thái đích từ `PROCESSING` qua user endpoint. |
+
+`PROCESSING -> CANCELLED` không hợp lệ qua user endpoint. Nếu cần operator-abort trong tương lai, phải có story riêng và schema-backed proof rằng chưa có cleanup không rollback được.
 
 ## 10. Trạng thái block người dùng
 

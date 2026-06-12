@@ -40,6 +40,7 @@ Hard gates:
 
 - Auth.
 - Data loss/deletion.
+- Open deletion request mutation guard ownership: `TB-PRIVACY-RETENTION-JOB-001` owns the hard gate for blocking protected mutations during open `REQUESTED`/`PROCESSING` deletion requests unless this story is explicitly re-scoped to implement and prove that guard.
 - Audit/security.
 - Public API shape.
 
@@ -49,7 +50,7 @@ Hard gates:
 2. Confirm OpenAPI/API spec for in-app deletion request, status, cancellation, and web deletion path.
 3. Implement DB migration and rollback for deletion request workflow if not already present.
 4. Implement authenticated deletion request endpoints and duplicate-request guards.
-5. Implement session/push-token revocation and deletion/anonymization worker/job.
+5. Implement session/push-token revocation and deletion/anonymization worker/job. The dedicated job slice is tracked in `docs/stories/epics/E04-auth-identity/TB-PRIVACY-RETENTION-JOB-001-deletion-anonymization-processing/` and owns the open-deletion mutation guard hard gate unless this story is explicitly re-scoped to implement and prove it.
 6. Implement or document web deletion form/API identity verification path.
 7. Validate privacy, audit, session revocation, and store-readiness scenarios.
 8. Update Harness matrix/story evidence and release checklist.

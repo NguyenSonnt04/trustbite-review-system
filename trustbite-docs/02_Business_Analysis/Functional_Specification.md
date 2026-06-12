@@ -449,7 +449,7 @@ Người dùng đã đăng ký, hệ thống, CS/Ops nếu xử lý yêu cầu w
 1. Người dùng mở Settings > Account > Delete account.
 2. Mobile hiển thị hậu quả: mất hồ sơ, review có thể bị ẩn danh, dữ liệu audit/fraud có thể giữ giới hạn.
 3. Người dùng xác nhận.
-4. Backend tạo `account_deletion_requests`, revoke session và chuyển user sang `DELETION_REQUESTED`.
+4. Backend tạo `account_deletion_requests` ở `REQUESTED`, revoke session/push token cục bộ, ghi `users.deletion_requested_at`, và chặn protected mutations bằng backend guard; không tạo `users.status = DELETION_REQUESTED`.
 5. Job xử lý xóa/ẩn danh hóa dữ liệu theo retention.
 6. Hệ thống ghi audit log tối thiểu và trả trạng thái xử lý.
 

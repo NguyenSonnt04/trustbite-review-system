@@ -91,7 +91,7 @@ Nếu tài liệu này khác `State_Machines.md`, phải cập nhật đồng b�
 | `REQUESTED` | Đã ghi nhận yêu cầu xóa tài khoản | Tạo audit tối thiểu; chặn request trùng đang mở. |
 | `PROCESSING` | Đang xử lý xóa tài khoản | Revoke session/push token; bắt đầu xóa/ẩn danh hóa PII. |
 | `COMPLETED` | Đã xóa tài khoản | `users.deleted_at` có giá trị; PII đã xóa/ẩn danh hóa theo retention. |
-| `CANCELLED` | Đã hủy yêu cầu | Chỉ hợp lệ nếu còn grace period hoặc chưa xử lý dữ liệu. |
+| `CANCELLED` | Đã hủy yêu cầu | Chỉ hợp lệ khi request còn ở `REQUESTED` trong grace period/chưa được processor claim. Không hợp lệ sau khi chuyển sang `PROCESSING`; user endpoint phải trả lỗi xung đột trạng thái trừ khi có story operator-abort riêng. |
 
 ### 5.2. `user_blocks`
 
