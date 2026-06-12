@@ -2,18 +2,17 @@
 
 ## Current Behavior
 
-Product docs define in-app account deletion, a web deletion link/form, and account deletion request states. The backend does not yet implement the deletion request API, identity verification for web requests, session/push-token revocation, or the deletion/anonymization job.
+Product docs define in-app account deletion, a web deletion link/form, and account deletion request states. This story is limited to the authenticated backend request lifecycle: create/read/cancel deletion requests, reject duplicate open requests, block the current profile mutation while a request is active, revoke local sessions/push tokens when the request is accepted, and write request/cancel lifecycle audit records. Deletion/anonymization processing, public web deletion, and mobile account-settings entrypoints remain separate stories.
 
 ## Target Behavior
 
-Authenticated users can request account deletion from the app. If a grace period is configured, users can view the open request and cancel it before processing starts. Users who cannot access the app can submit a verified web deletion request. Accepted deletion requests revoke active sessions, move through explicit request states, and end with PII deleted or anonymized according to the data retention policy.
+Authenticated users can request account deletion from the app. If a grace period is configured, users can view the open request and cancel it before processing starts. Accepted deletion requests revoke active local sessions/push tokens, move through explicit request states, and hand off later deletion/anonymization to `TB-PRIVACY-RETENTION-JOB-001`.
 
 ## Affected Users
 
 - Authenticated users requesting account/data deletion.
-- Users who cannot log in but need a public web deletion path.
-- Support/privacy operators handling deletion requests.
-- Release, Legal, and QA teams validating store-compliance gates.
+- Support/privacy operators who need durable request lifecycle evidence.
+- QA teams validating the backend account deletion request lifecycle.
 
 ## Affected Product Docs
 
@@ -33,5 +32,8 @@ Authenticated users can request account deletion from the app. If a grace period
 
 - No admin account suspension/reactivation; that is covered by `TB-USER-ACCOUNT-SUSPENSION-001`.
 - No user-to-user block/unblock implementation.
+- No public web deletion form implementation; that is tracked by `TB-PRIVACY-WEB-DELETION-001`.
+- No mobile account-settings Delete Account UI; that is tracked by `TB-MOBILE-ACCOUNT-DELETION-001`.
+- No deletion/anonymization processor, provider cleanup, object storage cleanup, trust-score recomputation, or review-summary invalidation; those belong to separate retention/trust-score stories.
 - No full legal rewrite of public privacy policy or terms.
 - No physical deletion of fraud/audit/legal-minimum records beyond the retention policy.

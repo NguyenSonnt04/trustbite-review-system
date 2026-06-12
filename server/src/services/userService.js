@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const ACTIVE_DELETION_STATUSES = ['REQUESTED', 'PROCESSING'];
+const ACCOUNT_DELETION_REASON_MAX_LENGTH = 500;
 const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 
 const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
@@ -54,6 +55,17 @@ const validateCurrentUserCanRead = (user) => {
 
 const validateCurrentUserCanMutate = (user) => {
   validateCurrentUserCanRead(user);
+};
+
+const assertNoActiveDeletionRequest = async (client, userId) => {
+  const result = await client.query(
+    'SELECT id, status FROM account_deletion_requests WHERE user_id = $1 AND status = ANY($2::varchar[]) ORDER BY requested_at DESC LIMIT 1',
+    [userId, ACTIVE_DELETION_STATUSES]
+  );
+
+  if (result.rowCount > 0) {
+    throw createHttpError(409, 'DELETION_REQUEST_ACTIVE', 'Account deletion request is active');
+  }
 };
 
 const normalizeDisplayName = (value) => {
@@ -189,6 +201,7 @@ export class UserService {
       await client.query('BEGIN');
       const current = await requireUser(client, userId, { forUpdate: true });
       validateCurrentUserCanMutate(current);
+      await assertNoActiveDeletionRequest(client, userId);
 
       const result = await client.query(
         `UPDATE users SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING *`,
@@ -210,6 +223,10 @@ export class UserService {
     }
 
     const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim() : null;
+    if (reason !== null && reason.length > ACCOUNT_DELETION_REASON_MAX_LENGTH) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'reason must be at most 500 characters');
+    }
+
     const client = await pool.connect();
 
     try {
@@ -234,8 +251,26 @@ export class UserService {
       );
 
       await client.query('UPDATE users SET deletion_requested_at = now() WHERE id = $1', [userId]);
-      await client.query('UPDATE user_sessions SET revoked_at = COALESCE(revoked_at, now()) WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
-      await client.query('UPDATE push_tokens SET status = $2 WHERE user_id = $1 AND status = $3', [userId, 'INACTIVE', 'ACTIVE']);
+      const revokedSessions = await client.query('UPDATE user_sessions SET revoked_at = COALESCE(revoked_at, now()) WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
+      const inactivatedPushTokens = await client.query('UPDATE push_tokens SET status = $2 WHERE user_id = $1 AND status = $3', [userId, 'INACTIVE', 'ACTIVE']);
+
+      await client.query(
+        `INSERT INTO audit_logs (actor_id, actor_role, action, entity_type, entity_id, previous_status, new_status, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'USER',
+          'ACCOUNT_DELETION_REQUESTED',
+          'ACCOUNT_DELETION_REQUEST',
+          insert.rows[0].id,
+          null,
+          'REQUESTED',
+          {
+            revokedSessions: revokedSessions.rowCount,
+            inactivatedPushTokens: inactivatedPushTokens.rowCount,
+          },
+        ]
+      );
 
       await client.query('COMMIT');
       return mapDeletionRequestRow(insert.rows[0]);
@@ -264,6 +299,9 @@ export class UserService {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      const user = await requireUser(client, userId, { forUpdate: true });
+      validateCurrentUserCanMutate(user);
+
       const current = await client.query(
         'SELECT * FROM account_deletion_requests WHERE user_id = $1 AND status = $2 ORDER BY requested_at DESC LIMIT 1 FOR UPDATE',
         [userId, 'REQUESTED']
@@ -286,6 +324,20 @@ export class UserService {
       }
 
       await client.query('UPDATE users SET deletion_requested_at = NULL WHERE id = $1', [userId]);
+      await client.query(
+        `INSERT INTO audit_logs (actor_id, actor_role, action, entity_type, entity_id, previous_status, new_status, metadata)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          userId,
+          'USER',
+          'ACCOUNT_DELETION_CANCELLED',
+          'ACCOUNT_DELETION_REQUEST',
+          updated.rows[0].id,
+          current.rows[0].status,
+          updated.rows[0].status,
+          {},
+        ]
+      );
       await client.query('COMMIT');
       return mapDeletionRequestRow(updated.rows[0]);
     } catch (err) {
