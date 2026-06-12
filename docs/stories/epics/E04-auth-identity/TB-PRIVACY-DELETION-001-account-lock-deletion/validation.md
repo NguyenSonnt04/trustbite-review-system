@@ -29,7 +29,7 @@ Prove account deletion request creation, duplicate prevention, status lookup, op
 npm run db:migrate
 # DB insert/rollback SQL proof for account_deletion_requests, users.deletion_requested_at, users.deleted_at, and user_sessions revocation
 # API smoke commands for deletion request/status/cancel to be added during implementation
-# Deletion/anonymization job smoke command to be added during implementation
+# Deletion/anonymization job smoke command to be added during TB-PRIVACY-RETENTION-JOB-001 implementation
 ```
 
 ## Acceptance Evidence
