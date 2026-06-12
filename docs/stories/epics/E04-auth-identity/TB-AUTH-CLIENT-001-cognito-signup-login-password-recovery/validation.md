@@ -29,8 +29,9 @@ Prove clients use Cognito-owned auth flows, Express receives Cognito access toke
 ```text
 npm run client:build
 npm run mobile:test
-npm run server:build
-# Cognito provider/test-double smoke command to be selected during implementation
+npm run server:build # syntax check only; does not prove backend auth behavior
+npm run test:integration --prefix server
+# Cognito provider/test-double smoke command to be selected during implementation for signup/login/forgot-password behavior
 ```
 
 ## Acceptance Evidence
