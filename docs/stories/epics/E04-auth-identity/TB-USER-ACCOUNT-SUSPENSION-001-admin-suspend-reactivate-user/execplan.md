@@ -11,9 +11,9 @@ In scope:
 - `POST /api/v1/admin/users/{userId}/suspend`.
 - `POST /api/v1/admin/users/{userId}/reactivate`.
 - `users.status` transitions between `ACTIVE` and `SUSPENDED`.
-- Session revocation on suspend.
+- Local account-state enforcement on suspend.
 - Audit log entries with actor/reason/previous/new status.
-- Auth middleware/service checks that block suspended users from login/refresh/profile mutation and future protected mutations.
+- Auth middleware/service checks that block suspended users from profile mutation and future protected mutations even if a Cognito token remains valid until expiry.
 
 Out of scope:
 
@@ -44,7 +44,7 @@ Hard gates:
 1. Update product/API docs and decision record.
 2. Implement admin auth/role checks sufficient for this endpoint.
 3. Implement suspend/reactivate service in a DB transaction.
-4. Revoke sessions on suspend.
+4. Invalidate/revoke local product session or push-token records where applicable without taking ownership of Cognito refresh sessions.
 5. Validate audit logs and blocked interactions.
 6. Update Harness evidence.
 

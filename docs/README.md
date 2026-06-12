@@ -12,6 +12,12 @@ future user-provided spec.
   `scripts/bin/harness-cli query matrix`.
 - `HARNESS_BACKLOG.md`: legacy improvement list; current improvement records
   are stored with `scripts/bin/harness-cli backlog`.
+- `HARNESS_AUDIT.md`: drift categories and entropy score interpretation for
+  `scripts/bin/harness-cli audit`.
+- `IMPROVEMENT_PROTOCOL.md`: proposal loop for turning friction, interventions,
+  and audit findings into reviewed Harness improvements.
+- `TOOL_REGISTRY.md`: machine-readable tool manifest and external tool registry
+  command reference.
 - `GLOSSARY.md`: shared terms.
 
 ## Folders

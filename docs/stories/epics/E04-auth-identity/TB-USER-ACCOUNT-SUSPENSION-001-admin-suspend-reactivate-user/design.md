@@ -11,23 +11,25 @@
 
 ## Application Flow
 
-Validation order intentionally returns account-context errors before `reason` input errors. This preserves deterministic business error codes for deleted/self/already-suspended targets even when the request body also has an invalid reason, and matches the API spec contract.
+Validation order intentionally runs admin tier authorization before target status-specific errors so an `ADMIN` actor cannot infer `SUPER_ADMIN` target account state from error codes. For actors allowed to target the account, account-context errors still return before `reason` input errors. This preserves deterministic business error codes for authorized actors even when the request body also has an invalid reason.
 
 Suspend:
 
 1. Authenticate admin/super admin.
-2. Validate request in this order:
+2. Validate request in this order after loading the target row:
+   - if actor tier cannot target the account, return `403 INSUFFICIENT_ADMIN_TIER` before status-specific errors;
    - if target user is `DELETED`, return `400 CANNOT_SUSPEND_DELETED_USER`;
    - if actor targets their own account, return `403 CANNOT_SUSPEND_SELF`;
    - if target user is already `SUSPENDED`, return `409 USER_ALREADY_SUSPENDED`;
    - if `reason` is missing or shorter than 10 characters, return `422 ADMIN_REASON_REQUIRED`.
-3. In a DB transaction, update user status to `SUSPENDED`, revoke active `user_sessions`, insert audit log.
-4. Return user id, status, revoked session count, audit log id.
+3. In a DB transaction, update user status to `SUSPENDED`, invalidate/revoke local product session or push-token state where applicable, insert audit log.
+4. Return user id, status, invalidated local session/token count where applicable, audit log id.
 
 Reactivate:
 
 1. Authenticate admin/super admin.
-2. Validate request in this order:
+2. Validate request in this order after loading the target row:
+   - if actor tier cannot target the account, return `403 INSUFFICIENT_ADMIN_TIER` before status-specific errors;
    - if target user is `DELETED`, return `400 CANNOT_REACTIVATE_DELETED_USER`;
    - if actor targets their own account, return `403 CANNOT_REACTIVATE_SELF`;
    - if target user is not `SUSPENDED`, return `409 USER_NOT_SUSPENDED`;
@@ -42,7 +44,7 @@ Reactivate:
 
 ## Data Model
 
-Uses existing `users`, `user_sessions`, `user_roles`, `roles`, and `audit_logs`. No schema fields added.
+Uses existing `users`, `user_roles`, `roles`, and `audit_logs`. `user_roles` is the source of truth for product admin roles and tier checks; Cognito groups do not grant `ADMIN` or `SUPER_ADMIN` by default. Existing `user_sessions` may be used only for local product session/device records where applicable; Cognito refresh/session ownership remains with Cognito. No schema fields added in this story.
 
 ## UI / Platform Impact
 

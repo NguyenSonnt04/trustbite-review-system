@@ -1,35 +1,26 @@
 # Validation
 
+## Status
+
+Superseded by decision `0010-cognito-first-auth-boundary`.
+
 ## Proof Strategy
 
-Prove JWT issuance, refresh rotation, logout revocation, suspended/deleted user rejection, and DB rollback behavior.
+No implementation proof should be recorded against the old backend-issued JWT/refresh-session design. Future auth proof must target Cognito JWT verification and local account-state rejection instead.
 
 ## Test Plan
 
 | Layer | Cases |
 | --- | --- |
-| Unit | JWT sign/verify config, token hash verify, cookie option generation. |
-| Integration | OTP verify creates session; refresh rotates token; replay old refresh fails; logout revokes session; suspended/deleted users cannot refresh. |
-| E2E | Authenticated request with access JWT passes; missing/expired token fails. |
-| Platform | Local env can run without hardcoded secrets. |
-| Performance | Not required for first slice. |
-| Logs/Audit | No access token, refresh token, or session token in logs. |
-
-## Fixtures
-
-- Active user.
-- Suspended user.
-- Deleted user.
-- Revoked and expired sessions.
+| Unit | Future Cognito claim validation and local account-state rules. |
+| Integration | Future protected-route auth middleware with Cognito JWTs. |
+| E2E | Future client/mobile authenticated requests with Cognito tokens. |
+| Platform | Future Cognito-compatible local config. |
+| Performance | Not defined here. |
+| Logs/Audit | No raw token logging. |
 
 ## Commands
 
 ```text
-npm run db:migrate
-# DB insert/rollback SQL proof for users and user_sessions
-# API smoke commands to be added during implementation
+TBD by the Cognito-first auth story.
 ```
-
-## Acceptance Evidence
-
-TBD after implementation.

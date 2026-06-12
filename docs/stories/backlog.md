@@ -29,4 +29,6 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | TB-DEV-001 | Establish local smoke validation | normal | Team needs a repeatable proof path before larger features |
 | TB-API-001 | Mount API router and define response/error conventions | normal | Current server has health only and route mounting TODO |
 | TB-FRAUD-002 | Extract and test Haversine proximity rule | normal/high-risk | Current logic is client simulation; rule should become backend-testable |
-| TB-AUTH-001 | Define Cognito authentication contract | high-risk | Auth is a hard gate and needs product + security clarity before implementation |
+| TB-AUTH-001 | Cognito-first authentication contract | high-risk | Auth is a hard gate and needs product + security clarity before implementation |
+| TB-AUTH-OTP-001 | OTP SMS send and verify | retired | Superseded by Cognito-first auth boundary decision |
+| TB-AUTH-SESSION-001 | Access and refresh token lifecycle | retired | Superseded by Cognito-first auth boundary decision |

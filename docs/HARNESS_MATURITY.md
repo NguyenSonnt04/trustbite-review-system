@@ -264,8 +264,8 @@ Activated responsibilities:
 | H0 | Passed | Harness docs, templates, and durable records exist. |
 | H1 | Achieved | `AGENTS.md`, `docs/HARNESS.md`, `docs/FEATURE_INTAKE.md`, `docs/ARCHITECTURE.md`, `docs/templates/*`, and `docs/TEST_MATRIX.md` exist. |
 | H2 | Achieved | `scripts/bin/harness-cli`, `scripts/schema/001-init.sql`, durable story records, `docs/HARNESS_COMPONENTS.md`, `docs/HARNESS_MATURITY.md`, `docs/TRACE_SPEC.md`, and `docs/CONTEXT_RULES.md` define the Phase 2 surface. |
-| H3 | Partial | Phase 3 adds `scripts/bin/harness-cli score-trace`, enriched friction context, and the backlog outcome loop; Phase 4 auto-scores traces on write. Component-level benchmark attribution remains open. |
-| H4 | Partial | Phase 4 adds story-level `verify_command`, `story verify`, and trace-time verification warnings. Batch verification and proof-column automation remain open. |
+| H3 | Partial | Phase 3 adds `scripts/bin/harness-cli score-trace`, enriched friction context, and the backlog outcome loop; Phase 4 auto-scores traces on write; Phase 5 adds audit/propose/intervention records. Component-level benchmark attribution remains open. |
+| H4 | Partial | Phase 4 adds story-level `verify_command`, `story verify`, trace-time verification warnings, and Phase 5 adds `story verify-all` plus `score-context`. Proof-column automation remains open. |
 | H5 | Not achieved | No self-improvement protocol or automated evolution loop exists. |
 
 ## Responsibility Activation
