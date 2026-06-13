@@ -5,14 +5,7 @@ const mockClient = {
   release: vi.fn(),
 };
 
-vi.mock('../../../src/config/db.js', () => ({
-  pool: {
-    connect: vi.fn(),
-    query: vi.fn(),
-  },
-}));
-
-vi.mock('../../../src/config/app.js', () => ({
+const mockAppConfig = vi.hoisted(() => ({
   default: {
     env: 'test',
     trustedAuthHeaders: false,
@@ -28,8 +21,23 @@ vi.mock('../../../src/config/app.js', () => ({
   },
 }));
 
+function setPhoneFallbackEnabled(phoneFallbackEnabled) {
+  mockAppConfig.default.auth = {
+    ...mockAppConfig.default.auth,
+    phoneFallbackEnabled,
+  };
+}
+
+vi.mock('../../../src/config/db.js', () => ({
+  pool: {
+    connect: vi.fn(),
+    query: vi.fn(),
+  },
+}));
+
+vi.mock('../../../src/config/app.js', () => mockAppConfig);
+
 const { pool } = await import('../../../src/config/db.js');
-const appConfig = (await import('../../../src/config/app.js')).default;
 const { AuthService } = await import('../../../src/services/auth.js');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -58,7 +66,7 @@ describe('AuthService local user mapping', () => {
     mockClient.query.mockReset();
     mockClient.release.mockReset();
     pool.connect.mockResolvedValue(mockClient);
-    appConfig.auth.phoneFallbackEnabled = false;
+    setPhoneFallbackEnabled(false);
   });
 
   it('maps a Cognito subject to the matching local user', async () => {
@@ -142,7 +150,7 @@ describe('AuthService local user mapping', () => {
   });
 
   it('binds a verified phone transition user only when fallback is enabled', async () => {
-    appConfig.auth.phoneFallbackEnabled = true;
+    setPhoneFallbackEnabled(true);
 
     pool.query
       .mockResolvedValueOnce({ rowCount: 0, rows: [] })

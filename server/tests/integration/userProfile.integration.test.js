@@ -1,18 +1,6 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import dotenv from 'dotenv';
+import '../helpers/env.js';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const serverRoot = path.resolve(__dirname, '../..');
-
-dotenv.config({ path: path.join(serverRoot, '.env') });
-process.env.AWS_COGNITO_USER_POOL_ID ??= 'local-test-pool';
-process.env.AWS_COGNITO_CLIENT_ID ??= 'local-test-client';
-process.env.AWS_REGION ??= 'us-east-1';
-// Keep the key present so helper dotenv loads cannot rehydrate it from local .env.
-process.env.AUTH_PHONE_FALLBACK_ENABLED = '';
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
 process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
 

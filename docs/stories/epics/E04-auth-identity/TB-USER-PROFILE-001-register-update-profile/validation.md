@@ -64,3 +64,15 @@ npm run db:migrate
 2026-06-13 hermetic fallback proof fix:
 
 - Updated route-level profile integration setup to keep `AUTH_PHONE_FALLBACK_ENABLED` present but empty before helper/app imports, preventing later `dotenv` helper loads from rehydrating a local `.env` value while still exercising the runtime default path.
+
+2026-06-13 PR #27 review fix:
+
+- Centralized test environment loading in `server/tests/helpers/env.js` and set `AUTH_PHONE_FALLBACK_ENABLED ??= ''` before `dotenv.config()`, so future tests that import DB/HTTP helpers do not silently inherit a local development fallback flag.
+- Removed duplicate direct `dotenv.config()` setup from the user profile integration test; it now imports the shared helper once.
+- Replaced direct `appConfig.auth.phoneFallbackEnabled` mutation in auth service unit tests with `setPhoneFallbackEnabled()`, which replaces the mocked auth config object for explicit test opt-in/out.
+- `npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/auth/authService.test.js` passed with 5 files and 31 tests.
+- `npm run test:integration --prefix server -- tests/integration/userProfile.integration.test.js` passed with 3 files and 9 tests.
+- `npm run test --prefix server` passed with 8 files and 40 tests.
+- `npm run server:build` passed; syntax check covered 80 files.
+- `npm run db:migrate` passed with 0 migrations applied.
+- `git diff --check` passed with LF/CRLF warnings only.
