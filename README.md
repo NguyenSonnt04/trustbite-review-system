@@ -178,7 +178,11 @@ AWS_S3_BUCKET_NAME=trustbite-invoices
 AWS_SES_SENDER_EMAIL=noreply@trustbite.com
 AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
 AWS_COGNITO_CLIENT_ID=local-cognito-client
+AUTH_PHONE_FALLBACK_ENABLED=true
+TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test
 ```
+
+`AUTH_PHONE_FALLBACK_ENABLED=true` is a local transition setting. Production-like environments default this fallback off and should opt in only after verified-phone backfill proof.
 
 If a temporary JWT fallback is ever needed for isolated test doubles, keep it out of the default runtime path and document the exception in a decision record.
 

@@ -1,3 +1,4 @@
+import './env.js';
 import { pool, disconnectDB } from '../../src/config/db.js';
 
 function ensureTestEnvironment() {

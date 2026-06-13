@@ -13,10 +13,10 @@
 2. Express auth middleware verifies a Cognito access token through the identity provider adapter.
 3. Express maps the normalized identity to a local user by `users.cognito_sub`.
 4. During transition only, a verified provider phone number may bind a local user with matching `phone_number` and empty `cognito_sub`.
-   - The transition fallback is enabled only behind an explicit non-default `AUTH_PHONE_FALLBACK_ENABLED` configuration flag and is not a permanent production auth path.
+   - The transition fallback is enabled by default only in local development and test for the accepted transition period; explicit `AUTH_PHONE_FALLBACK_ENABLED=false` disables it as a kill switch.
    - Before enabling the fallback outside local/test environments, a backfill script must dry-run and then bind known legacy rows to Cognito subjects from a trusted provider export or migration source; the script must report unmatched and duplicate phone numbers without mutating them.
    - Runtime fallback may bind only when exactly one local row matches the normalized verified phone and has `cognito_sub IS NULL`. Zero matches, multiple matches, unverified phone claims, or rows that already have a different `cognito_sub` fail closed as unmapped identity and require manual migration cleanup.
-   - The transition ends after backfill completion plus one release with zero production fallback binds; the flag then defaults off in all environments, and any later fallback use requires a new accepted high-risk decision/story update.
+   - Production-like environments default the fallback off; explicit `AUTH_PHONE_FALLBACK_ENABLED=true` is allowed only after the backfill proof above. The transition ends after backfill completion plus one release with zero production fallback binds; changing the default on outside local/test requires a new accepted high-risk decision/story update.
 5. `GET /users/me` returns current user profile.
 6. `PATCH /users/me` validates body and updates only `display_name`/`avatar_url`.
 7. `SUSPENDED`, `DELETED`, and active deletion-request users are rejected for profile mutation.

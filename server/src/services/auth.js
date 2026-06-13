@@ -78,7 +78,12 @@ const findUserByIdentity = async (identity) => {
     }
   }
 
-  if (identity.subject && identity.phoneNumber && identity.phoneNumberVerified) {
+  if (
+    identity.subject
+    && identity.phoneNumber
+    && identity.phoneNumberVerified
+    && appConfig.auth.phoneFallbackEnabled
+  ) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');

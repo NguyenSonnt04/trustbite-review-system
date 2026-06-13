@@ -41,9 +41,9 @@ Hard gates:
 1. Done: Confirm schema/model fields including `users.cognito_sub`.
 2. Done/partial: Bind users route behind auth middleware.
 3. Done/partial: Implement user service mapping snake_case DB columns to API response.
-4. Pending: Add automated proof for Cognito subject mapping, verified-phone transition fallback, unmapped identity rejection, and active deletion-request profile mutation rejection.
-5. Pending: Validate DB insert/update rollback and suspended/deleted user behavior against migrated PostgreSQL.
-6. Pending: Update Harness evidence when automated proof is complete.
+4. Done: Add automated proof for Cognito subject mapping, verified-phone transition fallback, unmapped identity rejection, and active deletion-request profile mutation rejection.
+5. Done: Validate DB insert/update rollback and suspended/deleted user behavior against migrated PostgreSQL.
+6. Done: Update Harness evidence when automated proof is complete.
 
 ## Stop Conditions
 
