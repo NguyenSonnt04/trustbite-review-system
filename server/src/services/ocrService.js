@@ -144,6 +144,10 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
   // Load the receipt (short transaction; provider call happens outside any tx).
   const receipt = await loadReceipt(receiptVerificationId);
   if (TERMINAL_RECEIPT_STATUSES.has(receipt.status)) return terminalResult(receipt);
+  if (receipt.status === 'OCR_SUCCESS') {
+    const decision = await verifyReceipt(receipt.id, { now });
+    return { status: 'OCR_SUCCESS', resumed: true, decision };
+  }
 
   // 1. File format/size guard — reject before any hashing/scoring.
   const fileCheck = validateReceiptFile({ fileUrl: receipt.file_url, sizeBytes: receipt.file_size_bytes }, ocrConfig);

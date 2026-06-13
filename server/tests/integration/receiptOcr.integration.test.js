@@ -218,6 +218,42 @@ describe('processReceiptOcr — pipeline + downstream decision (mock provider)',
     expect(rev.status).toBe('SUBMITTED');
   });
 
+  it('OCR_SUCCESS retry resumes at verification without reloading or re-running OCR', async () => {
+    const { receipt, review } = await seedReceipt();
+    await query(
+      `UPDATE receipt_verifications
+       SET status='OCR_SUCCESS',
+           ocr_text=$2,
+           ocr_restaurant_name=$3,
+           ocr_receipt_time=$4,
+           ocr_invoice_no=$5,
+           ocr_total_amount=$6
+       WHERE id=$1`,
+      [
+        receipt.id,
+        'previously extracted receipt text',
+        'Highlands Coffee',
+        new Date('2026-06-12T08:00:00.000Z'),
+        'INV-RESUME-1',
+        120000,
+      ],
+    );
+    const provider = {
+      async loadFile() { throw new Error('file should not be loaded again'); },
+      async analyzeExpense() { throw new Error('OCR should not run again'); },
+    };
+
+    const result = await processReceiptOcr(receipt.id, { provider, now: NOW });
+
+    const rec = await receiptRow(receipt.id);
+    const rev = await reviewRow(review.id);
+    expect(result).toMatchObject({ status: 'OCR_SUCCESS', resumed: true });
+    expect(rec.status).toBe('VERIFIED');
+    expect(rec.ocr_restaurant_name).toBe('Highlands Coffee');
+    expect(rev.status).toBe('VERIFIED');
+    expect(rev.trust_weight_bucket).toBe('HIGH');
+  });
+
   it('records an audit row for a successful OCR + decision', async () => {
     const { receipt } = await seedReceipt();
     registerMockReceipt(receipt.file_url, { struct: struct() });

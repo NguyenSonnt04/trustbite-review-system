@@ -44,10 +44,19 @@ export async function markPendingAdminReview(receiptVerificationId, reason) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    await client.query(
-      `UPDATE receipt_verifications SET status = 'PENDING_ADMIN_REVIEW', decision_reason = $2 WHERE id = $1`,
+    const updated = await client.query(
+      `UPDATE receipt_verifications
+       SET status = 'PENDING_ADMIN_REVIEW', decision_reason = $2
+       WHERE id = $1
+         AND status NOT IN ('VERIFIED', 'REJECTED', 'REFERENCE_ONLY', 'PENDING_ADMIN_REVIEW')
+       RETURNING id, review_id, status`,
       [receipt.id, reason ?? null],
     );
+    if (updated.rows.length === 0) {
+      await client.query('COMMIT');
+      return { skipped: true, status: receipt.status };
+    }
+
     await client.query(
       `UPDATE reviews
        SET status = 'PENDING_ADMIN_REVIEW', verification_status = 'PENDING_ADMIN_REVIEW',

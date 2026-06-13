@@ -62,6 +62,40 @@ describe('receipt OCR worker degrade behavior', () => {
     expect(flags.rows).toHaveLength(0);
   });
 
+  it('markPendingAdminReview does not overwrite an already-final receipt decision', async () => {
+    const { receipt, review } = await seedReceipt();
+    await query(
+      `UPDATE receipt_verifications
+       SET status='VERIFIED', decision='VERIFIED', fraud_risk_score=0
+       WHERE id=$1`,
+      [receipt.id],
+    );
+    await query(
+      `UPDATE reviews
+       SET status='VERIFIED', verification_status='VERIFIED',
+           trust_label='VERIFIED', public_visibility='PUBLIC',
+           trust_weight_bucket='HIGH'
+       WHERE id=$1`,
+      [review.id],
+    );
+
+    const result = await markPendingAdminReview(receipt.id, 'late timeout');
+
+    const rec = await recRow(receipt.id);
+    const rev = await revRow(review.id);
+    expect(result).toMatchObject({ skipped: true, status: 'VERIFIED' });
+    expect(rec.status).toBe('VERIFIED');
+    expect(rec.decision).toBe('VERIFIED');
+    expect(rev.status).toBe('VERIFIED');
+    expect(rev.public_visibility).toBe('PUBLIC');
+
+    const audit = await query(
+      `SELECT 1 FROM audit_logs WHERE entity_id=$1 AND action='RECEIPT_OCR_DEGRADED'`,
+      [receipt.id],
+    );
+    expect(audit.rows).toHaveLength(0);
+  });
+
   it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW and zombie OCR cannot overwrite it', async () => {
     const { receipt, review } = await seedReceipt();
     // Mock provider sleeps far past the job timeout.
