@@ -24,8 +24,9 @@ const parseBoolean = (value, defaultValue = false) => {
   return value.trim().toLowerCase() === 'true';
 };
 
-const env = process.env.NODE_ENV || 'development';
-const phoneFallbackDefault = ['development', 'test'].includes(env);
+const explicitNodeEnv = process.env.NODE_ENV;
+const env = explicitNodeEnv || 'development';
+const phoneFallbackDefault = ['development', 'test'].includes(explicitNodeEnv);
 
 const avatarAllowedHosts = parseCsv(process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS)
   .map((host) => host.toLowerCase());

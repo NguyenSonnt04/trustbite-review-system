@@ -11,6 +11,8 @@ async function loadAppConfig(caseName) {
     'phone-fallback-production-default': () => import('../../../src/config/app.js?phone-fallback-production-default'),
     'phone-fallback-staging-default': () => import('../../../src/config/app.js?phone-fallback-staging-default'),
     'phone-fallback-production-opt-in': () => import('../../../src/config/app.js?phone-fallback-production-opt-in'),
+    'phone-fallback-missing-node-env': () => import('../../../src/config/app.js?phone-fallback-missing-node-env'),
+    'phone-fallback-empty-node-env': () => import('../../../src/config/app.js?phone-fallback-empty-node-env'),
   };
   return (await imports[caseName]()).default;
 }
@@ -39,6 +41,27 @@ describe('app auth config', () => {
       .toMatchObject({
         auth: {
           phoneFallbackEnabled: true,
+        },
+      });
+  });
+
+  it.each([
+    ['unset', undefined, 'phone-fallback-missing-node-env'],
+    ['empty', '', 'phone-fallback-empty-node-env'],
+  ])('keeps verified-phone transition fallback disabled by default when NODE_ENV is %s', async (_label, nodeEnv, caseName) => {
+    setBaseEnv();
+    if (nodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = nodeEnv;
+    }
+
+    await expect(loadAppConfig(caseName))
+      .resolves
+      .toMatchObject({
+        env: 'development',
+        auth: {
+          phoneFallbackEnabled: false,
         },
       });
   });

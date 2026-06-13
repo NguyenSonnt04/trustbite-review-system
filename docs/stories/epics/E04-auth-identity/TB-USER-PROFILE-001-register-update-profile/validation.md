@@ -76,3 +76,26 @@ npm run db:migrate
 - `npm run server:build` passed; syntax check covered 80 files.
 - `npm run db:migrate` passed with 0 migrations applied.
 - `git diff --check` passed with LF/CRLF warnings only.
+
+2026-06-13 PR #27 missing `NODE_ENV` fix:
+
+- Narrowed the verified-phone transition fallback default so it turns on only when `NODE_ENV` is explicitly set to `development` or `test`; if `NODE_ENV` is absent, `env` remains `development` for local defaults but phone fallback stays disabled unless `AUTH_PHONE_FALLBACK_ENABLED=true` explicitly opts in.
+- Added config regression proof for an unset `NODE_ENV` to prevent production-like deployments missing `NODE_ENV` from silently enabling phone fallback.
+- `npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/auth/authService.test.js` passed with 5 files and 32 tests.
+- `npm run test:integration --prefix server -- tests/integration/userProfile.integration.test.js` passed with 3 files and 9 tests.
+- `npm run test --prefix server` passed with 8 files and 41 tests.
+- `npm run server:build` passed; syntax check covered 80 files.
+- `npm run db:migrate` passed with 0 migrations applied.
+- `git diff --check` passed with LF/CRLF warnings only.
+
+2026-06-13 PR #27 empty `NODE_ENV` review blocker fix:
+
+- Fixed the follow-up review blocker where `NODE_ENV=''` still fell back to `env='development'` and enabled verified-phone transition fallback by default.
+- Added config regression proof for both missing and empty `NODE_ENV`; fallback now defaults on only when the raw `NODE_ENV` value is explicitly `development` or `test`.
+- Manual config smoke for `NODE_ENV=''` returned `phoneFallbackEnabled:false` while keeping `env:'development'` for local defaults.
+- `npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/auth/authService.test.js` passed with 5 files and 33 tests.
+- `npm run test:integration --prefix server -- tests/integration/userProfile.integration.test.js` passed with 3 files and 9 tests after rerunning sequentially; the first parallel run conflicted with another full server test against shared DB fixture rows.
+- `npm run test --prefix server` passed with 8 files and 42 tests.
+- `npm run server:build` passed; syntax check covered 80 files.
+- `npm run db:migrate` passed with 0 migrations applied.
+- `git diff --check` passed with LF/CRLF warnings only.
