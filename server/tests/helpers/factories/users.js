@@ -1,10 +1,12 @@
 import { query } from '../db.js';
+import crypto from 'node:crypto';
 
 let userSequence = 0;
+const phonePrefix = String(crypto.randomInt(0, 100_000_000)).padStart(8, '0');
 
 export async function createUser(overrides = {}) {
   userSequence += 1;
-  const phoneNumber = overrides.phoneNumber ?? `+8490000${String(userSequence).padStart(5, '0')}`;
+  const phoneNumber = overrides.phoneNumber ?? `+84${phonePrefix}${String(userSequence).padStart(4, '0')}`;
 
   const result = await query(
     `
