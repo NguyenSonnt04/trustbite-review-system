@@ -21,6 +21,18 @@ import { verifyReceipt, NotFoundError } from './receiptVerificationService.js';
 
 export { NotFoundError };
 
+const TERMINAL_RECEIPT_STATUSES = new Set(['VERIFIED', 'REJECTED', 'REFERENCE_ONLY', 'PENDING_ADMIN_REVIEW']);
+
+function terminalResult(receipt) {
+  return { status: receipt.status, skipped: true, reason: 'Receipt already has a terminal OCR decision.' };
+}
+
+async function loadReceipt(receiptVerificationId) {
+  const loaded = await pool.query(`SELECT * FROM receipt_verifications WHERE id = $1`, [receiptVerificationId]);
+  if (loaded.rows.length === 0) throw new NotFoundError('Receipt verification not found.');
+  return loaded.rows[0];
+}
+
 export function computeFileHash(bytes) {
   return crypto.createHash('sha256').update(bytes).digest('hex');
 }
@@ -130,9 +142,8 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
   const ocrConfig = getOcrConfig();
 
   // Load the receipt (short transaction; provider call happens outside any tx).
-  const loaded = await pool.query(`SELECT * FROM receipt_verifications WHERE id = $1`, [receiptVerificationId]);
-  if (loaded.rows.length === 0) throw new NotFoundError('Receipt verification not found.');
-  const receipt = loaded.rows[0];
+  const receipt = await loadReceipt(receiptVerificationId);
+  if (TERMINAL_RECEIPT_STATUSES.has(receipt.status)) return terminalResult(receipt);
 
   // 1. File format/size guard — reject before any hashing/scoring.
   const fileCheck = validateReceiptFile({ fileUrl: receipt.file_url, sizeBytes: receipt.file_size_bytes }, ocrConfig);
@@ -200,6 +211,12 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
 
   // 4. OCR (outside any DB transaction). Errors propagate to the worker.
   const struct = await provider.analyzeExpense({ fileUrl: receipt.file_url, bytes });
+
+  // A prior timed-out attempt may have been degraded while provider I/O was still
+  // in flight. Re-check before any post-provider writes so terminal decisions are
+  // not overwritten by an orphaned continuation or manual replay.
+  const current = await loadReceipt(receipt.id);
+  if (TERMINAL_RECEIPT_STATUSES.has(current.status)) return terminalResult(current);
 
   // 4. Persist extraction + line items atomically, then run the fraud decision.
   const client = await pool.connect();

@@ -27,6 +27,7 @@ async function seedReceipt() {
 
 const recRow = async (id) => (await query(`SELECT * FROM receipt_verifications WHERE id=$1`, [id])).rows[0];
 const revRow = async (id) => (await query(`SELECT * FROM reviews WHERE id=$1`, [id])).rows[0];
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 beforeEach(() => clearMockReceipts());
 
@@ -61,7 +62,7 @@ describe('receipt OCR worker degrade behavior', () => {
     expect(flags.rows).toHaveLength(0);
   });
 
-  it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW', async () => {
+  it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW and zombie OCR cannot overwrite it', async () => {
     const { receipt, review } = await seedReceipt();
     // Mock provider sleeps far past the job timeout.
     registerMockReceipt(receipt.file_url, { delayMs: 200, struct: { lineItems: [] } });
@@ -74,8 +75,14 @@ describe('receipt OCR worker degrade behavior', () => {
 
     await runReceiptOcrJob(job, { provider: mockOcrProvider, timeoutMs: 20 });
 
+    expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+    await delay(250);
+
     const rec = await recRow(receipt.id);
     expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+    expect(rec.decision).toBeNull();
     expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
   });
 
