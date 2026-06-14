@@ -1,13 +1,14 @@
 import '../helpers/env.js';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
-process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
+const originalTrustedAuthHeaders = process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
+const originalAvatarAllowedHosts = process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS;
 
-const { cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js');
-const { createUser } = await import('../helpers/factories/index.js');
-const { closeDbPool, query } = await import('../helpers/db.js');
-const { requestApp } = await import('../helpers/http.js');
+let cognitoIdentityProvider;
+let createUser;
+let closeDbPool;
+let query;
+let requestApp;
 
 const adminReason = 'Verified safety abuse case';
 
@@ -51,31 +52,59 @@ async function cleanupUsers(userIds) {
   await query('DELETE FROM users WHERE id = ANY($1::uuid[])', [userIds]);
 }
 
+function restoreTestEnv() {
+  if (originalTrustedAuthHeaders === undefined) {
+    delete process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
+  } else {
+    process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = originalTrustedAuthHeaders;
+  }
+
+  if (originalAvatarAllowedHosts === undefined) {
+    delete process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS;
+  } else {
+    process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = originalAvatarAllowedHosts;
+  }
+}
+
 describe('admin user suspension API', () => {
+  beforeAll(async () => {
+    process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
+    process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
+
+    ({ cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js'));
+    ({ createUser } = await import('../helpers/factories/index.js'));
+    ({ closeDbPool, query } = await import('../helpers/db.js'));
+    ({ requestApp } = await import('../helpers/http.js'));
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
   afterAll(async () => {
-    if (createdRoleIds.size > 0) {
-      await query(
-        `DELETE FROM roles r
-         WHERE r.id = ANY($1::varchar[])
-           AND NOT EXISTS (
-             SELECT 1 FROM user_roles ur WHERE ur.role_id = r.id
-           )`,
-        [[...createdRoleIds]],
-      );
+    try {
+      if (createdRoleIds.size > 0) {
+        await query(
+          `DELETE FROM roles r
+           WHERE r.id = ANY($1::varchar[])
+             AND NOT EXISTS (
+               SELECT 1 FROM user_roles ur WHERE ur.role_id = r.id
+             )`,
+          [[...createdRoleIds]],
+        );
+      }
+    } finally {
+      restoreTestEnv();
+      if (closeDbPool) {
+        await closeDbPool();
+      }
     }
-
-    await closeDbPool();
   });
 
-  it('suspends an active user, writes audit evidence, invalidates local state, rejects suspended profile mutation, and reactivates without restoring sessions', async () => {
+  it('suspends an active user, writes audit evidence, and invalidates local state', async () => {
     const admin = await createUser({ displayName: 'Local Admin' });
     const target = await createUser({ displayName: 'Suspend Target' });
     await assignRole(admin.id, 'ADMIN');
-    await query('UPDATE users SET cognito_sub = $1 WHERE id = $2', ['suspended-target-sub', target.id]);
 
     const session = await query(
       `INSERT INTO user_sessions (user_id, refresh_token_hash, device_label, platform, expires_at)
@@ -134,6 +163,26 @@ describe('admin user suspension API', () => {
       expect(suspended.rows[0].revoked_at).toBeTruthy();
       expect(suspended.rows[0].metadata).toMatchObject({ revokedSessions: 1 });
 
+      const sessionAfter = await query('SELECT revoked_at FROM user_sessions WHERE id = $1', [session.rows[0].id]);
+      expect(sessionAfter.rows[0].revoked_at).toBeTruthy();
+    } finally {
+      await cleanupUsers([admin.id, target.id]);
+    }
+  });
+
+  it('rejects suspended profile mutations through trusted headers and Cognito bearer identity', async () => {
+    const admin = await createUser({ displayName: 'Suspension Admin' });
+    const target = await createUser({ displayName: 'Blocked Target' });
+    await assignRole(admin.id, 'ADMIN');
+    await query('UPDATE users SET cognito_sub = $1 WHERE id = $2', ['suspended-target-sub', target.id]);
+
+    try {
+      await requestApp()
+        .post(`/api/v1/admin/users/${target.id}/suspend`)
+        .set(authHeaders(admin.id))
+        .send({ reason: adminReason })
+        .expect(200);
+
       const blockedPatch = await requestApp()
         .patch('/api/v1/users/me')
         .set(authHeaders(target.id))
@@ -156,7 +205,24 @@ describe('admin user suspension API', () => {
         .expect(403);
       expect(verifyAccessToken).toHaveBeenCalledWith('suspended-target-token');
       expect(cognitoBlockedPatch.body.error.code).toBe('ACCOUNT_SUSPENDED');
+    } finally {
+      await cleanupUsers([admin.id, target.id]);
+    }
+  });
 
+  it('reactivates a suspended user without restoring revoked sessions', async () => {
+    const admin = await createUser({ displayName: 'Reactivation Admin' });
+    const target = await createUser({ displayName: 'Reactivate Target', status: 'SUSPENDED' });
+    await assignRole(admin.id, 'ADMIN');
+
+    const session = await query(
+      `INSERT INTO user_sessions (user_id, refresh_token_hash, device_label, platform, revoked_at, expires_at)
+       VALUES ($1, $2, $3, $4, now() - interval '1 hour', now() + interval '1 day')
+       RETURNING id, revoked_at`,
+      [target.id, `reactivate-session-hash-${target.id}`, 'phone', 'IOS'],
+    );
+
+    try {
       const reactivateResponse = await requestApp()
         .post(`/api/v1/admin/users/${target.id}/reactivate`)
         .set(authHeaders(admin.id))
@@ -184,10 +250,7 @@ describe('admin user suspension API', () => {
         reason: 'Appeal reviewed successfully',
       });
       expect(reactivated.rows[0].revoked_at).toBeTruthy();
-      expect(reactivated.rows[0].revoked_at.getTime()).toBe(suspended.rows[0].revoked_at.getTime());
-
-      const sessionAfter = await query('SELECT revoked_at FROM user_sessions WHERE id = $1', [session.rows[0].id]);
-      expect(sessionAfter.rows[0].revoked_at).toBeTruthy();
+      expect(reactivated.rows[0].revoked_at.getTime()).toBe(session.rows[0].revoked_at.getTime());
     } finally {
       await cleanupUsers([admin.id, target.id]);
     }
@@ -281,7 +344,7 @@ describe('admin user suspension API', () => {
     }
   });
 
-  it('enforces admin tier, deleted/self/reason business guards for suspend and reactivate', async () => {
+  it('enforces admin tier, deleted/self/status/reason business guards for suspend and reactivate', async () => {
     const admin = await createUser({ displayName: 'Tier Admin' });
     const superTarget = await createUser({ displayName: 'Super Target' });
     const deletedTarget = await createUser({ displayName: 'Deleted Target', status: 'DELETED' });
@@ -332,6 +395,20 @@ describe('admin user suspension API', () => {
         .send({ reason: adminReason })
         .expect(403);
       expect(selfReactivate.body.error.code).toBe('CANNOT_REACTIVATE_SELF');
+
+      const alreadySuspended = await requestApp()
+        .post(`/api/v1/admin/users/${suspendedTarget.id}/suspend`)
+        .set(authHeaders(admin.id))
+        .send({ reason: adminReason })
+        .expect(409);
+      expect(alreadySuspended.body.error.code).toBe('USER_ALREADY_SUSPENDED');
+
+      const notSuspended = await requestApp()
+        .post(`/api/v1/admin/users/${activeTarget.id}/reactivate`)
+        .set(authHeaders(admin.id))
+        .send({ reason: adminReason })
+        .expect(409);
+      expect(notSuspended.body.error.code).toBe('USER_NOT_SUSPENDED');
 
       const reasonSuspend = await requestApp()
         .post(`/api/v1/admin/users/${activeTarget.id}/suspend`)

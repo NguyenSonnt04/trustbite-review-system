@@ -47,3 +47,30 @@ npm run db:migrate
 - `git diff --check` returned only the existing LF/CRLF warning for this story execplan.
 
 Harness row can be marked `implemented` with unit and integration proof. Platform proof is not applicable beyond the local DB migration/integration pass for this story.
+
+2026-06-14 PR #28 review follow-up:
+
+- Updated `server/tests/integration/adminUserSuspension.integration.test.js` to address Greptile P2 feedback:
+  - Moved trusted-auth/avatar env setup into test lifecycle before dynamic app imports and restored original env values in teardown to avoid cross-file leakage.
+  - Split the large suspend/profile-block/reactivate integration flow into separate focused `it()` cases for clearer failure isolation.
+  - Added route-level rejection assertions for `USER_ALREADY_SUSPENDED` and `USER_NOT_SUSPENDED`.
+- `npm run test:unit --prefix server -- tests/unit/user/userService.test.js` passed: Vitest reported 5 unit files / 45 tests passed.
+- `npm run server:build` passed: syntax check passed for 80 files.
+- `npm run harness -- query matrix` passed.
+- `git diff --check` completed with the expected LF/CRLF working-copy warnings.
+- `npm run test:integration --prefix server -- tests/integration/adminUserSuspension.integration.test.js` could not complete locally because PostgreSQL was unavailable at `127.0.0.1:15432` / `::1:15432`.
+- `npm run docker:up` could not start the local stack because Docker Desktop was not running: Docker API pipe `//./pipe/dockerDesktopLinuxEngine` was missing.
+- `npm run db:migrate` failed under the same unavailable local database environment. Do not treat the 2026-06-14 follow-up as refreshed DB/integration proof until Docker/PostgreSQL is started and the integration/migration commands are rerun.
+
+2026-06-14 PR #28 review follow-up validation refresh:
+
+- Guarded `closeDbPool()` in `server/tests/integration/adminUserSuspension.integration.test.js` teardown so a failed dynamic import does not mask the original setup failure.
+- `npm run docker:up` passed after Docker Desktop/PostgreSQL were available: PostgreSQL, Redis, pgAdmin, and LocalStack containers were running/started.
+- `npm run db:migrate` passed: migration runner skipped existing migrations and applied 0 new migrations.
+- `npm run test:unit --prefix server -- tests/unit/user/userService.test.js` passed: Vitest reported 5 unit files / 45 tests passed because the package script includes `tests/unit` plus the supplied path.
+- `npm run test:integration --prefix server -- tests/integration/adminUserSuspension.integration.test.js` passed: Vitest reported 4 integration files / 15 tests passed because the package script includes `tests/integration` plus the supplied path.
+- `npm run test --prefix server` passed: Vitest reported 9 test files / 60 tests passed.
+- `npm run server:build` passed: syntax check passed for 80 files.
+- DB transaction/rollback proof passed for users, user_roles, audit_logs, user_sessions, and push_tokens: inside the transaction counts were users=2, user_roles=1, audit_logs=1, user_sessions=1, push_tokens=1; after rollback residue counts were users=0, audit_logs=0, user_sessions=0, push_tokens=0.
+- `git diff --check` completed with the expected LF/CRLF working-copy warning for `server/tests/integration/adminUserSuspension.integration.test.js`.
+- `npm run harness -- query matrix` passed after the refreshed validation commands.
