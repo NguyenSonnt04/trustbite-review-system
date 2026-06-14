@@ -229,3 +229,141 @@ describe('UserService account deletion guards', () => {
     expect(mockClient.release).toHaveBeenCalledTimes(1);
   });
   });
+
+const ADMIN_ID = '33333333-3333-4333-8333-333333333333';
+const TARGET_ID = '44444444-4444-4444-8444-444444444444';
+const AUDIT_ID = '55555555-5555-4555-8555-555555555555';
+const adminActor = (overrides = {}) => ({
+  id: ADMIN_ID,
+  roles: ['ADMIN'],
+  ...overrides,
+});
+
+describe('UserService admin suspension transitions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockClient.query.mockReset();
+    mockClient.release.mockReset();
+    pool.connect.mockResolvedValue(mockClient);
+  });
+
+  it('suspends an active user, revokes sessions, and writes admin audit metadata', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: TARGET_ID })] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: TARGET_ID, status: 'SUSPENDED' })] })
+      .mockResolvedValueOnce({ rowCount: 2, rows: [{ id: 'session-1' }, { id: 'session-2' }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'push-1' }] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: AUDIT_ID }] })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service.suspendUser(adminActor(), TARGET_ID, 'Safety investigation reason'))
+      .resolves
+      .toMatchObject({
+        userId: TARGET_ID,
+        status: 'SUSPENDED',
+        revokedSessions: 2,
+        auditLogId: AUDIT_ID,
+      });
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE users SET status = 'SUSPENDED'"),
+      [TARGET_ID],
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO audit_logs'),
+      [ADMIN_ID, 'ADMIN', TARGET_ID, 'ACTIVE', 'Safety investigation reason', { revokedSessions: 2 }],
+    );
+    expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('reactivates a suspended user and writes admin audit evidence without session restoration', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: TARGET_ID, status: 'SUSPENDED' })] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: TARGET_ID, status: 'ACTIVE' })] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: AUDIT_ID }] })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service.reactivateUser(adminActor(), TARGET_ID, 'Appeal accepted reason'))
+      .resolves
+      .toMatchObject({
+        userId: TARGET_ID,
+        status: 'ACTIVE',
+        auditLogId: AUDIT_ID,
+      });
+
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("UPDATE users SET status = 'ACTIVE'"),
+      [TARGET_ID],
+    );
+    expect(mockClient.query.mock.calls.some(([sql]) => (
+      typeof sql === 'string' && sql.includes('UPDATE user_sessions')
+    ))).toBe(false);
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO audit_logs'),
+      [ADMIN_ID, 'ADMIN', TARGET_ID, 'SUSPENDED', 'Appeal accepted reason'],
+    );
+    expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('rejects non-admin actors before opening a transaction', async () => {
+    const service = new UserService();
+
+    await expect(service.suspendUser({ id: USER_ID, roles: ['USER'] }, TARGET_ID, 'Safety reason'))
+      .rejects
+      .toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['suspendUser', 'CANNOT_SUSPEND_DELETED_USER', 'DELETED'],
+    ['suspendUser', 'CANNOT_SUSPEND_SELF', 'ACTIVE', ADMIN_ID],
+    ['suspendUser', 'USER_ALREADY_SUSPENDED', 'SUSPENDED'],
+    ['suspendUser', 'ADMIN_REASON_REQUIRED', 'ACTIVE', TARGET_ID, 'short'],
+    ['reactivateUser', 'CANNOT_REACTIVATE_DELETED_USER', 'DELETED'],
+    ['reactivateUser', 'CANNOT_REACTIVATE_SELF', 'SUSPENDED', ADMIN_ID],
+    ['reactivateUser', 'USER_NOT_SUSPENDED', 'ACTIVE'],
+    ['reactivateUser', 'ADMIN_REASON_REQUIRED', 'SUSPENDED', TARGET_ID, 'short'],
+  ])('enforces %s validation order with %s', async (methodName, expectedCode, targetStatus, targetId = TARGET_ID, reason = 'Valid admin reason') => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: targetId, status: targetStatus })] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service[methodName](adminActor(), targetId, reason))
+      .rejects
+      .toMatchObject({ code: expectedCode });
+
+    expect(mockClient.query.mock.calls.some(([sql]) => (
+      typeof sql === 'string' && sql.includes('UPDATE users SET status')
+    ))).toBe(false);
+    expect(mockClient.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('runs admin tier checks before target status-specific errors', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow({ id: TARGET_ID, status: 'DELETED' })] })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ role_id: 'SUPER_ADMIN' }] })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service.suspendUser(adminActor(), TARGET_ID, 'Valid admin reason'))
+      .rejects
+      .toMatchObject({ statusCode: 403, code: 'INSUFFICIENT_ADMIN_TIER' });
+
+    expect(mockClient.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+});
