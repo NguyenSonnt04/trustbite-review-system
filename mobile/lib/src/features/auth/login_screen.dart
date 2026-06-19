@@ -16,24 +16,14 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _muted = Color(0xFF8E8E9A);
 
   int _activeTab = 0;
-  int _activeMethod = 0;
 
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-
-  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _phoneController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
-
-  bool get _isRegistering => _activeTab == 1;
-  bool get _usesPhone => _activeMethod == 0;
 
   @override
   Widget build(BuildContext context) {
@@ -184,14 +174,12 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           _buildTabs(),
           const SizedBox(height: 18),
-          _buildMethodSelector(),
-          const SizedBox(height: 16),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: _usesPhone ? _buildPhoneFields() : _buildEmailFields(),
+            child: _buildPhoneFields(),
           ),
           const SizedBox(height: 16),
-          _primaryButton(_isRegistering ? 'Tạo tài khoản' : 'Đăng nhập'),
+          _primaryButton('Gửi mã OTP'),
           const SizedBox(height: 16),
           _divider(),
           const SizedBox(height: 16),
@@ -243,50 +231,6 @@ class _LoginScreenState extends State<LoginScreen> {
   );
 }
 
-
-  Widget _buildMethodSelector() {
-    return Row(
-      children: [
-        _methodChip(0, Icons.phone_iphone_rounded, 'SĐT'),
-        const SizedBox(width: 10),
-        _methodChip(1, Icons.mail_outline_rounded, 'Email'),
-      ],
-    );
-  }
-
-  Widget _methodChip(int index, IconData icon, String label) {
-    final active = _activeMethod == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _activeMethod = index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: active ? _brand.withValues(alpha: 0.1) : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: active ? _brand : const Color(0xFFF0F0F0)),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: active ? _brand : _muted),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: active ? _brand : _muted,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPhoneFields() {
     return Column(
       key: const ValueKey('phone-fields'),
@@ -296,44 +240,6 @@ class _LoginScreenState extends State<LoginScreen> {
           icon: Icons.phone_iphone_rounded,
           hint: 'Số điện thoại',
           keyboardType: TextInputType.phone,
-        ),
-        if (_isRegistering) ...[
-          const SizedBox(height: 12),
-          _inputField(
-            controller: _emailController,
-            icon: Icons.mail_outline_rounded,
-            hint: 'Email khôi phục (tuỳ chọn)',
-            keyboardType: TextInputType.emailAddress,
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildEmailFields() {
-    return Column(
-      key: const ValueKey('email-fields'),
-      children: [
-        _inputField(
-          controller: _emailController,
-          icon: Icons.mail_outline_rounded,
-          hint: 'Email',
-          keyboardType: TextInputType.emailAddress,
-        ),
-        const SizedBox(height: 12),
-        _inputField(
-          controller: _passwordController,
-          icon: Icons.lock_outline_rounded,
-          hint: 'Mật khẩu',
-          obscureText: _obscurePassword,
-          suffix: IconButton(
-            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            icon: Icon(
-              _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-              size: 18,
-              color: _muted,
-            ),
-          ),
         ),
       ],
     );

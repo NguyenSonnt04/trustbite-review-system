@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/core/theme/app_theme.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
+import 'package:trustbite_mobile/src/features/home/home_screen.dart';
 
 class TrustBiteApp extends StatelessWidget {
   const TrustBiteApp({super.key});

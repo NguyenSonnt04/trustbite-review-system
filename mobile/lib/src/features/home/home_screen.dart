@@ -58,14 +58,14 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   static const List<_Category> _categories = [
-    _Category(icon: '🍜', label: 'Thức ăn'),
-    _Category(icon: '🧋', label: 'Nước uống'),
-    _Category(icon: '🍲', label: 'Lẩu'),
-    _Category(icon: '🍣', label: 'Sushi'),
-    _Category(icon: '🍕', label: 'Pizza'),
-    _Category(icon: '🍗', label: 'Gà rán'),
-    _Category(icon: '🥗', label: 'Chay'),
-    _Category(icon: '🍰', label: 'Bánh ngọt'),
+    _Category(icon: Icons.restaurant_menu_rounded, label: 'Thức ăn', color: Color(0xFFFF5E00)),
+    _Category(icon: Icons.local_cafe_rounded, label: 'Nước uống', color: Color(0xFF8B5CF6)),
+    _Category(icon: Icons.ramen_dining_rounded, label: 'Lẩu', color: Color(0xFFEF4444)),
+    _Category(icon: Icons.set_meal_rounded, label: 'Sushi', color: Color(0xFF06B6D4)),
+    _Category(icon: Icons.local_pizza_rounded, label: 'Pizza', color: Color(0xFFF59E0B)),
+    _Category(icon: Icons.lunch_dining_rounded, label: 'Hamburger', color: Color(0xFFEAB308)),
+    _Category(icon: Icons.eco_rounded, label: 'Chay', color: Color(0xFF22C55E)),
+    _Category(icon: Icons.cake_rounded, label: 'Bánh ngọt', color: Color(0xFFEC4899)),
   ];
 
   @override
@@ -87,7 +87,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       _buildTitleAndSearch(),
                       const SizedBox(height: 30),
                       _buildNearbySection(),
-                      const SizedBox(height: 50),
+                      const SizedBox(height: 20),
                       _buildServicesSection(),
                     ],
                   ),
@@ -115,8 +115,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
                   color: _brand,
                   borderRadius: BorderRadius.circular(12),
@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w900,
-                    fontSize: 14,
+                    fontSize: 20,
                   ),
                 ),
               ),
@@ -138,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                     'Vị trí hiện tại',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                       color: Colors.black.withValues(alpha: 0.3),
                     ),
@@ -149,7 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         'Quận 1, TP.HCM',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
                         ),
@@ -176,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: const Icon(
                       Icons.notifications_outlined,
-                      size: 18,
+                      size: 25,
                       color: _brand,
                     ),
                   ),
@@ -240,7 +240,7 @@ class _HomeScreenState extends State<HomeScreen> {
           RichText(
             text: const TextSpan(
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 24,
                 fontWeight: FontWeight.w900,
                 height: 1.1,
               ),
@@ -359,8 +359,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.75),
-                    Colors.black.withValues(alpha: 0.1),
+                    Colors.black.withValues(alpha: 0.78),
+                    _brand.withValues(alpha: 0.18),
                     Colors.transparent,
                   ],
                 ),
@@ -368,22 +368,37 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             if (r.featured)
               Positioned(
-                top: 8,
+                top: 10,
                 left: 12,
                 child: Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(12),
+                    color: _brand.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _brand.withValues(alpha: 0.25),
+                        offset: const Offset(0, 3),
+                        blurRadius: 8,
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    'Nổi bật',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white.withValues(alpha: 0.9),
-                    ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.local_fire_department_rounded,
+                          size: 12, color: Colors.white),
+                      SizedBox(width: 3),
+                      Text(
+                        'Nổi bật',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -391,18 +406,25 @@ class _HomeScreenState extends State<HomeScreen> {
               top: 10,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: _brand.withValues(alpha: 0.8),
-                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.white.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
-                  '⭐ ${r.rating}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.star_rounded, size: 14, color: _brand),
+                    const SizedBox(width: 3),
+                    Text(
+                      r.rating,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -415,41 +437,63 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Text(
                     r.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
-                      Text(
-                        r.status,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFFB6FF9C),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.18),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFB6FF9C).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          r.status,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFB6FF9C),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          shape: BoxShape.circle,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.place, size: 10, color: _brand),
-                      const SizedBox(width: 2),
-                      Text(
-                        r.distance,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.place_rounded,
+                                size: 12, color: _brand),
+                            const SizedBox(width: 3),
+                            Text(
+                              r.distance,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -472,27 +516,40 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Dịch vụ',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.black,
-                ),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Dịch vụ',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.black,
+                    ),
+                  ),
+                  Text(
+                    'Danh mục món ăn phổ biến',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: _muted,
+                    ),
+                  ),
+                ],
               ),
               _seeAllChip(),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 26),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _categories.length,
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.78,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.92,
             ),
             itemBuilder: (context, index) {
               final cat = _categories[index];
@@ -501,32 +558,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => setState(() => _activeCategory = index),
                 child: Column(
                   children: [
-                    AspectRatio(
-                      aspectRatio: 1,
+                    Center(
                       child: Container(
+                        width: 54,
+                        height: 54,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.6),
+                          color: cat.color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: active ? _brand : Colors.transparent,
+                            color: active ? cat.color : cat.color.withValues(alpha: 0.18),
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color.fromARGB(255, 0, 0, 0)
-                                  .withValues(alpha: 0.15),
-                              offset: const Offset(2, 2),
+                              color: cat.color.withValues(alpha: 0.16),
+                              offset: const Offset(2, 3),
                               blurRadius: 8,
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: Text(
+                        child: Icon(
                           cat.icon,
-                          style: const TextStyle(fontSize: 24),
+                          size: 26,
+                          color: cat.color,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Text(
                       cat.label,
                       textAlign: TextAlign.center,
@@ -639,8 +697,13 @@ class _Restaurant {
 }
 
 class _Category {
-  const _Category({required this.icon, required this.label});
+  const _Category({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
 
-  final String icon;
+  final IconData icon;
   final String label;
+  final Color color;
 }
