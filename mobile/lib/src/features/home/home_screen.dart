@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/features/map/map_screen.dart';
 
 /// Discover screen converted from the Builder.io / Figma "Tìm với TrustBite"
 /// mobile layout. Mirrors the web `client/src/app/discover` reference design:
@@ -58,14 +59,31 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   static const List<_Category> _categories = [
-    _Category(icon: Icons.restaurant_menu_rounded, label: 'Thức ăn', color: Color(0xFFFF5E00)),
-    _Category(icon: Icons.local_cafe_rounded, label: 'Nước uống', color: Color(0xFF8B5CF6)),
-    _Category(icon: Icons.ramen_dining_rounded, label: 'Lẩu', color: Color(0xFFEF4444)),
-    _Category(icon: Icons.set_meal_rounded, label: 'Sushi', color: Color(0xFF06B6D4)),
-    _Category(icon: Icons.local_pizza_rounded, label: 'Pizza', color: Color(0xFFF59E0B)),
-    _Category(icon: Icons.lunch_dining_rounded, label: 'Hamburger', color: Color(0xFFEAB308)),
+    _Category(
+        icon: Icons.restaurant_menu_rounded,
+        label: 'Thức ăn',
+        color: Color(0xFFFF5E00)),
+    _Category(
+        icon: Icons.local_cafe_rounded,
+        label: 'Nước uống',
+        color: Color(0xFF8B5CF6)),
+    _Category(
+        icon: Icons.ramen_dining_rounded,
+        label: 'Lẩu',
+        color: Color(0xFFEF4444)),
+    _Category(
+        icon: Icons.set_meal_rounded, label: 'Sushi', color: Color(0xFF06B6D4)),
+    _Category(
+        icon: Icons.local_pizza_rounded,
+        label: 'Pizza',
+        color: Color(0xFFF59E0B)),
+    _Category(
+        icon: Icons.lunch_dining_rounded,
+        label: 'Hamburger',
+        color: Color(0xFFEAB308)),
     _Category(icon: Icons.eco_rounded, label: 'Chay', color: Color(0xFF22C55E)),
-    _Category(icon: Icons.cake_rounded, label: 'Bánh ngọt', color: Color(0xFFEC4899)),
+    _Category(
+        icon: Icons.cake_rounded, label: 'Bánh ngọt', color: Color(0xFFEC4899)),
   ];
 
   @override
@@ -80,16 +98,27 @@ class _HomeScreenState extends State<HomeScreen> {
               color: Colors.white,
               child: Stack(
                 children: [
-                  ListView(
-                    padding: const EdgeInsets.only(bottom: 110),
-                    children: [
-                      _buildHeader(),
-                      _buildTitleAndSearch(),
-                      const SizedBox(height: 30),
-                      _buildNearbySection(),
-                      const SizedBox(height: 20),
-                      _buildServicesSection(),
-                    ],
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        final slideAnimation = Tween<Offset>(
+                          begin: const Offset(0.04, 0),
+                          end: Offset.zero,
+                        ).animate(animation);
+
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: slideAnimation,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _buildActivePage(),
+                    ),
                   ),
                   Positioned(
                     left: 20,
@@ -106,7 +135,155 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() { 
+  Widget _buildActivePage() {
+    return switch (_activeNav) {
+      0 => _buildHomePage(),
+      1 => const MapScreen(),
+      2 => _buildFavoritesPage(),
+      _ => _buildProfilePage(),
+    };
+  }
+
+  Widget _buildHomePage() {
+    return ListView(
+      key: const ValueKey('home-page'),
+      padding: const EdgeInsets.only(bottom: 110),
+      children: [
+        _buildHeader(),
+        _buildTitleAndSearch(),
+        const SizedBox(height: 30),
+        _buildNearbySection(),
+        const SizedBox(height: 20),
+        _buildServicesSection(),
+      ],
+    );
+  }
+
+  Widget _buildFavoritesPage() {
+    return ListView(
+      key: const ValueKey('favorites-page'),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+      children: [
+        _sectionHeader(
+          icon: Icons.favorite_rounded,
+          title: 'Yêu thích',
+          subtitle: 'Các địa điểm bạn đã lưu',
+        ),
+        const SizedBox(height: 18),
+        _emptyState(
+          icon: Icons.favorite_border_rounded,
+          title: 'Chưa có quán yêu thích',
+          subtitle: 'Hãy lưu những quán ngon để xem lại nhanh hơn.',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProfilePage() {
+    return ListView(
+      key: const ValueKey('profile-page'),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+      children: [
+        _sectionHeader(
+          icon: Icons.person_rounded,
+          title: 'Tôi',
+          subtitle: 'Thông tin tài khoản TrustBite',
+        ),
+        const SizedBox(height: 18),
+        _emptyState(
+          icon: Icons.account_circle_outlined,
+          title: 'Hồ sơ người dùng',
+          subtitle: 'Khu vực hồ sơ sẽ được nối với đăng nhập sau.',
+        ),
+      ],
+    );
+  }
+
+  Widget _sectionHeader({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: _brand.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Icon(icon, color: _brand, size: 25),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _muted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFF4F4F4)),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 48, color: _brand),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Colors.black,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _muted,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
       child: Row(
@@ -245,7 +422,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 1.1,
               ),
               children: [
-                TextSpan(text: 'Tìm với ', style: TextStyle(color: Colors.black)),
+                TextSpan(
+                    text: 'Tìm với ', style: TextStyle(color: Colors.black)),
                 TextSpan(text: 'TrustBite', style: TextStyle(color: _brand)),
               ],
             ),
@@ -330,7 +508,8 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             itemCount: _restaurants.length,
             separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemBuilder: (context, index) => _restaurantCard(_restaurants[index]),
+            itemBuilder: (context, index) =>
+                _restaurantCard(_restaurants[index]),
           ),
         ),
       ],
@@ -406,7 +585,8 @@ class _HomeScreenState extends State<HomeScreen> {
               top: 10,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.94),
                   borderRadius: BorderRadius.circular(14),
@@ -454,10 +634,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E).withValues(alpha: 0.18),
+                          color:
+                              const Color(0xFF22C55E).withValues(alpha: 0.18),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFFB6FF9C).withValues(alpha: 0.35),
+                            color:
+                                const Color(0xFFB6FF9C).withValues(alpha: 0.35),
                           ),
                         ),
                         child: Text(
@@ -566,7 +748,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: cat.color.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: active ? cat.color : cat.color.withValues(alpha: 0.18),
+                            color: active
+                                ? cat.color
+                                : cat.color.withValues(alpha: 0.18),
                           ),
                           boxShadow: [
                             BoxShadow(
@@ -615,7 +799,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 95, 95, 95).withValues(alpha: 0.08),
+        color: const Color.fromARGB(255, 156, 156, 156).withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
       ),
@@ -631,7 +815,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
                     color: _activeNav == i
-                        ? const Color.fromARGB(255, 174, 174, 174).withValues(alpha: 0.2)
+                        ? const Color.fromARGB(255, 174, 174, 174)
+                            .withValues(alpha: 0.3)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -648,8 +833,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         items[i].$2,
                         style: TextStyle(
                           fontSize: 12,
-                          fontWeight:
-                              _activeNav == i ? FontWeight.w900 : FontWeight.bold,
+                          fontWeight: _activeNav == i
+                              ? FontWeight.w900
+                              : FontWeight.bold,
                           color: _activeNav == i ? _brand : _muted,
                         ),
                       ),
