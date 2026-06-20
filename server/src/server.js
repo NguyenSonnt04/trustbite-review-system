@@ -21,6 +21,9 @@ const startOcrWorker = () => {
     ocrWorker.on('failed', (job, err) => {
       console.error(`[OCR] job ${job?.id} failed: ${err?.message}`);
     });
+    ocrWorker.on('error', (err) => {
+      console.error('[OCR] worker error:', err?.message ?? err);
+    });
     console.log('[Server] Receipt OCR worker started');
   } catch (err) {
     console.error('[Server] Failed to start OCR worker:', err.message);

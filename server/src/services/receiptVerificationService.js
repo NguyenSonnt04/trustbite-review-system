@@ -47,8 +47,11 @@ function deriveGpsSignals(receipt, venue, now, rules) {
   const lng = num(receipt.gps_longitude);
   const accuracy = num(receipt.gps_accuracy_meters);
 
-  if (lat == null || lng == null || venue.latitude == null || venue.longitude == null) {
+  if (lat == null || lng == null) {
     return { gpsProvided: false, gpsDistanceMeters: null, gpsAccuracyMeters: null, submittedNear: true };
+  }
+  if (venue.latitude == null || venue.longitude == null) {
+    return { gpsProvided: true, gpsDistanceMeters: null, gpsAccuracyMeters: accuracy, submittedNear: true };
   }
 
   const distance = haversineMeters(lat, lng, num(venue.latitude), num(venue.longitude));
