@@ -5,7 +5,11 @@ import { createHttpError } from '../../utils/httpErrors.js';
 let cachedJwks = null;
 let cachedAt = 0;
 let pendingJwksFetch = null;
+let lastUnknownKidRefreshAt = null;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+const UNKNOWN_KID_REFRESH_COOLDOWN_MS = 30 * 1000;
+
+const isJwkObject = (key) => Boolean(key) && typeof key === 'object' && !Array.isArray(key);
 
 const base64UrlDecode = (value) => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -47,7 +51,11 @@ const loadJwksFromProvider = async () => {
     throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Invalid Cognito JWKS response');
   }
 
-  if (!Array.isArray(jwks.keys)) {
+  if (
+    !isJwkObject(jwks)
+    || !Array.isArray(jwks.keys)
+    || jwks.keys.some((key) => !isJwkObject(key))
+  ) {
     throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Invalid Cognito JWKS response');
   }
 
@@ -71,6 +79,24 @@ const fetchJwks = async ({ forceRefresh = false } = {}) => {
   return pendingJwksFetch;
 };
 
+const refreshJwksForUnknownKid = async () => {
+  if (pendingJwksFetch) {
+    return pendingJwksFetch;
+  }
+
+  const now = Date.now();
+  if (
+    cachedJwks
+    && lastUnknownKidRefreshAt !== null
+    && now - lastUnknownKidRefreshAt < UNKNOWN_KID_REFRESH_COOLDOWN_MS
+  ) {
+    return cachedJwks;
+  }
+
+  lastUnknownKidRefreshAt = now;
+  return fetchJwks({ forceRefresh: true });
+};
+
 const verifySignature = async (token, header) => {
   if (header.alg !== 'RS256') {
     throw createHttpError(401, 'INVALID_TOKEN', 'Unsupported JWT algorithm');
@@ -79,12 +105,15 @@ const verifySignature = async (token, header) => {
   const jwks = await fetchJwks();
   let jwk = jwks.keys.find((key) => key.kid === header.kid);
   if (!jwk) {
-    const refreshedJwks = await fetchJwks({ forceRefresh: true });
+    const refreshedJwks = await refreshJwksForUnknownKid();
     jwk = refreshedJwks.keys.find((key) => key.kid === header.kid);
   }
 
   if (!jwk) {
     throw createHttpError(401, 'INVALID_TOKEN', 'Unknown JWT key id');
+  }
+  if (jwk.kty !== 'RSA' || jwk.alg !== 'RS256' || jwk.use !== 'sig') {
+    throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Invalid Cognito JWKS response');
   }
 
   const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
@@ -130,8 +159,13 @@ const validateAccessTokenClaims = (payload) => {
   if (typeof payload.exp !== 'number' || payload.exp <= now) {
     throw createHttpError(401, 'TOKEN_EXPIRED', 'JWT is expired');
   }
-  if (typeof payload.nbf === 'number' && payload.nbf > now) {
-    throw createHttpError(401, 'INVALID_TOKEN', 'JWT is not active yet');
+  if (payload.nbf !== undefined) {
+    if (typeof payload.nbf !== 'number' || !Number.isFinite(payload.nbf)) {
+      throw createHttpError(401, 'INVALID_TOKEN', 'JWT nbf is invalid');
+    }
+    if (payload.nbf > now) {
+      throw createHttpError(401, 'INVALID_TOKEN', 'JWT is not active yet');
+    }
   }
 };
 

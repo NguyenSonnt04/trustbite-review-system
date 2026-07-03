@@ -9,7 +9,7 @@ After adding or updating a markdown decision file, also add or refresh the
 durable decision row:
 
 ```bash
-scripts/bin/harness-cli decision add \
+npm run harness -- decision add \
   --id 0008-auth-boundary \
   --title "Auth Boundary" \
   --doc docs/decisions/0008-auth-boundary.md

@@ -132,7 +132,7 @@ After cloning, install or refresh the Harness CLI from the pinned Harness instal
 
 ```bash
 # macOS/Linux
-HARNESS_INSTALLER_REV=79c9bb2938e3b1669af83be59a05d4b1988bf0ca
+HARNESS_INSTALLER_REV=f07cd06db8f329cbe4009b730704d67ed8c3016e
 curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
 less /tmp/install-harness.sh
 HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}" \
@@ -141,7 +141,7 @@ HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-
 
 ```powershell
 # Windows PowerShell
-$HarnessInstallerRev = "79c9bb2938e3b1669af83be59a05d4b1988bf0ca"
+$HarnessInstallerRev = "f07cd06db8f329cbe4009b730704d67ed8c3016e"
 $Installer = "$env:TEMP\install-harness.ps1"
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
 Get-Content $Installer
@@ -149,12 +149,17 @@ $env:HARNESS_SOURCE_BASE_URL = "https://raw.githubusercontent.com/hoangnb24/repo
 & $Installer -Merge -Yes
 ```
 
-Then initialize/query local Harness state:
+Then initialize/query local Harness state and apply schema migrations from the refreshed docs:
 
 ```bash
 npm run harness -- init
+npm run harness -- migrate
+npm run harness -- --version   # expected: harness-cli 0.1.10
 npm run harness -- query matrix
+npm run harness -- tool check
 ```
+
+If `tool check` is unavailable or `--version` prints an older release, rerun the pinned installer above or set `HARNESS_CLI_RELEASE_TAG=harness-cli-v0.1.10` before installing. The v0.1.10 update includes `scripts/schema/005-tool-extensions.sql` for tool kind/capability/status fields.
 
 Use `docs/`, `docs/stories/`, `docs/decisions/`, and `scripts/schema/` as the shared source of truth. Do not commit the local Harness DB or binary.
 

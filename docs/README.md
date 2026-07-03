@@ -9,11 +9,11 @@ future user-provided spec.
 - `FEATURE_INTAKE.md`: how prompts become tiny, normal, or high-risk work.
 - `ARCHITECTURE.md`: architecture discovery and boundary rules.
 - `TEST_MATRIX.md`: legacy proof map; current proof status is queried with
-  `scripts/bin/harness-cli query matrix`.
+  `npm run harness -- query matrix`.
 - `HARNESS_BACKLOG.md`: legacy improvement list; current improvement records
-  are stored with `scripts/bin/harness-cli backlog`.
+  are stored with `npm run harness -- backlog`.
 - `HARNESS_AUDIT.md`: drift categories and entropy score interpretation for
-  `scripts/bin/harness-cli audit`.
+  `npm run harness -- audit`.
 - `IMPROVEMENT_PROTOCOL.md`: proposal loop for turning friction, interventions,
   and audit findings into reviewed Harness improvements.
 - `TOOL_REGISTRY.md`: machine-readable tool manifest and external tool registry
