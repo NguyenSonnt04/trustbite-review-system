@@ -124,14 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: _brand.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          
-        ),
         const SizedBox(height: 30),
         Center(
           child: RichText(
@@ -143,14 +135,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 1.08,
               ),
               children: [
-                TextSpan(text: 'Đăng nhập ', style: TextStyle(color: Color.fromARGB(255, 0, 0, 0))),
+                TextSpan(
+                    text: 'Đăng nhập ',
+                    style: TextStyle(color: Color.fromARGB(255, 0, 0, 0))),
                 TextSpan(text: 'TrustBite', style: TextStyle(color: _brand)),
               ],
             ),
           ),
         ),
         const SizedBox(height: 10),
-        
       ],
     );
   }
@@ -206,40 +199,66 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _tabButton(int index, String label) {
-  final active = _activeTab == index;
-  return Expanded(
-    child: GestureDetector(
-      onTap: () => setState(() => _activeTab = index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        height: 42,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: active ? _brand : Colors.transparent,
+    final active = _activeTab == index;
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _activeTab = index),
           borderRadius: BorderRadius.circular(15),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? Colors.white : _muted,
-            fontSize: 15,
-            fontWeight: FontWeight.w900,
+          child: Semantics(
+            button: true,
+            selected: active,
+            label: label,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? _brand : Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? Colors.white : _muted,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildPhoneFields() {
+    final helperText = _activeTab == 0
+        ? 'Nhập số điện thoại để nhận mã đăng nhập.'
+        : 'Tạo tài khoản mới bằng số điện thoại của bạn.';
+
     return Column(
-      key: const ValueKey('phone-fields'),
+      key: ValueKey('phone-fields-$_activeTab'),
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Text(
+          helperText,
+          style: const TextStyle(
+            color: _muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 12),
         _inputField(
           controller: _phoneController,
           icon: Icons.phone_iphone_rounded,
           hint: 'Số điện thoại',
           keyboardType: TextInputType.phone,
+          textInputAction: TextInputAction.done,
+          autofillHints: const [AutofillHints.telephoneNumber],
         ),
       ],
     );
@@ -250,6 +269,8 @@ class _LoginScreenState extends State<LoginScreen> {
     required IconData icon,
     required String hint,
     TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    Iterable<String>? autofillHints,
     bool obscureText = false,
     Widget? suffix,
   }) {
@@ -271,6 +292,8 @@ class _LoginScreenState extends State<LoginScreen> {
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        autofillHints: autofillHints,
         obscureText: obscureText,
         decoration: InputDecoration(
           icon: Icon(icon, size: 18, color: _brand),
@@ -344,12 +367,15 @@ class _LoginScreenState extends State<LoginScreen> {
         onPressed: () {},
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFF0F0F0)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('G', style: TextStyle(color: _brand, fontSize: 18, fontWeight: FontWeight.w900)),
+            Text('G',
+                style: TextStyle(
+                    color: _brand, fontSize: 18, fontWeight: FontWeight.w900)),
             SizedBox(width: 10),
             Text(
               'Tiếp tục với Google',

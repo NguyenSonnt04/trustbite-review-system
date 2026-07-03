@@ -161,7 +161,11 @@ class MapScreen extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          Positioned.fill(child: CustomPaint(painter: _MapGridPainter())),
+          Positioned.fill(
+            child: RepaintBoundary(
+              child: CustomPaint(painter: _MapGridPainter()),
+            ),
+          ),
           _mapPin(top: 34, left: 46, label: 'Phở', color: _brand),
           _mapPin(
             top: 76,
@@ -262,17 +266,9 @@ class MapScreen extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: Image.network(
-              restaurant.image,
-              width: 62,
-              height: 62,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                width: 62,
-                height: 62,
-                color: const Color(0xFFE5E7EB),
-                child: const Icon(Icons.restaurant_rounded, color: _brand),
-              ),
+            child: _MapRestaurantImage(
+              imageUrl: restaurant.image,
+              semanticLabel: restaurant.name,
             ),
           ),
           const SizedBox(width: 12),
@@ -328,16 +324,76 @@ class MapScreen extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: _brand.withValues(alpha: 0.1),
+          Material(
+            color: _brand.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              onTap: () {},
               borderRadius: BorderRadius.circular(14),
+              child: SizedBox(
+                width: 36,
+                height: 36,
+                child: Semantics(
+                  button: true,
+                  label: 'Chỉ đường đến quán',
+                  child: const Icon(
+                    Icons.near_me_rounded,
+                    color: _brand,
+                    size: 18,
+                  ),
+                ),
+              ),
             ),
-            child: const Icon(Icons.near_me_rounded, color: _brand, size: 18),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MapRestaurantImage extends StatelessWidget {
+  const _MapRestaurantImage({
+    required this.imageUrl,
+    required this.semanticLabel,
+  });
+
+  static const double _size = 62;
+
+  final String imageUrl;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+
+    return SizedBox(
+      width: _size,
+      height: _size,
+      child: Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        semanticLabel: semanticLabel,
+        cacheWidth: (_size * devicePixelRatio).round(),
+        cacheHeight: (_size * devicePixelRatio).round(),
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return const _MapRestaurantImageFallback();
+        },
+        errorBuilder: (_, __, ___) => const _MapRestaurantImageFallback(),
+      ),
+    );
+  }
+}
+
+class _MapRestaurantImageFallback extends StatelessWidget {
+  const _MapRestaurantImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFE5E7EB),
+      child: Center(
+        child: Icon(Icons.restaurant_rounded, color: MapScreen._brand),
       ),
     );
   }

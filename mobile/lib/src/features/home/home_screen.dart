@@ -123,8 +123,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   Positioned(
                     left: 20,
                     right: 20,
-                    bottom: 20,
-                    child: _buildBottomNav(),
+                    bottom: 0,
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.only(bottom: 20),
+                      child: _buildBottomNav(),
+                    ),
                   ),
                 ],
               ),
@@ -524,13 +528,12 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            Image.network(
-              r.image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Container(
-                color: const Color(0xFFE5E7EB),
-                child: const Icon(Icons.restaurant, size: 32),
-              ),
+            _NetworkRestaurantImage(
+              imageUrl: r.image,
+              width: 240,
+              height: 160,
+              borderRadius: 24,
+              semanticLabel: r.name,
             ),
             DecoratedBox(
               decoration: BoxDecoration(
@@ -736,49 +739,59 @@ class _HomeScreenState extends State<HomeScreen> {
             itemBuilder: (context, index) {
               final cat = _categories[index];
               final active = _activeCategory == index;
-              return GestureDetector(
-                onTap: () => setState(() => _activeCategory = index),
-                child: Column(
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 54,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: cat.color.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: active
-                                ? cat.color
-                                : cat.color.withValues(alpha: 0.18),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: cat.color.withValues(alpha: 0.16),
-                              offset: const Offset(2, 3),
-                              blurRadius: 8,
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => setState(() => _activeCategory = index),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Semantics(
+                    button: true,
+                    selected: active,
+                    label: 'Danh mục ${cat.label}',
+                    child: Column(
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 54,
+                            height: 54,
+                            decoration: BoxDecoration(
+                              color: cat.color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: active
+                                    ? cat.color
+                                    : cat.color.withValues(alpha: 0.18),
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: cat.color.withValues(alpha: 0.16),
+                                  offset: const Offset(2, 3),
+                                  blurRadius: 8,
+                                ),
+                              ],
                             ),
-                          ],
+                            alignment: Alignment.center,
+                            child: Icon(
+                              cat.icon,
+                              size: 26,
+                              color: cat.color,
+                            ),
+                          ),
                         ),
-                        alignment: Alignment.center,
-                        child: Icon(
-                          cat.icon,
-                          size: 26,
-                          color: cat.color,
+                        const SizedBox(height: 8),
+                        Text(
+                          cat.label,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight:
+                                active ? FontWeight.w900 : FontWeight.w600,
+                            color: active ? _brand : Colors.black,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      cat.label,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-                        color: active ? _brand : Colors.black,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               );
             },
@@ -808,38 +821,46 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           for (var i = 0; i < items.length; i++)
             Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _activeNav = i),
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _activeNav == i
-                        ? const Color.fromARGB(255, 174, 174, 174)
-                            .withValues(alpha: 0.3)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        items[i].$1,
-                        size: 20,
-                        color: _activeNav == i ? _brand : _muted,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => setState(() => _activeNav = i),
+                  borderRadius: BorderRadius.circular(16),
+                  child: Semantics(
+                    button: true,
+                    selected: _activeNav == i,
+                    label: items[i].$2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _activeNav == i
+                            ? const Color.fromARGB(255, 174, 174, 174)
+                                .withValues(alpha: 0.3)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        items[i].$2,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: _activeNav == i
-                              ? FontWeight.w900
-                              : FontWeight.bold,
-                          color: _activeNav == i ? _brand : _muted,
-                        ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            items[i].$1,
+                            size: 20,
+                            color: _activeNav == i ? _brand : _muted,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            items[i].$2,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: _activeNav == i
+                                  ? FontWeight.w900
+                                  : FontWeight.bold,
+                              color: _activeNav == i ? _brand : _muted,
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -859,6 +880,64 @@ class _HomeScreenState extends State<HomeScreen> {
           fontWeight: FontWeight.bold,
           color: Color(0xFFFF7300),
         ),
+      ),
+    );
+  }
+}
+
+class _NetworkRestaurantImage extends StatelessWidget {
+  const _NetworkRestaurantImage({
+    required this.imageUrl,
+    required this.width,
+    required this.height,
+    required this.borderRadius,
+    required this.semanticLabel,
+  });
+
+  final String imageUrl;
+  final double width;
+  final double height;
+  final double borderRadius;
+  final String semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          semanticLabel: semanticLabel,
+          cacheWidth: (width * devicePixelRatio).round(),
+          cacheHeight: (height * devicePixelRatio).round(),
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return const _RestaurantImageFallback(icon: Icons.restaurant);
+          },
+          errorBuilder: (_, __, ___) =>
+              const _RestaurantImageFallback(icon: Icons.restaurant),
+        ),
+      ),
+    );
+  }
+}
+
+class _RestaurantImageFallback extends StatelessWidget {
+  const _RestaurantImageFallback({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFFE5E7EB),
+      child: Center(
+        child: Icon(icon, size: 32, color: const Color(0xFFFF5E00)),
       ),
     );
   }
