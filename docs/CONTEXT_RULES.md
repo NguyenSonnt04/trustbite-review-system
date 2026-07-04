@@ -16,7 +16,7 @@ Read to classify the request, find the affected surface, and choose a lane.
 | --- | --- | --- | --- |
 | `AGENTS.md` | Must | Must | Must |
 | `docs/FEATURE_INTAKE.md` | Must | Must | Must |
-| `scripts/bin/harness-cli query matrix` | Must | Must | Must |
+| `npm run harness -- query matrix` | Must | Must | Must |
 | `README.md` | Should | Must | Must |
 | `docs/HARNESS.md` | Should | Must | Must |
 | `docs/ARCHITECTURE.md` | Skip | Should | Must |
@@ -35,10 +35,10 @@ Read to decide the smallest safe approach and expected proof.
 | `docs/templates/story.md` | Skip | Must when creating/updating a story | Should |
 | `docs/templates/high-risk-story/*` | Skip | Skip unless risk escalates | Must |
 | `docs/ARCHITECTURE.md` | Skip | Should for code or boundary changes | Must |
-| `docs/TEST_MATRIX.md` or `scripts/bin/harness-cli query matrix` | Should | Must | Must |
+| `docs/TEST_MATRIX.md` or `npm run harness -- query matrix` | Should | Must | Must |
 | Relevant decisions | Skip | Should | Must |
 | `docs/HARNESS_MATURITY.md` | Skip | Should for Harness improvements | Must for maturity or process changes |
-| `docs/HARNESS_BACKLOG.md` and `scripts/bin/harness-cli query backlog` | Skip | Should if friction repeats | Must if changing Harness behavior |
+| `docs/HARNESS_BACKLOG.md` and `npm run harness -- query backlog` | Skip | Should if friction repeats | Must if changing Harness behavior |
 
 ### Implementation Phase
 
@@ -63,7 +63,7 @@ Read to prove the change and avoid claiming unsupported completion.
 | Document Or Source | Tiny | Normal | High-Risk |
 | --- | --- | --- | --- |
 | Story acceptance criteria | Should | Must | Must |
-| `docs/TEST_MATRIX.md` or `scripts/bin/harness-cli query matrix` | Should | Must | Must |
+| `docs/TEST_MATRIX.md` or `npm run harness -- query matrix` | Should | Must | Must |
 | Validation section of story packet | Skip if no story | Must | Must |
 | `docs/templates/validation-report.md` | Skip | Should for notable proof | Must for high-risk proof |
 | Relevant commands from README/package docs | Should | Must | Must |
@@ -77,8 +77,8 @@ Read to leave useful evidence for the next agent and for benchmark scoring.
 | Document Or Source | Tiny | Normal | High-Risk |
 | --- | --- | --- | --- |
 | `docs/TRACE_SPEC.md` | Should | Must | Must |
-| `scripts/bin/harness-cli query matrix` | Should | Must | Must |
-| `scripts/bin/harness-cli query backlog` | Skip | Should if friction occurred | Must |
+| `npm run harness -- query matrix` | Should | Must | Must |
+| `npm run harness -- query backlog` | Skip | Should if friction occurred | Must |
 | Changed-file list from `git status --short` | Must | Must | Must |
 | Validation command output | Should | Must | Must |
 | Story packet or progress log | Skip if no story | Must | Must |
@@ -90,7 +90,7 @@ Read to leave useful evidence for the next agent and for benchmark scoring.
 | --- | --- |
 | Task touches Harness durable records or CLI migrations | Read `docs/decisions/0004-sqlite-durable-layer.md`, `scripts/schema/`, and relevant CLI code before planning. |
 | Task touches TrustBite product database schema, persistence, repositories, seed data, or server models | Read `docs/ARCHITECTURE.md`, the relevant product/story docs, `server/migrations/`, and the affected `server/src/models/**` files before coding; verify code matches existing table/column names and constraints. |
-| Task touches CLI command behavior or installer distribution | Read `docs/decisions/0005-prebuilt-rust-harness-cli.md`, `scripts/README.md`, relevant `crates/harness-cli/*` code, CLI help output, and installer docs. |
+| Task touches CLI command behavior or installer distribution | Read `docs/decisions/0005-prebuilt-rust-harness-cli.md`, `scripts/README.md`, CLI help output, installer docs, and upstream `repository-harness` CLI source when command internals must be changed. |
 | Task touches auth, authorization, audit/security, data loss, or external providers | Treat as high-risk, read `docs/templates/high-risk-story/*`, and check prior decisions before implementation. |
 | Task changes public API shape, product behavior, or user-visible workflow | Read relevant `docs/product/*`, story packets, and validation expectations before editing. |
 | Task changes Harness policy, source hierarchy, risk classification, or validation requirements | Read `docs/HARNESS.md`, `docs/FEATURE_INTAKE.md`, `docs/ARCHITECTURE.md`, and `docs/decisions/*`; pause if direction is ambiguous. |

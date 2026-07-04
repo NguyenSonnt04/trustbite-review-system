@@ -1,9 +1,11 @@
 import '../helpers/env.js';
+import crypto from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
 process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
 
+const { default: appConfig } = await import('../../src/config/app.js');
 const { cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js');
 const { createUser } = await import('../helpers/factories/index.js');
 const { closeDbPool, query } = await import('../helpers/db.js');
@@ -12,6 +14,35 @@ const { requestApp } = await import('../helpers/http.js');
 const authHeaders = (userId) => ({
   'x-trustbite-user-id': userId,
 });
+
+const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', {
+  modulusLength: 2048,
+});
+const cognitoKeyId = 'profile-integration-key';
+const cognitoPublicJwk = {
+  ...publicKey.export({ format: 'jwk' }),
+  alg: 'RS256',
+  kid: cognitoKeyId,
+  use: 'sig',
+};
+
+const encodeJson = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
+
+function signCognitoAccessToken(subject) {
+  const encodedHeader = encodeJson({ alg: 'RS256', kid: cognitoKeyId, typ: 'JWT' });
+  const encodedPayload = encodeJson({
+    sub: subject,
+    iss: appConfig.auth.cognito.issuer,
+    client_id: appConfig.auth.cognito.clientId,
+    token_use: 'access',
+    exp: Math.floor(Date.now() / 1000) + 300,
+  });
+  const signature = crypto
+    .sign('RSA-SHA256', Buffer.from(`${encodedHeader}.${encodedPayload}`), privateKey)
+    .toString('base64url');
+
+  return `${encodedHeader}.${encodedPayload}.${signature}`;
+}
 
 const mockCognitoIdentity = (identity) => vi
   .spyOn(cognitoIdentityProvider, 'verifyAccessToken')
@@ -32,6 +63,7 @@ async function cleanupUser(userId) {
 describe('current user profile API', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   afterAll(async () => {
@@ -109,6 +141,32 @@ describe('current user profile API', () => {
     }
   });
 
+  it('verifies a signed Cognito JWT before returning the mapped local profile', async () => {
+    const user = await createUser({ displayName: 'Signed Cognito Profile User' });
+    const cognitoSub = 'signed-profile-cognito-sub';
+    await query('UPDATE users SET cognito_sub = $1 WHERE id = $2', [cognitoSub, user.id]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({ keys: [cognitoPublicJwk] }),
+    }));
+
+    try {
+      const response = await requestApp()
+        .get('/api/v1/users/me')
+        .set('Authorization', `Bearer ${signCognitoAccessToken(cognitoSub)}`)
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        id: user.id,
+        displayName: 'Signed Cognito Profile User',
+        status: 'ACTIVE',
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
   it('binds a verified-phone transition user through a Cognito bearer request', async () => {
     const user = await createUser({ displayName: 'Transition Profile User' });
     const verifyAccessToken = mockCognitoIdentity({
@@ -152,6 +210,44 @@ describe('current user profile API', () => {
       .expect(401);
 
     expect(response.body.error.code).toBe('UNMAPPED_IDENTITY');
+  });
+
+  it('rejects a protected profile request without a bearer token', async () => {
+    const response = await requestApp()
+      .get('/api/v1/users/me')
+      .expect(401);
+
+    expect(response.body.error.code).toBe('AUTH_REQUIRED');
+  });
+
+  it('rejects a malformed Cognito bearer token at the route boundary', async () => {
+    const response = await requestApp()
+      .get('/api/v1/users/me')
+      .set('Authorization', 'Bearer malformed-token')
+      .expect(401);
+
+    expect(response.body.error.code).toBe('INVALID_TOKEN');
+  });
+
+  it.each([
+    ['SUSPENDED', 'ACCOUNT_SUSPENDED'],
+    ['DELETED', 'ACCOUNT_DELETED'],
+  ])('rejects Cognito bearer authentication for %s users', async (status, errorCode) => {
+    const user = await createUser({ displayName: `${status} Cognito User`, status });
+    const cognitoSub = `${status.toLowerCase()}-cognito-sub`;
+    await query('UPDATE users SET cognito_sub = $1 WHERE id = $2', [cognitoSub, user.id]);
+    mockCognitoIdentity({ subject: cognitoSub });
+
+    try {
+      const response = await requestApp()
+        .get('/api/v1/users/me')
+        .set('Authorization', `Bearer ${status.toLowerCase()}-profile-token`)
+        .expect(403);
+
+      expect(response.body.error.code).toBe(errorCode);
+    } finally {
+      await cleanupUser(user.id);
+    }
   });
 
   it('rejects arbitrary external avatar URLs', async () => {
