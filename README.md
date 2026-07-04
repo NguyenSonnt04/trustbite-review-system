@@ -185,6 +185,7 @@ AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
 AWS_COGNITO_CLIENT_ID=local-cognito-client
 AUTH_PHONE_FALLBACK_ENABLED=true
 TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test
+GPS_PROXIMITY_THRESHOLD_METERS=200
 ```
 
 `AUTH_PHONE_FALLBACK_ENABLED=true` is a local transition setting. Production-like environments default this fallback off and should opt in only after verified-phone backfill proof.
