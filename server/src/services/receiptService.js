@@ -353,19 +353,49 @@ async function createDuplicateReceiptFraudFlag(client, { existingReceiptId, atte
   );
 }
 
-async function assertReceiptHashIsUnique(client, fileHash, userId) {
+function duplicateReceiptHashError(existingReceiptId = null) {
+  const error = createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
+  error.existingReceiptId = existingReceiptId;
+  return error;
+}
+
+async function assertReceiptHashIsUnique(client, fileHash) {
   const existingReceipt = await findExistingReceiptByHash(client, fileHash);
   if (!existingReceipt) return;
 
-  await createDuplicateReceiptFraudFlag(client, {
-    existingReceiptId: existingReceipt.id,
-    attemptedUserId: userId,
-  });
-  throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
+  throw duplicateReceiptHashError(existingReceipt.id);
 }
 
 function isDuplicateReceiptError(err) {
   return err.code === '23505' && err.constraint === 'idx_receipts_hash_uniq';
+}
+
+async function persistDuplicateReceiptFraudFlag({ existingReceiptId, attemptedUserId }) {
+  if (!existingReceiptId) return;
+
+  const fraudClient = await pool.connect();
+  try {
+    await fraudClient.query('BEGIN');
+    await createDuplicateReceiptFraudFlag(fraudClient, {
+      existingReceiptId,
+      attemptedUserId,
+    });
+    await fraudClient.query('COMMIT');
+  } catch (err) {
+    await fraudClient.query('ROLLBACK');
+    throw err;
+  } finally {
+    fraudClient.release();
+  }
+}
+
+async function findReceiptByHashOutsideTransaction(fileHash) {
+  const client = await pool.connect();
+  try {
+    return await findExistingReceiptByHash(client, fileHash);
+  } finally {
+    client.release();
+  }
 }
 
 export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file }) {
@@ -398,7 +428,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
 
     const review = await getReviewForUpload(client, userId, data.reviewId, data.restaurantId);
     await assertNoActiveReceipt(client, data.reviewId);
-    await assertReceiptHashIsUnique(client, fileHash, userId);
+    await assertReceiptHashIsUnique(client, fileHash);
 
     const objectKey = buildReceiptObjectKey({
       userId,
@@ -464,17 +494,30 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       await deleteReceiptObject({ fileUrl: uploadedFileUrl });
     }
 
-    if (ownsIdempotencyAttempt && !isDuplicateReceiptError(err) && err.code !== 'DUPLICATE_RECEIPT_HASH') {
+    if (err.code === 'DUPLICATE_RECEIPT_HASH') {
+      await persistDuplicateReceiptFraudFlag({
+        existingReceiptId: err.existingReceiptId,
+        attemptedUserId: userId,
+      });
+      throw err;
+    }
+
+    if (isDuplicateReceiptError(err)) {
+      const existingReceipt = await findReceiptByHashOutsideTransaction(fileHash);
+      await persistDuplicateReceiptFraudFlag({
+        existingReceiptId: existingReceipt?.id,
+        attemptedUserId: userId,
+      });
+      throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
+    }
+
+    if (ownsIdempotencyAttempt) {
       const failureClient = await pool.connect();
       try {
         await markIdempotencyFailed(failureClient, userId, idempotencyKey);
       } finally {
         failureClient.release();
       }
-    }
-
-    if (isDuplicateReceiptError(err)) {
-      throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
     }
 
     throw err;
