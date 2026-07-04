@@ -1,12 +1,11 @@
-const EARTH_RADIUS_METERS = 6_371_000;
+import { GPS_PROXIMITY_THRESHOLD_METERS } from '../../config/antiFraud.js';
 
-export const DEFAULT_GPS_PROXIMITY_THRESHOLD_METERS = 200;
+const EARTH_RADIUS_METERS = 6_371_000;
 
 export class GpsProximityValidationError extends Error {
   constructor(message) {
     super(`VALIDATION_ERROR: ${message}`);
     this.name = 'GpsProximityValidationError';
-    this.statusCode = 422;
     this.code = 'VALIDATION_ERROR';
   }
 }
@@ -75,7 +74,7 @@ export function evaluateGpsProximity({
   userLongitude,
   restaurantLatitude,
   restaurantLongitude,
-  thresholdMeters = DEFAULT_GPS_PROXIMITY_THRESHOLD_METERS,
+  thresholdMeters = GPS_PROXIMITY_THRESHOLD_METERS,
 }) {
   assertThresholdMeters(thresholdMeters);
 

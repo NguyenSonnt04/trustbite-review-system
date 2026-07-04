@@ -10,7 +10,7 @@ normal
 
 ## Product Contract
 
-TrustBite backend code provides a deterministic GPS proximity rule that calculates Haversine distance in meters between device coordinates and restaurant coordinates, then compares the distance against an explicit threshold. The default accepted threshold is 200 meters.
+TrustBite backend code provides a deterministic GPS proximity rule that calculates Haversine distance in meters between device coordinates and restaurant coordinates, then compares the distance against an explicit threshold. The default accepted threshold is 200 meters, sourced from server anti-fraud configuration (`GPS_PROXIMITY_THRESHOLD_METERS`).
 
 This story is intentionally backend-only: it proves the domain/service rule without adding UI, public API shape, persistence, review mutation, or trust-score mutation.
 
@@ -25,7 +25,7 @@ This story is intentionally backend-only: it proves the domain/service rule with
 
 - Backend service code calculates Haversine distance in meters for valid latitude/longitude pairs.
 - Backend service code evaluates proximity as passing when distance is less than or equal to the configured threshold.
-- The default GPS proximity threshold is explicit and documented as 200 meters.
+- The default GPS proximity threshold is explicit, configurable through server anti-fraud config, and documented as 200 meters.
 - Invalid latitude, longitude, or threshold values are rejected before producing a verification result.
 - Unit tests cover zero-distance, inside-threshold, boundary-threshold, outside-threshold, custom-threshold, and invalid-input cases.
 - No client/UI changes, database migrations, provider calls, review status changes, or trust-score changes are included in this slice.
@@ -36,7 +36,7 @@ This story is intentionally backend-only: it proves the domain/service rule with
 - Queries: none.
 - API: none in this slice.
 - Tables: none in this slice.
-- Domain rules: Haversine distance; `distance_meters <= threshold_meters`; default threshold `200`.
+- Domain rules: Haversine distance; `distance_meters <= threshold_meters`; default config threshold `200`.
 - UI surfaces: none.
 
 ## Validation
@@ -66,3 +66,9 @@ Validated on 2026-07-04:
 - `npm run harness -- story update --id TB-FRAUD-002 --status implemented --unit 1 --integration 0 --e2e 0 --platform 0 --evidence "..."` — durable story row updated.
 - `npm run harness -- query matrix` — shows `TB-FRAUD-002` implemented with unit proof.
 - `git diff --check` — passed.
+
+PR #31 Greptile follow-up on 2026-07-04:
+
+- Moved default GPS threshold source to `server/src/config/antiFraud.js` with `GPS_PROXIMITY_THRESHOLD_METERS` env parsing.
+- Kept `GpsProximityValidationError` domain-only by removing HTTP `statusCode` coupling.
+- Expanded invalid threshold proof for negative and infinite values.

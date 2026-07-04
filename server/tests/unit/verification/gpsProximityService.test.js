@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { GPS_PROXIMITY_THRESHOLD_METERS } from '../../../src/config/antiFraud.js';
 import {
-  DEFAULT_GPS_PROXIMITY_THRESHOLD_METERS,
   calculateHaversineDistanceMeters,
   evaluateGpsProximity,
 } from '../../../src/services/verification/gpsProximityService.js';
 
 describe('GPS proximity verification rule', () => {
-  it('uses an explicit 200 meter default threshold', () => {
-    expect(DEFAULT_GPS_PROXIMITY_THRESHOLD_METERS).toBe(200);
+  it('uses the anti-fraud config default threshold', () => {
+    expect(GPS_PROXIMITY_THRESHOLD_METERS).toBe(200);
   });
 
   it('calculates zero meters for identical coordinate pairs', () => {
@@ -92,6 +92,8 @@ describe('GPS proximity verification rule', () => {
     ['userLongitude', { userLongitude: 181 }],
     ['restaurantLongitude', { restaurantLongitude: -181 }],
     ['thresholdMeters', { thresholdMeters: 0 }],
+    ['thresholdMeters', { thresholdMeters: -1 }],
+    ['thresholdMeters', { thresholdMeters: Infinity }],
     ['thresholdMeters', { thresholdMeters: Number.NaN }],
   ])('rejects invalid %s values before producing a result', (_field, override) => {
     const input = {

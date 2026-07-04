@@ -9,7 +9,7 @@ GPS proximity checks compare the device-reported review location with the restau
 Accepted rule for `TB-FRAUD-002`:
 
 - Distance is computed in meters between two latitude/longitude coordinate pairs.
-- The default GPS proximity threshold is **200 meters**.
+- The default GPS proximity threshold is **200 meters** and is read from server anti-fraud configuration (`GPS_PROXIMITY_THRESHOLD_METERS`) so environments can tune it without changing service code.
 - A proximity result passes when `distance_meters <= threshold_meters`.
 - Latitude must be a finite number in `[-90, 90]`.
 - Longitude must be a finite number in `[-180, 180]`.
