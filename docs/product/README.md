@@ -37,4 +37,4 @@ Create focused product docs as stories are selected:
   - receipt age: within `48h`,
   - GPS proximity threshold: `<= 200m`,
   - selected restaurant 3 intentionally fails GPS validation.
-- These assumptions are not yet backend-enforced product contracts until accepted in story/product docs and proven by tests.
+- The GPS proximity threshold is now accepted for backend rule proof in `docs/product/verification.md` and `TB-FRAUD-002`; the remaining simulation assumptions are not yet backend-enforced product contracts until accepted in story/product docs and proven by tests.
