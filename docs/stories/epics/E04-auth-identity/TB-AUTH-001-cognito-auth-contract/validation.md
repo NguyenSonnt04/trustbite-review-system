@@ -44,9 +44,9 @@ git diff --check
 
 ## Acceptance Evidence
 
-Validated on 2026-07-03:
+Validated on 2026-07-03 and PR #30 follow-up on 2026-07-04:
 
-- Provider/auth unit proof passed: 2 files, 26 tests.
+- Provider/auth unit proof passed: 2 files, 27 tests.
 - Profile route integration proof passed: 1 file, 12 tests, including a signed
   RSA Cognito JWT resolved through JWKS and mapped by `users.cognito_sub`.
 - Full server suite passed: 10 files, 86 tests.
@@ -56,9 +56,10 @@ Validated on 2026-07-03:
   provider/JWKS failures, unmapped identity, and suspended/deleted accounts.
 - TDD exposed and fixed two fail-open gaps: non-numeric `nbf` claims and matching
   JWKs whose type, algorithm, or use is not valid for RS256 signing.
-- Review follow-up added a shared 30-second cooldown after an unknown-`kid`
-  refresh, so sequential attacker-controlled key ids do not trigger unbounded
-  provider requests while legitimate rotation still gets one immediate refresh.
+- Review follow-up added a shared 30-second cooldown only after a successful
+  unknown-`kid` refresh, so transient provider failures do not start the
+  cooldown while sequential attacker-controlled key ids still cannot trigger
+  unbounded provider requests after one completed refresh.
 - JWKS responses now reject a null document and malformed key entries before
   caching, preserving the structured `503 PROVIDER_UNAVAILABLE` boundary instead
   of leaking a runtime `TypeError` as `500 INTERNAL_ERROR`.

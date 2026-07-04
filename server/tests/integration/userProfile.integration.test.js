@@ -5,6 +5,7 @@ import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
 process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
 
+const { default: appConfig } = await import('../../src/config/app.js');
 const { cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js');
 const { createUser } = await import('../helpers/factories/index.js');
 const { closeDbPool, query } = await import('../helpers/db.js');
@@ -31,8 +32,8 @@ function signCognitoAccessToken(subject) {
   const encodedHeader = encodeJson({ alg: 'RS256', kid: cognitoKeyId, typ: 'JWT' });
   const encodedPayload = encodeJson({
     sub: subject,
-    iss: `https://cognito-idp.${process.env.AWS_REGION}.amazonaws.com/${process.env.AWS_COGNITO_USER_POOL_ID}`,
-    client_id: process.env.AWS_COGNITO_CLIENT_ID,
+    iss: appConfig.auth.cognito.issuer,
+    client_id: appConfig.auth.cognito.clientId,
     token_use: 'access',
     exp: Math.floor(Date.now() / 1000) + 300,
   });

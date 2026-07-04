@@ -7,7 +7,7 @@ ALTER TABLE tool ADD COLUMN kind TEXT NOT NULL DEFAULT 'cli';
 ALTER TABLE tool ADD COLUMN capability TEXT;
 ALTER TABLE tool ADD COLUMN scan_target TEXT;
 ALTER TABLE tool ADD COLUMN status TEXT NOT NULL DEFAULT 'unknown';
-ALTER TABLE tool ADD COLUMN checked_at TEXT;
+ALTER TABLE tool ADD COLUMN checked_at TIMESTAMPTZ;
 
 -- Backfill kind for tools registered before kinds existed, inferring it from
 -- the agent-neutral command prefix convention so an upgrade does not mis-type

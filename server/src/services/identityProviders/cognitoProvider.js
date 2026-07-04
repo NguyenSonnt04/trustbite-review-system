@@ -93,8 +93,9 @@ const refreshJwksForUnknownKid = async () => {
     return cachedJwks;
   }
 
-  lastUnknownKidRefreshAt = now;
-  return fetchJwks({ forceRefresh: true });
+  const refreshedJwks = await fetchJwks({ forceRefresh: true });
+  lastUnknownKidRefreshAt = Date.now();
+  return refreshedJwks;
 };
 
 const verifySignature = async (token, header) => {

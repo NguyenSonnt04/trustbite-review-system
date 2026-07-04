@@ -193,6 +193,26 @@ describe('CognitoIdentityProvider', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('does not start the unknown-kid cooldown when a forced JWKS refresh fails', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jwksResponse())
+      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce(jwksResponse());
+    const provider = await loadProvider();
+    const unknownToken = signAccessToken({}, { signingKeyId: 'unknown-key-id' });
+
+    await expect(provider.verifyAccessToken(unknownToken)).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'PROVIDER_UNAVAILABLE',
+    });
+    await expect(provider.verifyAccessToken(unknownToken)).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
   it('shares one in-flight JWKS refresh across concurrent tokens with unknown key ids', async () => {
     let resolveRefresh;
     vi.mocked(fetch)
