@@ -145,9 +145,11 @@ describe('uploadReceiptForReview', () => {
 
   it('creates a fraud flag and rejects when the receipt hash already exists', async () => {
     const client = createClient();
+    const failureClient = createClient();
     const fraudClient = createClient();
     pool.connect
       .mockResolvedValueOnce(client)
+      .mockResolvedValueOnce(failureClient)
       .mockResolvedValueOnce(fraudClient);
 
     client.query
@@ -171,6 +173,8 @@ describe('uploadReceiptForReview', () => {
       .mockResolvedValueOnce({ rows: [{ id: '66666666-6666-4666-8666-666666666666' }], rowCount: 1 })
       .mockResolvedValueOnce({}); // ROLLBACK
 
+    failureClient.query.mockResolvedValue({});
+
     fraudClient.query
       .mockResolvedValueOnce({}) // BEGIN
       .mockResolvedValueOnce({ rows: [{ id: '77777777-7777-4777-8777-777777777777' }], rowCount: 1 })
@@ -185,6 +189,11 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(failureClient.query).toHaveBeenCalledWith(
+      expect.stringContaining("SET status = 'FAILED'"),
+      [USER_ID, 'POST /api/v1/receipts', IDEMPOTENCY_KEY],
+    );
+    expect(failureClient.release).toHaveBeenCalled();
     expect(fraudClient.query.mock.calls[1][0]).toContain('INSERT INTO fraud_flags');
     expect(fraudClient.query.mock.calls[2][1]).toEqual([
       '77777777-7777-4777-8777-777777777777',

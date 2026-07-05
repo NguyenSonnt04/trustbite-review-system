@@ -497,6 +497,15 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       await deleteReceiptObject({ fileUrl: uploadedFileUrl });
     }
 
+    if (ownsIdempotencyAttempt) {
+      const failureClient = await pool.connect();
+      try {
+        await markIdempotencyFailed(failureClient, userId, idempotencyKey);
+      } finally {
+        failureClient.release();
+      }
+    }
+
     if (err.code === 'DUPLICATE_RECEIPT_HASH') {
       await persistDuplicateReceiptFraudFlag({
         existingReceiptId: err.existingReceiptId,
@@ -512,15 +521,6 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
         attemptedUserId: userId,
       });
       throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
-    }
-
-    if (ownsIdempotencyAttempt) {
-      const failureClient = await pool.connect();
-      try {
-        await markIdempotencyFailed(failureClient, userId, idempotencyKey);
-      } finally {
-        failureClient.release();
-      }
     }
 
     throw err;
