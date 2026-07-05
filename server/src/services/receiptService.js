@@ -431,11 +431,14 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
   const failOwnedIdempotencyAttempt = async () => {
     if (!ownsIdempotencyAttempt) return;
 
-    const failureClient = await pool.connect();
+    let failureClient;
     try {
+      failureClient = await pool.connect();
       await markIdempotencyFailed(failureClient, userId, idempotencyKey);
+    } catch {
+      // Preserve the original failure response even if failure-state persistence is unavailable.
     } finally {
-      failureClient.release();
+      failureClient?.release();
     }
   };
 
