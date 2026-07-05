@@ -188,7 +188,7 @@ async function createIdempotency(client, userId, idempotencyKey, requestHash) {
        expires_at
      )
      VALUES ($1, $2, $3, $4, 'IN_PROGRESS', NOW() + ($5 || ' minutes')::interval, NOW() + ($6 || ' hours')::interval)`,
-    [userId, idempotencyKey, RECEIPT_ENDPOINT, requestHash, RECEIPT_LOCK_MINUTES, RECEIPT_IDEMPOTENCY_TTL_HOURS],
+    [idempotencyKey, userId, RECEIPT_ENDPOINT, requestHash, RECEIPT_LOCK_MINUTES, RECEIPT_IDEMPOTENCY_TTL_HOURS],
   );
 }
 

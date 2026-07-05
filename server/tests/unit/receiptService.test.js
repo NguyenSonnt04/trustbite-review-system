@@ -119,6 +119,15 @@ describe('uploadReceiptForReview', () => {
       body: JPEG_BUFFER,
       contentType: 'image/jpeg',
     }));
+    expect(client.query.mock.calls[2][0]).toContain('INSERT INTO idempotency_keys');
+    expect(client.query.mock.calls[2][1]).toEqual([
+      IDEMPOTENCY_KEY,
+      USER_ID,
+      'POST /api/v1/receipts',
+      expect.any(String),
+      5,
+      24,
+    ]);
     expect(client.query.mock.calls[6][0]).toContain('captured_at');
     expect(client.query.mock.calls[6][1]).toEqual([
       REVIEW_ID,
