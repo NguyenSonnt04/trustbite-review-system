@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm run lint --prefix client)",
+      "PowerShell($env:NEXT_PUBLIC_API_URL='http://localhost:5000'; $env:NEXT_PUBLIC_AWS_REGION='ap-southeast-1'; npm run build --prefix client)",
+      "PowerShell(npm run server:build)"
+    ]
+  }
+}

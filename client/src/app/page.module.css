@@ -1,0 +1,403 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--background);
+}
+
+.header {
+  height: 70px;
+  border-bottom: 1px solid var(--card-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  background-color: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  z-index: 100;
+}
+
+.titleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--font-display);
+}
+
+.logoDot {
+  color: var(--secondary);
+}
+
+.slogan {
+  color: var(--muted);
+  font-size: 0.85rem;
+  padding-left: 8px;
+  border-left: 1px solid var(--card-border);
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.authBadge {
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--card-border);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Layout Split-Screen default >= 1024px */
+.mainLayout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  border-right: 1px solid var(--card-border);
+  padding: 24px;
+  gap: 20px;
+}
+
+.mapContainer {
+  width: 50%;
+  height: 100%;
+  position: relative;
+  background-color: #0f172a;
+}
+
+/* Search and Filters Section */
+.searchSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.searchBar {
+  display: flex;
+  gap: 10px;
+}
+
+.searchInput {
+  flex: 1;
+  background-color: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #fff;
+  font-size: 0.95rem;
+  font-family: var(--font-sans);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: var(--secondary);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterBtn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--card-border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filterBtn:hover, .filterActive {
+  background: rgba(0, 242, 254, 0.1);
+  border-color: var(--secondary);
+  color: var(--secondary);
+}
+
+/* Restaurant List Section */
+.listSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.restaurantCard {
+  background-color: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.restaurantCard:hover {
+  transform: translateY(-2px);
+  border-color: hsla(180, 100%, 50%, 0.3);
+  box-shadow: var(--shadow-lg), 0 0 15px rgba(0, 242, 254, 0.1);
+}
+
+.restaurantHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.restaurantInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.restaurantName {
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.restaurantCuisine {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.trustScoreBadge {
+  background: linear-gradient(135deg, rgba(0, 242, 254, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: var(--secondary);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.restaurantFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+.verifiedLabel {
+  color: var(--success);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.deviationWarning {
+  color: var(--danger);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Interactive Map Visual Mock */
+.mockMap {
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Simulated grid/topography lines */
+.mapGrid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.mapPin {
+  position: absolute;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -100%);
+  transition: all 0.3s ease;
+}
+
+.mapPin:hover {
+  z-index: 10;
+}
+
+.pinIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50% 50% 50% 0;
+  background: var(--primary);
+  transform: rotate(-45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
+  transition: all 0.2s ease;
+}
+
+.pinIconActive {
+  background: var(--secondary) !important;
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.8) !important;
+  transform: rotate(-45deg) scale(1.15);
+}
+
+.pinEmoji {
+  transform: rotate(45deg);
+  font-size: 0.95rem;
+}
+
+.pinGlow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(0, 242, 254, 0.5);
+  bottom: -4px;
+  transform: scaleY(0.5);
+  animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+  0% { transform: scaleY(0.5) scale(1); opacity: 0.8; }
+  100% { transform: scaleY(0.5) scale(3.5); opacity: 0; }
+}
+
+.pinPopup {
+  background-color: var(--card);
+  border: 1px solid var(--secondary);
+  border-radius: 8px;
+  padding: 8px 12px;
+  position: absolute;
+  bottom: 40px;
+  width: max-content;
+  max-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  font-size: 0.8rem;
+  color: #fff;
+  z-index: 200;
+}
+
+/* TrustBite Verification Modal Widgets */
+.fraudWidget {
+  background-color: rgba(15, 23, 42, 0.9);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.widgetTitle {
+  font-size: 1.1rem;
+  color: var(--secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stepList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stepItem {
+  display: flex;
+  gap: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  align-items: center;
+}
+
+.stepIcon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.stepDone {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.stepActive {
+  background-color: rgba(0, 242, 254, 0.15);
+  color: var(--secondary);
+  border: 1px solid var(--secondary);
+}
+
+.stepWaiting {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  border: 1px solid var(--card-border);
+}
+
+/* Responsiveness <= 1024px */
+@media (max-width: 1024px) {
+  .mainLayout {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    height: 50vh;
+    border-right: none;
+    border-bottom: 1px solid var(--card-border);
+  }
+
+  .mapContainer {
+    width: 100%;
+    height: 50vh;
+  }
+}
