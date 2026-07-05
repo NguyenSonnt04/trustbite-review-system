@@ -13,6 +13,7 @@ const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const RECEIPT_ENDPOINT = 'POST /api/v1/receipts';
 const RECEIPT_IDEMPOTENCY_TTL_HOURS = 24;
 const RECEIPT_LOCK_MINUTES = 5;
+const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
 
@@ -367,7 +368,7 @@ async function assertReceiptHashIsUnique(client, fileHash) {
 }
 
 function isDuplicateReceiptError(err) {
-  return err.code === '23505' && err.constraint === 'idx_receipts_hash_uniq';
+  return err.code === '23505' && err.constraint === DUPLICATE_RECEIPT_HASH_INDEX;
 }
 
 async function persistDuplicateReceiptFraudFlag({ existingReceiptId, attemptedUserId }) {
@@ -452,9 +453,10 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
          status,
          gps_latitude,
          gps_longitude,
-         gps_accuracy_meters
+         gps_accuracy_meters,
+         captured_at
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9)
+       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10)
        RETURNING id, status`,
       [
         data.reviewId,
@@ -466,6 +468,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
         data.latitude,
         data.longitude,
         data.gpsAccuracyMeters,
+        data.capturedAt,
       ],
     );
 

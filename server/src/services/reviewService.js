@@ -80,6 +80,11 @@ function parseVisitedAt(value, details) {
     return null;
   }
 
+  if (date.getTime() > Date.now()) {
+    details.push(validationDetail('visitedAt', 'FUTURE_DATETIME', 'visitedAt must not be in the future.'));
+    return null;
+  }
+
   return date.toISOString();
 }
 
