@@ -425,9 +425,17 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
     }
   };
 
+  const tryPersistDuplicateReceiptFraudFlag = async ({ existingReceiptId, attemptedUserId }) => {
+    try {
+      await persistDuplicateReceiptFraudFlag({ existingReceiptId, attemptedUserId });
+    } catch {
+      // Preserve the original duplicate-hash response even if fraud-flag persistence is unavailable.
+    }
+  };
+
   const handleDuplicateReceiptError = async (err) => {
     if (err.code === 'DUPLICATE_RECEIPT_HASH') {
-      await persistDuplicateReceiptFraudFlag({
+      await tryPersistDuplicateReceiptFraudFlag({
         existingReceiptId: err.existingReceiptId,
         attemptedUserId: userId,
       });
@@ -436,7 +444,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
 
     if (isDuplicateReceiptError(err)) {
       const existingReceipt = await findReceiptByHashOutsideTransaction(fileHash);
-      await persistDuplicateReceiptFraudFlag({
+      await tryPersistDuplicateReceiptFraudFlag({
         existingReceiptId: existingReceipt?.id,
         attemptedUserId: userId,
       });
