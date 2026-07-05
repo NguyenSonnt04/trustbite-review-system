@@ -221,6 +221,41 @@ describe('uploadReceiptForReview', () => {
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
+  it('preserves duplicate hash response when fraud flag persistence fails', async () => {
+    const client = createClient();
+    const failureClient = createClient();
+    const fraudClient = createClient();
+    pool.connect
+      .mockResolvedValueOnce(client)
+      .mockResolvedValueOnce(failureClient)
+      .mockResolvedValueOnce(fraudClient);
+
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // idempotency lookup
+      .mockResolvedValueOnce({}) // create idempotency
+      .mockResolvedValueOnce(reviewRow())
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // active receipt check
+      .mockResolvedValueOnce({ rows: [{ id: '66666666-6666-4666-8666-666666666666' }], rowCount: 1 })
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    failureClient.query.mockResolvedValue({});
+    fraudClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(new Error('transient fraud flag write failure'))
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
+
+    expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(fraudClient.release).toHaveBeenCalled();
+  });
+
   it('refreshes lock and expiry when retrying a failed idempotency key', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
