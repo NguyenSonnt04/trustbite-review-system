@@ -212,6 +212,79 @@ describe('uploadReceiptForReview', () => {
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
+  it('refreshes lock and expiry when retrying a failed idempotency key', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          request_hash: 'placeholder',
+          status: 'FAILED',
+        }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({}) // refresh idempotency attempt
+      .mockResolvedValueOnce({
+        rows: [{
+          id: REVIEW_ID,
+          user_id: USER_ID,
+          restaurant_id: RESTAURANT_ID,
+          branch_id: null,
+          status: 'SUBMITTED',
+          verification_status: 'UNVERIFIED',
+          restaurant_status: 'ACTIVE',
+          restaurant_is_deleted: false,
+        }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // active receipt check
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // duplicate hash check
+      .mockResolvedValueOnce({ rows: [{ id: '55555555-5555-4555-8555-555555555555', status: 'UPLOADED' }], rowCount: 1 })
+      .mockResolvedValueOnce({}) // update review
+      .mockResolvedValueOnce({}) // idempotency completed
+      .mockResolvedValueOnce({}); // COMMIT
+
+    const originalQuery = client.query;
+    client.query = vi.fn(async (...args) => {
+      const result = await originalQuery(...args);
+      if (args[0].includes('SELECT *') && result.rows[0]) {
+        const crypto = await import('node:crypto');
+        const fileHash = crypto.createHash('sha256').update(JPEG_BUFFER).digest('hex');
+        result.rows[0].request_hash = crypto.createHash('sha256').update(JSON.stringify({
+          userId: USER_ID,
+          endpoint: 'POST /api/v1/receipts',
+          reviewId: REVIEW_ID,
+          restaurantId: RESTAURANT_ID,
+          latitude: null,
+          longitude: null,
+          gpsAccuracyMeters: null,
+          capturedAt: null,
+          fileHash,
+        })).digest('hex');
+      }
+      return result;
+    });
+
+    await uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    });
+
+    expect(client.query.mock.calls[2][0]).toContain('expires_at = NOW()');
+    expect(client.query.mock.calls[2][1]).toEqual([
+      USER_ID,
+      'POST /api/v1/receipts',
+      IDEMPOTENCY_KEY,
+      expect.any(String),
+      5,
+      24,
+    ]);
+  });
+
   it('replays a completed idempotent response for the same payload', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);

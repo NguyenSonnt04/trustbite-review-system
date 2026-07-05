@@ -229,11 +229,12 @@ async function refreshIdempotencyAttempt(client, userId, idempotencyKey, request
      SET request_hash = $4,
          status = 'IN_PROGRESS',
          locked_until = NOW() + ($5 || ' minutes')::interval,
+         expires_at = NOW() + ($6 || ' hours')::interval,
          updated_at = NOW()
      WHERE user_id = $1
        AND endpoint = $2
        AND idempotency_key = $3`,
-    [userId, RECEIPT_ENDPOINT, idempotencyKey, requestHash, RECEIPT_LOCK_MINUTES],
+    [userId, RECEIPT_ENDPOINT, idempotencyKey, requestHash, RECEIPT_LOCK_MINUTES, RECEIPT_IDEMPOTENCY_TTL_HOURS],
   );
 }
 
