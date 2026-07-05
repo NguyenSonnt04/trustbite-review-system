@@ -13,7 +13,9 @@ const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const RECEIPT_ENDPOINT = 'POST /api/v1/receipts';
 const RECEIPT_IDEMPOTENCY_TTL_HOURS = 24;
 const RECEIPT_LOCK_MINUTES = 5;
+// Keep this aligned with server/migrations/001_init_schema.sql.
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
+const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
 
@@ -340,8 +342,9 @@ async function findExistingReceiptByHash(client, fileHash) {
 async function createDuplicateReceiptFraudFlag(client, { existingReceiptId, attemptedUserId }) {
   const flagResult = await client.query(
     `INSERT INTO fraud_flags (flag_code, risk_score, status)
-     VALUES ('DUPLICATE_RECEIPT_HASH', 80, 'OPEN')
+     VALUES ('DUPLICATE_RECEIPT_HASH', $1, 'OPEN')
      RETURNING id`,
+    [DUPLICATE_RECEIPT_HASH_RISK_SCORE],
   );
   const fraudFlagId = flagResult.rows[0].id;
 
