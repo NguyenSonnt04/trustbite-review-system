@@ -64,7 +64,7 @@ The Flutter mobile app must integrate with the Express backend through documente
 ## Validation
 
 When updating durable proof status, use numeric booleans:
-`scripts/bin/harness-cli story update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0`.
+`npm run harness -- story update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0`.
 
 | Layer | Expected proof |
 | --- | --- |

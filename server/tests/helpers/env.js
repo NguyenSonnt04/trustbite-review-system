@@ -13,6 +13,6 @@ process.env.AUTH_PHONE_FALLBACK_ENABLED ??= '';
 
 dotenv.config({ path: path.join(serverRoot, '.env') });
 
-process.env.AWS_COGNITO_USER_POOL_ID ??= 'local-test-pool';
-process.env.AWS_COGNITO_CLIENT_ID ??= 'local-test-client';
-process.env.AWS_REGION ??= 'us-east-1';
+process.env.AWS_COGNITO_USER_POOL_ID ||= 'local-test-pool';
+process.env.AWS_COGNITO_CLIENT_ID ||= 'local-test-client';
+process.env.AWS_REGION ||= 'us-east-1';

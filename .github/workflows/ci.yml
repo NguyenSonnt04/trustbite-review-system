@@ -19,6 +19,20 @@ jobs:
     name: Web and server checks
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgis/postgis:15-3.4-alpine
+        env:
+          POSTGRES_USER: trustbite_user
+          POSTGRES_PASSWORD: "ci-${{ github.run_id }}"
+          POSTGRES_DB: trustbite_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trustbite_user -d trustbite_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - name: Checkout repository
@@ -51,8 +65,31 @@ jobs:
       - name: Install server dependencies
         run: npm ci --prefix server
 
-      - name: Syntax-check server sources
-        run: find server/src -name '*.js' -print0 | xargs -0 -n 1 node --check
+      - name: Build server
+        run: npm run build --prefix server
+
+      - name: Run database migrations
+        run: npm run db:migrate --prefix server
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: trustbite_user
+          DATABASE_PASSWORD: "ci-${{ github.run_id }}"
+          DATABASE_NAME: trustbite_db
+
+      - name: Test server
+        run: npm run test --prefix server
+        env:
+          NODE_ENV: test
+          DATABASE_HOST: localhost
+          DATABASE_PORT: 5432
+          DATABASE_USER: trustbite_user
+          DATABASE_PASSWORD: "ci-${{ github.run_id }}"
+          DATABASE_NAME: trustbite_db
+          AWS_COGNITO_USER_POOL_ID: local-test-pool
+          AWS_COGNITO_CLIENT_ID: local-test-client
+          AWS_REGION: us-east-1
+          TRUSTBITE_AVATAR_ALLOWED_HOSTS: cdn.trustbite.test
 
       - name: Install Harness CLI
         run: |
@@ -80,10 +117,9 @@ jobs:
             echo "| Client lint | completed when this job is green |"
             echo "| Client build | completed when this job is green |"
             echo "| Server dependency install | completed |"
-            echo "| Server syntax check | completed when this job is green |"
+            echo "| Server build | completed when this job is green |"
+            echo "| Server tests | completed when this job is green |"
             echo "| Harness matrix query | completed when this job is green |"
-            echo ""
-            echo "Backend build/test proof is intentionally not claimed because server package scripts do not expose build/test yet."
           } >> "$GITHUB_STEP_SUMMARY"
 
   mobile:
