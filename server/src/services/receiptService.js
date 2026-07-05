@@ -408,30 +408,70 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
   const fileHash = sha256Hex(file.buffer);
   const requestHash = stableRequestHash({ userId, data, fileHash });
 
-  const client = await pool.connect();
   let uploadedFileUrl = null;
   let ownsIdempotencyAttempt = false;
 
+  const failOwnedIdempotencyAttempt = async () => {
+    if (!ownsIdempotencyAttempt) return;
+
+    const failureClient = await pool.connect();
+    try {
+      await markIdempotencyFailed(failureClient, userId, idempotencyKey);
+    } finally {
+      failureClient.release();
+    }
+  };
+
+  const handleDuplicateReceiptError = async (err) => {
+    if (err.code === 'DUPLICATE_RECEIPT_HASH') {
+      await persistDuplicateReceiptFraudFlag({
+        existingReceiptId: err.existingReceiptId,
+        attemptedUserId: userId,
+      });
+      throw err;
+    }
+
+    if (isDuplicateReceiptError(err)) {
+      const existingReceipt = await findReceiptByHashOutsideTransaction(fileHash);
+      await persistDuplicateReceiptFraudFlag({
+        existingReceiptId: existingReceipt?.id,
+        attemptedUserId: userId,
+      });
+      throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
+    }
+  };
+
+  const preflightClient = await pool.connect();
   try {
-    await client.query('BEGIN');
-    const existing = await getExistingIdempotency(client, userId, idempotencyKey);
+    await preflightClient.query('BEGIN');
+    const existing = await getExistingIdempotency(preflightClient, userId, idempotencyKey);
     const replay = resolveExistingIdempotency(existing, requestHash);
     if (replay?.replayed) {
-      await client.query('COMMIT');
+      await preflightClient.query('COMMIT');
       return replay;
     }
     if (!existing) {
-      await createIdempotency(client, userId, idempotencyKey, requestHash);
+      await createIdempotency(preflightClient, userId, idempotencyKey, requestHash);
       ownsIdempotencyAttempt = true;
     } else if (replay?.retryable) {
-      await refreshIdempotencyAttempt(client, userId, idempotencyKey, requestHash);
+      await refreshIdempotencyAttempt(preflightClient, userId, idempotencyKey, requestHash);
       ownsIdempotencyAttempt = true;
     }
 
-    const review = await getReviewForUpload(client, userId, data.reviewId, data.restaurantId);
-    await assertNoActiveReceipt(client, data.reviewId);
-    await assertReceiptHashIsUnique(client, fileHash);
+    await getReviewForUpload(preflightClient, userId, data.reviewId, data.restaurantId);
+    await assertNoActiveReceipt(preflightClient, data.reviewId);
+    await assertReceiptHashIsUnique(preflightClient, fileHash);
+    await preflightClient.query('COMMIT');
+  } catch (err) {
+    await preflightClient.query('ROLLBACK');
+    await failOwnedIdempotencyAttempt();
+    await handleDuplicateReceiptError(err);
+    throw err;
+  } finally {
+    preflightClient.release();
+  }
 
+  try {
     const objectKey = buildReceiptObjectKey({
       userId,
       reviewId: data.reviewId,
@@ -442,8 +482,19 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       body: file.buffer,
       contentType: file.mimetype,
     });
+  } catch (err) {
+    await failOwnedIdempotencyAttempt();
+    throw err;
+  }
 
-    const receiptResult = await client.query(
+  const persistClient = await pool.connect();
+  try {
+    await persistClient.query('BEGIN');
+    const review = await getReviewForUpload(persistClient, userId, data.reviewId, data.restaurantId);
+    await assertNoActiveReceipt(persistClient, data.reviewId);
+    await assertReceiptHashIsUnique(persistClient, fileHash);
+
+    const receiptResult = await persistClient.query(
       `INSERT INTO receipt_verifications (
          review_id,
          user_id,
@@ -473,7 +524,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       ],
     );
 
-    await client.query(
+    await persistClient.query(
       `UPDATE reviews
        SET verification_status = 'PROCESSING',
            trust_label = 'PROCESSING'
@@ -487,45 +538,21 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       processingStatus: 'HASH_CHECKING',
     };
 
-    await markIdempotencyCompleted(client, userId, idempotencyKey, body, receiptResult.rows[0].id);
-    await client.query('COMMIT');
+    await markIdempotencyCompleted(persistClient, userId, idempotencyKey, body, receiptResult.rows[0].id);
+    await persistClient.query('COMMIT');
 
     return { statusCode: 202, body };
   } catch (err) {
-    await client.query('ROLLBACK');
+    await persistClient.query('ROLLBACK');
 
     if (uploadedFileUrl) {
       await deleteReceiptObject({ fileUrl: uploadedFileUrl });
     }
 
-    if (ownsIdempotencyAttempt) {
-      const failureClient = await pool.connect();
-      try {
-        await markIdempotencyFailed(failureClient, userId, idempotencyKey);
-      } finally {
-        failureClient.release();
-      }
-    }
-
-    if (err.code === 'DUPLICATE_RECEIPT_HASH') {
-      await persistDuplicateReceiptFraudFlag({
-        existingReceiptId: err.existingReceiptId,
-        attemptedUserId: userId,
-      });
-      throw err;
-    }
-
-    if (isDuplicateReceiptError(err)) {
-      const existingReceipt = await findReceiptByHashOutsideTransaction(fileHash);
-      await persistDuplicateReceiptFraudFlag({
-        existingReceiptId: existingReceipt?.id,
-        attemptedUserId: userId,
-      });
-      throw createHttpError(409, 'DUPLICATE_RECEIPT_HASH', 'Receipt image was already uploaded.');
-    }
-
+    await failOwnedIdempotencyAttempt();
+    await handleDuplicateReceiptError(err);
     throw err;
   } finally {
-    client.release();
+    persistClient.release();
   }
 }

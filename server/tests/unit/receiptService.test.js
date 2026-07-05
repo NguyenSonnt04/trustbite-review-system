@@ -48,30 +48,39 @@ function createClient() {
   };
 }
 
+function reviewRow() {
+  return {
+    rows: [{
+      id: REVIEW_ID,
+      user_id: USER_ID,
+      restaurant_id: RESTAURANT_ID,
+      branch_id: null,
+      status: 'SUBMITTED',
+      verification_status: 'UNVERIFIED',
+      restaurant_status: 'ACTIVE',
+      restaurant_is_deleted: false,
+    }],
+    rowCount: 1,
+  };
+}
+
 function mockReceiptHappyPath(client) {
   client.query
-    .mockResolvedValueOnce({}) // BEGIN
+    .mockResolvedValueOnce({}) // preflight BEGIN
     .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // idempotency lookup
     .mockResolvedValueOnce({}) // create idempotency
-    .mockResolvedValueOnce({
-      rows: [{
-        id: REVIEW_ID,
-        user_id: USER_ID,
-        restaurant_id: RESTAURANT_ID,
-        branch_id: null,
-        status: 'SUBMITTED',
-        verification_status: 'UNVERIFIED',
-        restaurant_status: 'ACTIVE',
-        restaurant_is_deleted: false,
-      }],
-      rowCount: 1,
-    })
-    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // active receipt check
-    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // duplicate hash check
+    .mockResolvedValueOnce(reviewRow()) // preflight review lock
+    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // preflight active receipt check
+    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // preflight duplicate hash check
+    .mockResolvedValueOnce({}) // preflight COMMIT
+    .mockResolvedValueOnce({}) // persist BEGIN
+    .mockResolvedValueOnce(reviewRow()) // persist review lock
+    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // persist active receipt check
+    .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // persist duplicate hash check
     .mockResolvedValueOnce({ rows: [{ id: '55555555-5555-4555-8555-555555555555', status: 'UPLOADED' }], rowCount: 1 })
     .mockResolvedValueOnce({}) // update review
     .mockResolvedValueOnce({}) // idempotency completed
-    .mockResolvedValueOnce({}); // COMMIT
+    .mockResolvedValueOnce({}); // persist COMMIT
 }
 
 describe('uploadReceiptForReview', () => {
@@ -128,8 +137,8 @@ describe('uploadReceiptForReview', () => {
       5,
       24,
     ]);
-    expect(client.query.mock.calls[6][0]).toContain('captured_at');
-    expect(client.query.mock.calls[6][1]).toEqual([
+    expect(client.query.mock.calls[11][0]).toContain('captured_at');
+    expect(client.query.mock.calls[11][1]).toEqual([
       REVIEW_ID,
       USER_ID,
       RESTAURANT_ID,
@@ -239,12 +248,17 @@ describe('uploadReceiptForReview', () => {
         }],
         rowCount: 1,
       })
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // active receipt check
-      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // duplicate hash check
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // preflight active receipt check
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // preflight duplicate hash check
+      .mockResolvedValueOnce({}) // preflight COMMIT
+      .mockResolvedValueOnce({}) // persist BEGIN
+      .mockResolvedValueOnce(reviewRow()) // persist review lock
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // persist active receipt check
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // persist duplicate hash check
       .mockResolvedValueOnce({ rows: [{ id: '55555555-5555-4555-8555-555555555555', status: 'UPLOADED' }], rowCount: 1 })
       .mockResolvedValueOnce({}) // update review
       .mockResolvedValueOnce({}) // idempotency completed
-      .mockResolvedValueOnce({}); // COMMIT
+      .mockResolvedValueOnce({}); // persist COMMIT
 
     const originalQuery = client.query;
     client.query = vi.fn(async (...args) => {
