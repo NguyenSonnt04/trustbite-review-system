@@ -23,6 +23,7 @@ export class ReceiptVerificationModel {
     this.gps_longitude = data.gps_longitude != null ? parseFloat(data.gps_longitude) : null;
     this.gps_accuracy_meters = data.gps_accuracy_meters != null ? parseFloat(data.gps_accuracy_meters) : null;
     this.gps_distance_meters = data.gps_distance_meters != null ? parseFloat(data.gps_distance_meters) : null;
+    this.captured_at = data.captured_at ? new Date(data.captured_at) : null;
     this.fraud_risk_score = data.fraud_risk_score != null ? parseInt(data.fraud_risk_score, 10) : 0;
     this.decision = data.decision ?? null; // 'VERIFIED' | 'REJECTED' | 'REFERENCE_ONLY'
     this.redacted_file_url = data.redacted_file_url ?? null; // S3 path ẩn thông tin PII
@@ -53,6 +54,7 @@ export class ReceiptVerificationModel {
       gps_longitude: this.gps_longitude,
       gps_accuracy_meters: this.gps_accuracy_meters,
       gps_distance_meters: this.gps_distance_meters,
+      captured_at: this.captured_at,
       fraud_risk_score: this.fraud_risk_score,
       decision: this.decision,
       redacted_file_url: this.redacted_file_url,

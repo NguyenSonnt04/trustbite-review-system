@@ -101,15 +101,16 @@ describe('uploadReceiptForReview', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
-  it('uploads a receipt, records it, and returns a 202 response body', async () => {
+  it('uploads a receipt, records capturedAt, and returns a 202 response body', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     mockReceiptHappyPath(client);
 
+    const capturedAt = '2026-06-07T12:30:00.000Z';
     const result = await uploadReceiptForReview({
       userId: USER_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
-      fields: validFields(),
+      fields: validFields({ capturedAt }),
       file: validFile(),
     });
 
@@ -118,6 +119,19 @@ describe('uploadReceiptForReview', () => {
       body: JPEG_BUFFER,
       contentType: 'image/jpeg',
     }));
+    expect(client.query.mock.calls[6][0]).toContain('captured_at');
+    expect(client.query.mock.calls[6][1]).toEqual([
+      REVIEW_ID,
+      USER_ID,
+      RESTAURANT_ID,
+      null,
+      's3://trustbite-invoices/receipts/user/review/object.jpg',
+      expect.any(String),
+      null,
+      null,
+      null,
+      capturedAt,
+    ]);
     expect(result).toEqual({
       statusCode: 202,
       body: {
@@ -127,6 +141,57 @@ describe('uploadReceiptForReview', () => {
       },
     });
     expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('creates a fraud flag and rejects when the receipt hash already exists', async () => {
+    const client = createClient();
+    const fraudClient = createClient();
+    pool.connect
+      .mockResolvedValueOnce(client)
+      .mockResolvedValueOnce(fraudClient);
+
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // idempotency lookup
+      .mockResolvedValueOnce({}) // create idempotency
+      .mockResolvedValueOnce({
+        rows: [{
+          id: REVIEW_ID,
+          user_id: USER_ID,
+          restaurant_id: RESTAURANT_ID,
+          branch_id: null,
+          status: 'SUBMITTED',
+          verification_status: 'UNVERIFIED',
+          restaurant_status: 'ACTIVE',
+          restaurant_is_deleted: false,
+        }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // active receipt check
+      .mockResolvedValueOnce({ rows: [{ id: '66666666-6666-4666-8666-666666666666' }], rowCount: 1 })
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    fraudClient.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ id: '77777777-7777-4777-8777-777777777777' }], rowCount: 1 })
+      .mockResolvedValueOnce({}) // fraud flag entities
+      .mockResolvedValueOnce({}); // COMMIT
+
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
+
+    expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(fraudClient.query.mock.calls[1][0]).toContain('INSERT INTO fraud_flags');
+    expect(fraudClient.query.mock.calls[2][1]).toEqual([
+      '77777777-7777-4777-8777-777777777777',
+      '66666666-6666-4666-8666-666666666666',
+      USER_ID,
+    ]);
+    expect(fraudClient.release).toHaveBeenCalled();
   });
 
   it('replays a completed idempotent response for the same payload', async () => {

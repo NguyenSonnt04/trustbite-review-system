@@ -86,6 +86,17 @@ describe('createReviewForVerificationIntent', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
+  it('rejects future visitedAt values before opening a transaction', async () => {
+    const futureVisitedAt = new Date(Date.now() + 60_000).toISOString();
+
+    await expect(createReviewForVerificationIntent({
+      userId: USER_ID,
+      payload: validPayload({ visitedAt: futureVisitedAt }),
+    })).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
   it('rejects inactive restaurants and rolls back', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
