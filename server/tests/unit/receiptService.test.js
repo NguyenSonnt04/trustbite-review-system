@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const TEST_RECEIPT_FILE_URL = vi.hoisted(() => 'mock-receipt-file-url');
+
 vi.mock('../../src/config/db.js', () => ({
   pool: {
     connect: vi.fn(),
@@ -8,7 +10,7 @@ vi.mock('../../src/config/db.js', () => ({
 
 vi.mock('../../src/services/s3ReceiptStorageService.js', () => ({
   buildReceiptObjectKey: vi.fn(() => 'receipts/user/review/object.jpg'),
-  uploadReceiptObject: vi.fn(() => Promise.resolve('s3://trustbite-invoices/receipts/user/review/object.jpg')),
+  uploadReceiptObject: vi.fn(() => Promise.resolve(TEST_RECEIPT_FILE_URL)),
   deleteReceiptObject: vi.fn(() => Promise.resolve()),
 }));
 
@@ -110,12 +112,34 @@ describe('uploadReceiptForReview', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
+  it('rejects future capturedAt before opening a transaction', async () => {
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields({ capturedAt: new Date(Date.now() + 60_000).toISOString() }),
+      file: validFile(),
+    })).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
+  it('rejects capturedAt older than 48 hours before opening a transaction', async () => {
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields({ capturedAt: new Date(Date.now() - (49 * 60 * 60 * 1000)).toISOString() }),
+      file: validFile(),
+    })).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
   it('uploads a receipt, records capturedAt, and returns a 202 response body', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     mockReceiptHappyPath(client);
 
-    const capturedAt = '2026-06-07T12:30:00.000Z';
+    const capturedAt = new Date(Date.now() - 60_000).toISOString();
     const result = await uploadReceiptForReview({
       userId: USER_ID,
       idempotencyKey: IDEMPOTENCY_KEY,
@@ -143,7 +167,7 @@ describe('uploadReceiptForReview', () => {
       USER_ID,
       RESTAURANT_ID,
       null,
-      's3://trustbite-invoices/receipts/user/review/object.jpg',
+      TEST_RECEIPT_FILE_URL,
       expect.any(String),
       null,
       null,

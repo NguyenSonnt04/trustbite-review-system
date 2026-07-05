@@ -13,6 +13,7 @@ const MAX_RECEIPT_BYTES = 10 * 1024 * 1024;
 const RECEIPT_ENDPOINT = 'POST /api/v1/receipts';
 const RECEIPT_IDEMPOTENCY_TTL_HOURS = 24;
 const RECEIPT_LOCK_MINUTES = 5;
+const RECEIPT_CAPTURE_MAX_AGE_HOURS = 48;
 // Keep this aligned with server/migrations/001_init_schema.sql.
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
 const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
@@ -46,10 +47,23 @@ function parseCapturedAt(value, details) {
     return null;
   }
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const capturedTime = date.getTime();
+  if (Number.isNaN(capturedTime)) {
     details.push(validationDetail('capturedAt', 'INVALID_DATETIME', 'capturedAt must be a valid ISO-8601 datetime.'));
     return null;
   }
+
+  const now = Date.now();
+  const maxAgeMs = RECEIPT_CAPTURE_MAX_AGE_HOURS * 60 * 60 * 1000;
+  if (capturedTime > now) {
+    details.push(validationDetail('capturedAt', 'FUTURE_DATETIME', 'capturedAt must not be in the future.'));
+    return null;
+  }
+  if (now - capturedTime > maxAgeMs) {
+    details.push(validationDetail('capturedAt', 'TOO_OLD', `capturedAt must be within ${RECEIPT_CAPTURE_MAX_AGE_HOURS} hours.`));
+    return null;
+  }
+
   return date.toISOString();
 }
 
