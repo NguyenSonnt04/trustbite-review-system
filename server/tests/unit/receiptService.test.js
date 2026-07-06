@@ -314,6 +314,31 @@ describe('uploadReceiptForReview', () => {
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
+  it('returns request in progress when a concurrent request creates the idempotency key first', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // idempotency lookup
+      .mockRejectedValueOnce({
+        code: '23505',
+        constraint: 'idempotency_keys_user_id_endpoint_idempotency_key_key',
+      }) // create idempotency race
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    })).rejects.toMatchObject({ statusCode: 409, code: 'REQUEST_IN_PROGRESS' });
+
+    expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(pool.connect).toHaveBeenCalledTimes(1);
+  });
+
   it('refreshes lock and expiry when retrying a failed idempotency key', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);

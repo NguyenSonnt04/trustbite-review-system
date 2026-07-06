@@ -16,6 +16,7 @@ const RECEIPT_LOCK_MINUTES = 5;
 const RECEIPT_CAPTURE_MAX_AGE_HOURS = 48;
 // Keep this aligned with server/migrations/001_init_schema.sql.
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
+const IDEMPOTENCY_UNIQUE_CONSTRAINT = 'idempotency_keys_user_id_endpoint_idempotency_key_key';
 const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
@@ -389,6 +390,10 @@ function isDuplicateReceiptError(err) {
   return err.code === '23505' && err.constraint === DUPLICATE_RECEIPT_HASH_INDEX;
 }
 
+function isDuplicateIdempotencyError(err) {
+  return err.code === '23505' && err.constraint === IDEMPOTENCY_UNIQUE_CONSTRAINT;
+}
+
 async function persistDuplicateReceiptFraudFlag({ existingReceiptId, attemptedUserId }) {
   if (!existingReceiptId) return;
 
@@ -479,7 +484,14 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       return replay;
     }
     if (!existing) {
-      await createIdempotency(preflightClient, userId, idempotencyKey, requestHash);
+      try {
+        await createIdempotency(preflightClient, userId, idempotencyKey, requestHash);
+      } catch (err) {
+        if (isDuplicateIdempotencyError(err)) {
+          throw createHttpError(409, 'REQUEST_IN_PROGRESS', 'A request with this Idempotency-Key is still processing.');
+        }
+        throw err;
+      }
       ownsIdempotencyAttempt = true;
     } else if (replay?.retryable) {
       await refreshIdempotencyAttempt(preflightClient, userId, idempotencyKey, requestHash);
