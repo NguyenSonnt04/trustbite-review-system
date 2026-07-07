@@ -8,6 +8,7 @@ const DEFAULT_BATCH_SIZE = 10;
 const MAX_BATCH_SIZE = 100;
 const MAX_CLEANUP_ATTEMPTS = 5;
 const COMPLETION_RETAINED_DATA_REASON = 'security audit minimum; fraud minimum; retained Cognito subject deny mapping and audit/fraud references';
+const EXHAUSTED_RETRY_RETAINED_DATA_REASON = 'account deletion cleanup attempts exhausted; operator review required';
 
 const clampBatchSize = (value) => {
   const parsed = Number.parseInt(value, 10);
@@ -42,11 +43,12 @@ const selectDueRequest = async (client, excludedRequestIds = []) => {
         u.avatar_url
      FROM account_deletion_requests adr
       JOIN users u ON u.id = adr.user_id
-      WHERE adr.status IN ('REQUESTED', 'PROCESSING')
-        AND (adr.scheduled_deletion_at IS NULL OR adr.scheduled_deletion_at <= now())
-        AND (adr.legal_hold = false OR adr.cleanup_state <> 'LEGAL_HOLD')
-        AND adr.cleanup_attempts < $2
-        AND adr.id <> ALL($1::uuid[])
+        WHERE adr.status IN ('REQUESTED', 'PROCESSING')
+          AND (adr.scheduled_deletion_at IS NULL OR adr.scheduled_deletion_at <= now())
+          AND (adr.legal_hold = false OR adr.cleanup_state <> 'LEGAL_HOLD')
+          AND adr.cleanup_state <> 'FAILED'
+          AND (adr.legal_hold = true OR adr.cleanup_attempts < $2)
+          AND adr.id <> ALL($1::uuid[])
       ORDER BY adr.requested_at ASC
       LIMIT 1
      FOR UPDATE OF adr, u SKIP LOCKED`,
@@ -158,6 +160,60 @@ const markCleanupRetryable = async (client, request, errorCode = 'EXTERNAL_CLEAN
   );
 };
 
+const markExhaustedCleanupRequests = async (client, limit) => {
+  const result = await client.query(
+    `WITH exhausted AS (
+       SELECT id, user_id, cleanup_state, cleanup_last_error_code, cleanup_attempts
+       FROM account_deletion_requests
+       WHERE status = 'PROCESSING'
+         AND cleanup_state = 'RETRYABLE'
+         AND legal_hold = false
+         AND cleanup_attempts >= $1
+         AND (scheduled_deletion_at IS NULL OR scheduled_deletion_at <= now())
+       ORDER BY scheduled_deletion_at ASC NULLS FIRST, requested_at ASC, id ASC
+       LIMIT $3
+       FOR UPDATE SKIP LOCKED
+     ),
+     updated AS (
+       UPDATE account_deletion_requests adr
+       SET cleanup_state = 'FAILED',
+           cleanup_last_error_code = 'CLEANUP_ATTEMPTS_EXHAUSTED',
+           cleanup_last_error_at = now(),
+           cleanup_lease_token = NULL,
+           cleanup_lease_expires_at = NULL,
+           retained_data_reason = COALESCE(retained_data_reason, $2),
+           updated_at = now()
+       FROM exhausted
+       WHERE adr.id = exhausted.id
+       RETURNING
+         adr.id,
+         adr.user_id,
+         exhausted.cleanup_state AS previous_cleanup_state,
+         exhausted.cleanup_last_error_code AS previous_error_code,
+         exhausted.cleanup_attempts
+     )
+     INSERT INTO audit_logs (actor_id, actor_role, action, entity_type, entity_id, previous_status, new_status, metadata)
+     SELECT
+       user_id,
+       'SYSTEM',
+       'ACCOUNT_DELETION_CLEANUP_EXHAUSTED',
+       'ACCOUNT_DELETION_REQUEST',
+       id,
+       previous_cleanup_state,
+       'FAILED',
+       jsonb_build_object(
+         'cleanupAttempts', cleanup_attempts,
+         'lastErrorCode', previous_error_code,
+         'actionRequired', 'operator_review'
+       )
+     FROM updated
+     RETURNING entity_id`,
+    [MAX_CLEANUP_ATTEMPTS, EXHAUSTED_RETRY_RETAINED_DATA_REASON, limit],
+  );
+
+  return result.rowCount;
+};
+
 const listObjectCleanupTargets = async (client, userId) => {
   const result = await client.query(
     `SELECT avatar_url AS url
@@ -191,11 +247,16 @@ const cleanupExternalResources = async (request, { identityProvider, objectStora
   const providerResult = request.cognito_sub
     ? await identityProvider.deleteUser({ username: request.cognito_sub })
     : { skipped: true, reason: 'no_mapped_cognito_identity' };
-  const objectResults = [];
+  const settledObjectResults = await Promise.allSettled(
+    request.objectUrls.map((url) => objectStorage.deleteOwnedObject(url)),
+  );
+  const rejectedObjectResult = settledObjectResults.find((result) => result.status === 'rejected');
 
-  for (const url of request.objectUrls) {
-    objectResults.push(await objectStorage.deleteOwnedObject(url));
+  if (rejectedObjectResult) {
+    throw rejectedObjectResult.reason ?? new Error('Object cleanup failed');
   }
+
+  const objectResults = settledObjectResults.map((result) => result.value);
 
   return { providerResult, objectResults };
 };
@@ -676,8 +737,23 @@ export async function processDueAccountDeletions({
   const limit = clampBatchSize(batchSize);
   const results = [];
   const skippedRequestIds = [];
+  const exhausted = await pool.connect();
+  let exhaustedCount = 0;
 
-  for (let index = 0; index < limit; index += 1) {
+  try {
+    await exhausted.query('BEGIN');
+    exhaustedCount = await markExhaustedCleanupRequests(exhausted, limit);
+    await exhausted.query('COMMIT');
+  } catch (err) {
+    await exhausted.query('ROLLBACK');
+    throw err;
+  } finally {
+    exhausted.release();
+  }
+
+  const remainingBatchSize = Math.max(0, limit - exhaustedCount);
+
+  for (let index = 0; index < remainingBatchSize; index += 1) {
     const result = await processOneDueAccountDeletion({
       identityProvider,
       objectStorage,
@@ -697,6 +773,7 @@ export async function processDueAccountDeletions({
     completed: results.filter((result) => result.status === 'COMPLETED').length,
     skipped: results.filter((result) => result.status === 'SKIPPED').length,
     failed: results.filter((result) => result.status === 'FAILED').length,
+    exhausted: exhaustedCount,
     results,
   };
 }

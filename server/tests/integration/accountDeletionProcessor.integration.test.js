@@ -1335,7 +1335,7 @@ describe('account deletion processor', () => {
       }
     });
 
-    it('skips maxed retryable requests so later due cleanup can run', async () => {
+      it('marks maxed retryable requests exhausted so later due cleanup can run', async () => {
       const maxedUser = await createUser({ displayName: 'Maxed Retry Target' });
       const dueUser = await createUser({ displayName: 'After Maxed Retry Target' });
       await query(
@@ -1390,46 +1390,410 @@ describe('account deletion processor', () => {
       };
 
       try {
-        const result = await processDueAccountDeletions({
-          batchSize: 1,
-          identityProvider,
-          objectStorage,
-        });
+            const result = await processDueAccountDeletions({
+              batchSize: 2,
+              identityProvider,
+              objectStorage,
+            });
 
-        expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0, skipped: 0 });
+            expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0, skipped: 0, exhausted: 1 });
         expect(identityProvider.deleteUser).toHaveBeenCalledWith({
           username: `after-maxed-retry-sub-${dueUser.id}`,
         });
 
-        const rows = await query(
-          `SELECT adr.status, adr.cleanup_state, adr.cleanup_attempts, u.status AS user_status
-           FROM account_deletion_requests adr
-           JOIN users u ON u.id = adr.user_id
-           WHERE u.id IN ($1, $2)
-           ORDER BY adr.requested_at ASC`,
+          const rows = await query(
+            `SELECT adr.status,
+                    adr.cleanup_state,
+                    adr.cleanup_attempts,
+                    adr.cleanup_last_error_code,
+                    adr.retained_data_reason,
+                    u.status AS user_status
+             FROM account_deletion_requests adr
+             JOIN users u ON u.id = adr.user_id
+             WHERE u.id IN ($1, $2)
+             ORDER BY adr.requested_at ASC`,
           [maxedUser.id, dueUser.id],
         );
 
         expect(rows.rows).toEqual([
-          expect.objectContaining({
-            status: 'PROCESSING',
-            cleanup_state: 'RETRYABLE',
-            cleanup_attempts: 5,
-            user_status: 'DELETED',
-          }),
+            expect.objectContaining({
+              status: 'PROCESSING',
+              cleanup_state: 'FAILED',
+              cleanup_attempts: 5,
+              cleanup_last_error_code: 'CLEANUP_ATTEMPTS_EXHAUSTED',
+              retained_data_reason: 'account deletion cleanup attempts exhausted; operator review required',
+              user_status: 'DELETED',
+            }),
           expect.objectContaining({
             status: 'COMPLETED',
             cleanup_state: 'COMPLETED',
             user_status: 'DELETED',
-          }),
-        ]);
-      } finally {
-        await cleanupUser(maxedUser.id);
-        await cleanupUser(dueUser.id);
-      }
-    });
+            }),
+          ]);
 
-    it('removes relationship and system rows that would keep deleted-account state active', async () => {
+          const audit = await query(
+            `SELECT previous_status, new_status, metadata
+             FROM audit_logs
+             WHERE entity_id = (
+               SELECT id FROM account_deletion_requests WHERE user_id = $1
+             )
+             AND action = 'ACCOUNT_DELETION_CLEANUP_EXHAUSTED'`,
+            [maxedUser.id],
+          );
+          expect(audit.rows[0]).toMatchObject({
+            previous_status: 'RETRYABLE',
+            new_status: 'FAILED',
+            metadata: {
+              cleanupAttempts: 5,
+              lastErrorCode: 'EXTERNAL_CLEANUP_FAILED',
+              actionRequired: 'operator_review',
+            },
+          });
+        } finally {
+          await cleanupUser(maxedUser.id);
+          await cleanupUser(dueUser.id);
+          }
+        });
+
+        it('counts exhausted retry markers against the configured batch size', async () => {
+          const exhaustedUsers = await Promise.all([
+            createUser({ displayName: 'Batch Exhausted Target 1' }),
+            createUser({ displayName: 'Batch Exhausted Target 2' }),
+            createUser({ displayName: 'Batch Exhausted Target 3' }),
+          ]);
+          const dueUser = await createUser({ displayName: 'Batch Due After Exhausted Targets' });
+
+          try {
+            await Promise.all(
+              exhaustedUsers.map((user) => query(
+                `UPDATE users
+                 SET status = 'DELETED',
+                     cognito_sub = $2
+                 WHERE id = $1`,
+                [user.id, `batch-exhausted-sub-${user.id}`],
+              )),
+            );
+            await query(
+              `UPDATE users
+               SET cognito_sub = $2
+               WHERE id = $1`,
+              [dueUser.id, `batch-due-sub-${dueUser.id}`],
+            );
+
+            for (let index = 0; index < exhaustedUsers.length; index += 1) {
+              await query(
+                `INSERT INTO account_deletion_requests (
+                   user_id,
+                   status,
+                   cleanup_state,
+                   cleanup_attempts,
+                   cleanup_last_error_code,
+                   reason,
+                   requested_at,
+                   scheduled_deletion_at
+                 )
+                 VALUES (
+                   $1,
+                   'PROCESSING',
+                   'RETRYABLE',
+                   5,
+                   'EXTERNAL_CLEANUP_FAILED',
+                   $2,
+                   now() - ($3::int * interval '1 minute'),
+                   now() - ($3::int * interval '1 minute')
+                 )`,
+                [exhaustedUsers[index].id, `Sensitive exhausted batch reason ${index + 1}`, 10 - index],
+              );
+            }
+            await query(
+              `INSERT INTO account_deletion_requests (
+                 user_id,
+                 reason,
+                 requested_at,
+                 scheduled_deletion_at
+               )
+               VALUES ($1, $2, now() - interval '1 minute', now() - interval '1 minute')`,
+              [dueUser.id, 'Sensitive due after exhausted batch reason'],
+            );
+
+            const identityProvider = {
+              deleteUser: vi.fn().mockResolvedValue({ deleted: true, signedOut: true }),
+            };
+            const objectStorage = {
+              deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
+            };
+
+            const result = await processDueAccountDeletions({
+              batchSize: 2,
+              identityProvider,
+              objectStorage,
+            });
+
+            expect(result).toMatchObject({ processed: 0, completed: 0, failed: 0, skipped: 0, exhausted: 2 });
+            expect(identityProvider.deleteUser).not.toHaveBeenCalled();
+
+            const rows = await query(
+              `SELECT user_id, status, cleanup_state, cleanup_last_error_code
+               FROM account_deletion_requests
+               WHERE user_id IN ($1, $2, $3, $4)
+               ORDER BY requested_at ASC`,
+              [exhaustedUsers[0].id, exhaustedUsers[1].id, exhaustedUsers[2].id, dueUser.id],
+            );
+
+            expect(rows.rows).toEqual([
+              expect.objectContaining({
+                user_id: exhaustedUsers[0].id,
+                status: 'PROCESSING',
+                cleanup_state: 'FAILED',
+                cleanup_last_error_code: 'CLEANUP_ATTEMPTS_EXHAUSTED',
+              }),
+              expect.objectContaining({
+                user_id: exhaustedUsers[1].id,
+                status: 'PROCESSING',
+                cleanup_state: 'FAILED',
+                cleanup_last_error_code: 'CLEANUP_ATTEMPTS_EXHAUSTED',
+              }),
+              expect.objectContaining({
+                user_id: exhaustedUsers[2].id,
+                status: 'PROCESSING',
+                cleanup_state: 'RETRYABLE',
+                cleanup_last_error_code: 'EXTERNAL_CLEANUP_FAILED',
+              }),
+              expect.objectContaining({
+                user_id: dueUser.id,
+                status: 'REQUESTED',
+                cleanup_state: 'PENDING',
+                cleanup_last_error_code: null,
+              }),
+            ]);
+
+            const audit = await query(
+              `SELECT COUNT(*)::int AS count
+               FROM audit_logs
+               WHERE action = 'ACCOUNT_DELETION_CLEANUP_EXHAUSTED'
+                 AND entity_id IN (
+                   SELECT id FROM account_deletion_requests WHERE user_id IN ($1, $2, $3)
+                 )`,
+              [exhaustedUsers[0].id, exhaustedUsers[1].id, exhaustedUsers[2].id],
+            );
+            expect(audit.rows[0].count).toBe(2);
+          } finally {
+            await Promise.all(exhaustedUsers.map((user) => cleanupUser(user.id)));
+            await cleanupUser(dueUser.id);
+          }
+        });
+
+        it('preserves legal-hold handling for maxed retryable requests', async () => {
+        const user = await createUser({ displayName: 'Maxed Legal Hold Target' });
+        await query(
+          `UPDATE users
+           SET status = 'DELETED',
+               cognito_sub = $2
+           WHERE id = $1`,
+          [user.id, `maxed-legal-hold-sub-${user.id}`],
+        );
+        await query(
+          `INSERT INTO account_deletion_requests (
+             user_id,
+             status,
+             cleanup_state,
+             cleanup_attempts,
+             cleanup_last_error_code,
+             legal_hold,
+             legal_hold_reason,
+             reason,
+             requested_at,
+             scheduled_deletion_at
+           )
+           VALUES (
+             $1,
+             'PROCESSING',
+             'RETRYABLE',
+             5,
+             'EXTERNAL_CLEANUP_FAILED',
+             true,
+             'LEGAL_HOLD_CASE:retry-cap',
+             $2,
+             now() - interval '3 minutes',
+             now() - interval '2 minutes'
+           )`,
+          [user.id, 'Sensitive maxed legal hold reason'],
+        );
+        const identityProvider = {
+          deleteUser: vi.fn().mockResolvedValue({ deleted: true, signedOut: true }),
+        };
+        const objectStorage = {
+          deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
+        };
+
+        try {
+          const result = await processDueAccountDeletions({
+            batchSize: 1,
+            identityProvider,
+            objectStorage,
+          });
+
+          expect(result).toMatchObject({ processed: 1, completed: 0, failed: 0, skipped: 1 });
+          expect(result.results[0]).toMatchObject({
+            status: 'SKIPPED',
+            reason: 'legal_hold',
+          });
+          expect(identityProvider.deleteUser).not.toHaveBeenCalled();
+          expect(objectStorage.deleteOwnedObject).not.toHaveBeenCalled();
+
+          const persisted = await query(
+            `SELECT status,
+                    cleanup_state,
+                    cleanup_attempts,
+                    cleanup_last_error_code,
+                    retained_data_reason
+             FROM account_deletion_requests
+             WHERE user_id = $1`,
+            [user.id],
+          );
+
+          expect(persisted.rows[0]).toMatchObject({
+            status: 'PROCESSING',
+            cleanup_state: 'LEGAL_HOLD',
+            cleanup_attempts: 5,
+            cleanup_last_error_code: null,
+            retained_data_reason: 'LEGAL_HOLD_CASE:retry-cap',
+          });
+        } finally {
+          await cleanupUser(user.id);
+        }
+      });
+
+      it('deletes owned S3 objects concurrently during external cleanup', async () => {
+        const user = await createUser({ displayName: 'Concurrent Object Cleanup Target' });
+        const restaurant = await createRestaurant({
+          slug: `parallel-cleanup-${user.id}`,
+          name: `Parallel Cleanup ${user.id}`,
+        });
+        const review = await createReview({ userId: user.id, restaurantId: restaurant.id });
+        await query(
+          `UPDATE users
+           SET cognito_sub = $2,
+               avatar_url = $3
+           WHERE id = $1`,
+          [user.id, `parallel-cleanup-sub-${user.id}`, 's3://trustbite-invoices/avatars/parallel-avatar.png'],
+        );
+        await query(
+          `INSERT INTO receipt_verifications (
+             review_id, user_id, restaurant_id, file_url, file_hash_sha256, redacted_file_url
+           )
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            review.id,
+            user.id,
+            restaurant.id,
+            's3://trustbite-invoices/receipts/parallel-raw.png',
+            crypto.randomBytes(32).toString('hex'),
+            's3://trustbite-invoices/receipts/parallel-redacted.png',
+          ],
+        );
+        await query(
+          `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
+           VALUES ($1, $2, now() - interval '1 minute')`,
+          [user.id, 'Sensitive parallel cleanup reason'],
+        );
+        let inFlightDeletes = 0;
+        let maxInFlightDeletes = 0;
+        const objectStorage = {
+          deleteOwnedObject: vi.fn(async () => {
+            inFlightDeletes += 1;
+            maxInFlightDeletes = Math.max(maxInFlightDeletes, inFlightDeletes);
+            await new Promise((resolve) => { setTimeout(resolve, 20); });
+            inFlightDeletes -= 1;
+            return { deleted: true };
+          }),
+        };
+
+        try {
+          const result = await processDueAccountDeletions({
+            batchSize: 1,
+            identityProvider: {
+              deleteUser: vi.fn().mockResolvedValue({ deleted: true, signedOut: true }),
+            },
+            objectStorage,
+          });
+
+          expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0, skipped: 0 });
+          expect(objectStorage.deleteOwnedObject).toHaveBeenCalledTimes(3);
+          expect(maxInFlightDeletes).toBeGreaterThan(1);
+        } finally {
+          await cleanupUser(user.id);
+        }
+      });
+
+      it('waits for all started owned-object deletes before failing cleanup', async () => {
+        const user = await createUser({ displayName: 'Object Cleanup Failure Target' });
+        const restaurant = await createRestaurant({
+          slug: `object-failure-${user.id}`,
+          name: `Object Failure ${user.id}`,
+        });
+        const review = await createReview({ userId: user.id, restaurantId: restaurant.id });
+        await query(
+          `UPDATE users
+           SET cognito_sub = $2,
+               avatar_url = $3
+           WHERE id = $1`,
+          [user.id, `object-failure-sub-${user.id}`, 's3://trustbite-invoices/avatars/failure-avatar.png'],
+        );
+        await query(
+          `INSERT INTO receipt_verifications (
+             review_id, user_id, restaurant_id, file_url, file_hash_sha256, redacted_file_url
+           )
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            review.id,
+            user.id,
+            restaurant.id,
+            's3://trustbite-invoices/receipts/failure-raw.png',
+            crypto.randomBytes(32).toString('hex'),
+            's3://trustbite-invoices/receipts/failure-redacted.png',
+          ],
+        );
+        await query(
+          `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
+           VALUES ($1, $2, now() - interval '1 minute')`,
+          [user.id, 'Sensitive object failure cleanup reason'],
+        );
+        let settledDeletes = 0;
+        const objectStorage = {
+          deleteOwnedObject: vi.fn(async (url) => {
+            if (url.includes('failure-raw.png')) {
+              settledDeletes += 1;
+              throw Object.assign(new Error('object delete failed'), { name: 'S3DeleteFailed' });
+            }
+            await new Promise((resolve) => { setTimeout(resolve, 20); });
+            settledDeletes += 1;
+            return { deleted: true };
+          }),
+        };
+
+        try {
+          const result = await processDueAccountDeletions({
+            batchSize: 1,
+            identityProvider: {
+              deleteUser: vi.fn().mockResolvedValue({ deleted: true, signedOut: true }),
+            },
+            objectStorage,
+          });
+
+          expect(result).toMatchObject({ processed: 1, completed: 0, failed: 1, skipped: 0 });
+          expect(result.results[0]).toMatchObject({
+            reason: 'external_cleanup_failed',
+            errorName: 'S3DeleteFailed',
+          });
+          expect(objectStorage.deleteOwnedObject).toHaveBeenCalledTimes(3);
+          expect(settledDeletes).toBe(3);
+        } finally {
+          await cleanupUser(user.id);
+        }
+      });
+
+      it('removes relationship and system rows that would keep deleted-account state active', async () => {
       const user = await createUser({ displayName: 'Relationship Retention Target' });
     const otherUser = await createUser({ displayName: 'Relationship Retention Other' });
     const restaurant = await createRestaurant();

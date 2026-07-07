@@ -4,5 +4,6 @@ export function summarizeDeletionJobResult(result) {
     completed: result.completed,
     skipped: result.skipped,
     failed: result.failed,
+    exhausted: result.exhausted ?? 0,
   };
 }
