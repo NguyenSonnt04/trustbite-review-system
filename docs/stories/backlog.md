@@ -8,7 +8,7 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | --- | --- | --- |
 | E01 Harness Operations | Keep repository harness, product docs, story packets, validation matrix, and traces usable for team + agents | active |
 | E02 Local Development Baseline | Make install, Docker infrastructure, client, and server smoke validation reliable | unsliced |
-| E03 Restaurant Discovery UI/API | Search/list/detail restaurants with server-backed API and clear trust/price signals | unsliced |
+| E03 Restaurant Discovery UI/API | Search/list/detail restaurants with server-backed API and clear trust/price signals | active |
 | E04 Authentication & Identity | Cognito-backed login/session flow and protected actions | unsliced |
 | E05 Review Submission | Create, store, display, and moderate food reviews | unsliced |
 | E06 Anti-Fraud Verification | Receipt hash/OCR/timestamp/merchant/GPS verification pipeline | unsliced |
@@ -21,6 +21,9 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | Story | Title | Lane | Status | File |
 | --- | --- | --- | --- | --- |
 | TB-HARNESS-001 | Install and adopt repository harness | normal | implemented | `docs/stories/TB-HARNESS-001-install-repository-harness.md` |
+| TB-REST-001 | Restaurant CRUD API closeout | high-risk | in_progress | `docs/stories/epics/E03-restaurant-search/TB-REST-001-crud-restaurant/overview.md` |
+| TB-REST-002 | Restaurant search, filters, and nearby lookup | high-risk | planned | `docs/stories/epics/E03-restaurant-search/TB-REST-002-search-filter-nearby/overview.md` |
+| REST-US-003 | Restaurant detail and verified reviews | high-risk | in_progress | `docs/stories/epics/E03-restaurant-search/REST-US-003-restaurant-detail-verified-reviews/overview.md` |
 | TB-AUTH-CLIENT-001 | Cognito signup/login/forgot-password integration | high-risk | in_progress | `docs/stories/epics/E04-auth-identity/TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery/overview.md` |
 | TB-USER-PROFILE-001 | Register and update user profile | high-risk | implemented | `docs/stories/epics/E04-auth-identity/TB-USER-PROFILE-001-register-update-profile/overview.md` |
 

@@ -14,7 +14,7 @@ Create focused product docs as stories are selected:
 
 | Product area | Suggested doc | Notes |
 | --- | --- | --- |
-| Restaurant discovery | `docs/product/restaurant-discovery.md` | Search, filters, details, menu/price signals |
+| Restaurant discovery | `docs/product/restaurant-discovery.md` | Phase 3 backend contract for search, filters, nearby lookup, detail, and verified/reference reviews |
 | Reviews | `docs/product/reviews.md` | Review creation, states, ownership, editing/deletion |
 | Verification / anti-fraud | `docs/product/verification.md` | Receipt hash, OCR, merchant match, timestamp, GPS, evidence |
 | Trust score | `docs/product/trust-score.md` | Score inputs, aggregation, visibility, recalculation |

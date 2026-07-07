@@ -5,6 +5,7 @@
  *
  * Endpoints (mounted under /api/v1/restaurants):
  *   GET    /              → listRestaurantsHandler
+ *   GET    /nearby        → listNearbyRestaurantsHandler
  *   POST   /              → createRestaurantHandler
  *   GET    /:restaurantId → getRestaurantHandler
  *   PATCH  /:restaurantId → updateRestaurantHandler
@@ -27,6 +28,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const PUBLIC_ALLOWED_STATUSES = ['ACTIVE'];
 
 const VALID_STATUSES = ['DRAFT', 'ACTIVE', 'SUSPENDED', 'CLOSED'];
+const LIST_SORTS = ['name', 'trustScoreDesc', 'distanceAsc'];
 
 function isValidUUID(value) {
   return typeof value === 'string' && UUID_RE.test(value);
@@ -50,6 +52,40 @@ function parsePositiveInt(raw) {
   if (raw === undefined) return { value: undefined };
   if (typeof raw !== 'string' || !/^[1-9]\d*$/.test(raw)) return { error: true };
   return { value: Number(raw) };
+}
+
+function parseBoundedNumber(raw, fieldName, min, max) {
+  if (raw === undefined) return { value: undefined };
+  if (
+    typeof raw !== 'string'
+    || !/^-?(?:\d+|\d*\.\d+)$/.test(raw)
+  ) {
+    return { error: `${fieldName} must be a valid ${fieldName === 'lat' ? 'latitude' : 'longitude'}.` };
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < min || value > max) {
+    return { error: `${fieldName} must be a valid ${fieldName === 'lat' ? 'latitude' : 'longitude'}.` };
+  }
+
+  return { value };
+}
+
+function parseTrustScore(raw) {
+  if (raw === undefined) return { value: undefined };
+  if (
+    typeof raw !== 'string'
+    || !/^(?:\d+|\d*\.\d+)$/.test(raw)
+  ) {
+    return { error: 'minTrustScore must be a decimal from 0 to 5.' };
+  }
+
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0 || value > 5) {
+    return { error: 'minTrustScore must be a decimal from 0 to 5.' };
+  }
+
+  return { value };
 }
 
 /**
@@ -83,7 +119,17 @@ function hasKey(body, key) {
  */
 export const listRestaurantsHandler = async (req, res, next) => {
   try {
-    const { keyword, status, page, pageSize } = req.query;
+    const {
+      keyword,
+      status,
+      page,
+      pageSize,
+      lat,
+      lng,
+      radiusMeters,
+      minTrustScore,
+      sort,
+    } = req.query;
     const requestId = buildRequestId(req);
 
     // Validate keyword is a single string if provided
@@ -109,12 +155,121 @@ export const listRestaurantsHandler = async (req, res, next) => {
     if (parsedSize.error) {
       return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be a positive integer.', requestId);
     }
+    if (parsedSize.value !== undefined && parsedSize.value > 100) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be at most 100.', requestId);
+    }
+
+    const parsedLat = parseBoundedNumber(lat, 'lat', -90, 90);
+    if (parsedLat.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', parsedLat.error, requestId);
+    }
+    const parsedLng = parseBoundedNumber(lng, 'lng', -180, 180);
+    if (parsedLng.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', parsedLng.error, requestId);
+    }
+    const hasLocation = parsedLat.value !== undefined && parsedLng.value !== undefined;
+    if ((parsedLat.value === undefined) !== (parsedLng.value === undefined)) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'lat and lng must be supplied together.', requestId);
+    }
+
+    const parsedRadius = parsePositiveInt(radiusMeters);
+    if (parsedRadius.error || (parsedRadius.value !== undefined && parsedRadius.value > 50000)) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'radiusMeters must be an integer from 1 to 50000.', requestId);
+    }
+    if (parsedRadius.value !== undefined && !hasLocation) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'radiusMeters requires lat and lng.', requestId);
+    }
+
+    const parsedMinTrustScore = parseTrustScore(minTrustScore);
+    if (parsedMinTrustScore.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', parsedMinTrustScore.error, requestId);
+    }
+
+    const resolvedSort = sort ?? 'name';
+    if (typeof resolvedSort !== 'string' || !LIST_SORTS.includes(resolvedSort)) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'sort must be name, trustScoreDesc, or distanceAsc.', requestId);
+    }
+    if (resolvedSort === 'distanceAsc' && !hasLocation) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'distanceAsc requires lat and lng.', requestId);
+    }
 
     const result = await restaurantService.listRestaurants({
       keyword: keyword?.trim() || undefined,
       status: 'ACTIVE', // always ACTIVE for public endpoint regardless of query param
       page: parsedPage.value ?? 1,
       pageSize: parsedSize.value ?? 20,
+      latitude: parsedLat.value,
+      longitude: parsedLng.value,
+      radiusMeters: parsedRadius.value,
+      minTrustScore: parsedMinTrustScore.value,
+      sort: resolvedSort,
+    });
+
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const listNearbyRestaurantsHandler = async (req, res, next) => {
+  try {
+    const {
+      northEastLat,
+      northEastLng,
+      southWestLat,
+      southWestLng,
+      page,
+      pageSize,
+    } = req.query;
+    const requestId = buildRequestId(req);
+
+    const parsedNorthEastLat = parseBoundedNumber(northEastLat, 'lat', -90, 90);
+    const parsedNorthEastLng = parseBoundedNumber(northEastLng, 'lng', -180, 180);
+    const parsedSouthWestLat = parseBoundedNumber(southWestLat, 'lat', -90, 90);
+    const parsedSouthWestLng = parseBoundedNumber(southWestLng, 'lng', -180, 180);
+    const parsedBounds = [parsedNorthEastLat, parsedNorthEastLng, parsedSouthWestLat, parsedSouthWestLng];
+
+    const parseError = parsedBounds.find((parsed) => parsed.error);
+    if (parseError) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', parseError.error, requestId);
+    }
+
+    if (parsedBounds.some((parsed) => parsed.value === undefined)) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'nearby bounds are required.', requestId);
+    }
+
+    if (
+      parsedNorthEastLat.value <= parsedSouthWestLat.value
+      || parsedNorthEastLng.value <= parsedSouthWestLng.value
+    ) {
+      return errorResponse(
+        res,
+        422,
+        'VALIDATION_ERROR',
+        'nearby bounds must be a non-empty rectangle that does not cross the antimeridian.',
+        requestId,
+      );
+    }
+
+    const parsedPage = parsePositiveInt(page);
+    if (parsedPage.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'page must be a positive integer.', requestId);
+    }
+    const parsedSize = parsePositiveInt(pageSize);
+    if (parsedSize.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be a positive integer.', requestId);
+    }
+    if (parsedSize.value !== undefined && parsedSize.value > 250) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be at most 250.', requestId);
+    }
+
+    const result = await restaurantService.listNearbyRestaurants({
+      northEastLatitude: parsedNorthEastLat.value,
+      northEastLongitude: parsedNorthEastLng.value,
+      southWestLatitude: parsedSouthWestLat.value,
+      southWestLongitude: parsedSouthWestLng.value,
+      page: parsedPage.value ?? 1,
+      pageSize: parsedSize.value ?? 100,
     });
 
     return res.status(200).json(result);
@@ -181,6 +336,9 @@ export const listRestaurantReviewsHandler = async (req, res, next) => {
     const parsedSize = parsePositiveInt(pageSize);
     if (parsedSize.error) {
       return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be a positive integer.', requestId);
+    }
+    if (parsedSize.value !== undefined && parsedSize.value > 100) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be at most 100.', requestId);
     }
 
     // First check if restaurant exists and is public (ACTIVE)
