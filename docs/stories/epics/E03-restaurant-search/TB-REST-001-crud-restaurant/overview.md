@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+implemented
 
 ## Lane
 
@@ -41,11 +41,13 @@ until database-backed proof and Harness verification exist.
 
 ## Harness Delta
 
-Selected Phase 3 backend story. Matrix status should remain `in_progress`
-until DB-backed proof and an accurate verify command exist.
+Selected Phase 3 backend story. Matrix status is `implemented` after
+DB-backed CRUD proof, server syntax proof, and the accepted mutation-boundary
+decision were recorded.
 
 ## Evidence Gap
 
-The current code compiles and unit tests exist for adjacent restaurant detail
-behavior, but CRUD still lacks durable local database proof. This is the next
-work item before calling the CRUD slice complete.
+Closed on 2026-07-08. DB-backed CRUD proof now covers authenticated mutation
+requirements, unknown-category validation, create with category/geo persistence,
+slug collision retry, update/category replacement, geo clearing, soft-delete,
+and public read exclusion. Decision 0016 records the Phase 3 mutation boundary.

@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+implemented
 
 ## Lane
 
@@ -54,10 +54,10 @@ consume the API later.
 
 ## Validation Summary
 
-Minimum closeout proof:
+Closeout proof recorded on 2026-07-08:
 
 - `npm run db:migrate`
-- DB-backed integration tests for search, filters, nearby, and negative
-  validation paths
+- `npm run test:unit --prefix server -- tests/unit/restaurant/restaurantController.test.js`
+- `npm run test:integration --prefix server -- tests/integration/restaurantSearch.integration.test.js`
 - `npm run server:build`
-- Harness story verify command after tests exist
+- `npm run harness -- story verify TB-REST-002`

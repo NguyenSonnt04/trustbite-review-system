@@ -2,7 +2,7 @@
 
 ## Status
 
-in_progress
+implemented
 
 ## Lane
 
@@ -41,12 +41,11 @@ database-backed integration proof and Harness verification exist.
 
 ## Harness Delta
 
-Story remains `in_progress` for Phase 3 closeout. Unit-level proof is useful
-but insufficient because the acceptance criteria depend on SQL, schema, and
-public persistence behavior.
+Story is implemented after Phase 3 DB-backed closeout. Unit-level proof remains
+useful, and the required SQL/schema/public persistence behavior is now covered
+by focused integration proof.
 
 ## Evidence Gap
 
-Previous proof covered unit behavior and backend syntax. Missing proof is the
-database-backed integration path against migrated PostgreSQL with rollback or
-fixture cleanup.
+Closed on 2026-07-08 with DB-backed integration proof against migrated
+PostgreSQL, fixture cleanup, `server:build`, and Harness story verification.

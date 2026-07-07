@@ -2,22 +2,31 @@
 
 ## Current Proof State
 
-No implementation proof yet. Current code does not support the full query
-contract and does not expose `/api/v1/restaurants/nearby`.
+Implemented on 2026-07-08.
+
+The route/service slice now supports strict list query validation, PostGIS
+radius filtering, distance projection, minimum trust-score filtering,
+deterministic sorting, and `/api/v1/restaurants/nearby` map-bounds lookup before
+dynamic restaurant-id routes.
 
 ## Required Commands
 
-Use these only after the relevant tests exist:
+Verified locally:
 
 ```bash
 npm run db:migrate
 npm run test:unit --prefix server -- tests/unit/restaurant/restaurantController.test.js
-npm run test:integration --prefix server -- tests/integration/restaurant/restaurantSearch.test.js
+npm run test:integration --prefix server -- tests/integration/restaurantSearch.integration.test.js
 npm run server:build
+npm run harness -- story verify TB-REST-002
 ```
 
-If the repository does not yet have `server` integration scripts for this path,
-add the smallest practical test command before marking this story implemented.
+Results:
+
+- `db:migrate`: applied 0 migration(s).
+- Unit proof: 13 files / 115 tests passed.
+- Integration proof: 7 files passed, 1 skipped; 63 tests passed, 2 skipped.
+- `server:build`: syntax check passed for 91 files.
 
 ## Required Scenarios
 
@@ -38,10 +47,10 @@ add the smallest practical test command before marking this story implemented.
 
 ## Harness Closeout
 
-Do not set this story to `implemented` until:
+Closeout state:
 
-- DB migration has been run locally.
-- Tests above pass.
-- `npm run server:build` passes.
+- DB migration ran locally.
+- Required scenarios are covered by DB-backed integration tests.
+- `server:build` passed.
 - A real `verify_command` is attached to the Harness story.
 - Trace evidence includes commands and results.

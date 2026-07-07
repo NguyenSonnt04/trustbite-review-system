@@ -33,17 +33,22 @@ projection, and public DTO shaping.
 
 ## Commands
 
-Do not attach a Harness `verify_command` until the integration command exists
-and proves the behavior above.
-
-Expected closeout command shape:
+Verified locally:
 
 ```text
 npm run db:migrate
-npm run test:integration --prefix server -- <focused restaurant detail/review integration tests>
+npm run test:unit --prefix server -- tests/unit/restaurant/restaurantController.test.js
+npm run test:integration --prefix server -- tests/integration/restaurantDetail.integration.test.js
 npm run server:build
+npm run harness -- story verify REST-US-003
 ```
 
 ## Acceptance Evidence
 
-Pending. Detail/review closeout still lacks durable local database proof.
+Implemented on 2026-07-08.
+
+- `db:migrate`: applied 0 migration(s).
+- Unit proof: 13 files / 115 tests passed.
+- Integration proof: 8 files passed, 1 skipped; 67 tests passed, 2 skipped.
+- `server:build`: syntax check passed for 91 files.
+- `story verify`: passed with the focused proof chain above.

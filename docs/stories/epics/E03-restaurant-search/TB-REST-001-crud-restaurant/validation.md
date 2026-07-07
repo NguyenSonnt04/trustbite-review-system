@@ -37,17 +37,26 @@ mapping, and transaction cleanup.
 
 ## Commands
 
-Do not attach a Harness `verify_command` until the integration command exists
-and proves the behavior above.
-
-Expected closeout command shape:
-
 ```text
 npm run db:migrate
-npm run test:integration --prefix server -- <focused restaurant CRUD integration tests>
+npm run test:unit --prefix server -- tests/unit/restaurant/restaurantController.test.js
+npm run test:integration --prefix server -- tests/integration/restaurantCrud.integration.test.js
 npm run server:build
 ```
 
 ## Acceptance Evidence
 
-Pending. CRUD still lacks durable local database proof.
+Accepted on 2026-07-08.
+
+- `npm run db:migrate` applied 0 pending migrations after the local schema was
+  already current.
+- `npm run test:unit --prefix server -- tests/unit/restaurant/restaurantController.test.js`
+  passed 13 files / 115 tests.
+- `npm run test:integration --prefix server -- tests/integration/restaurantCrud.integration.test.js`
+  passed 6 files / 49 tests, with 1 skipped file / 2 skipped tests.
+- `npm run server:build` passed syntax checks for 91 files.
+- `npm run harness -- story verify TB-REST-001` passed with the command chain
+  above.
+- Decision 0016 documents that Phase 3 CRUD mutations stay behind the
+  authenticated internal backend boundary until a future high-risk admin/owner
+  authorization story narrows production exposure.

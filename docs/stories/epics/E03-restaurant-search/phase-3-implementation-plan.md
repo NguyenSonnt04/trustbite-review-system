@@ -2,7 +2,7 @@
 
 ## Status
 
-planned
+in_progress
 
 ## Lane
 
@@ -45,6 +45,8 @@ Harness and codebase review show:
 
 ### 1. Close out CRUD proof (`TB-REST-001`)
 
+Status: implemented on 2026-07-08.
+
 Implement only fixes exposed by tests. Expected work:
 
 - Add DB-backed tests for create, update, soft-delete, slug collision retry,
@@ -55,6 +57,8 @@ Implement only fixes exposed by tests. Expected work:
 - Add a real Harness `verify_command` only after the tests exist.
 
 ### 2. Implement search/filter/nearby (`TB-REST-002`)
+
+Status: implemented on 2026-07-08.
 
 Use TDD because this changes public API behavior, validation, SQL filtering,
 and location logic.
@@ -79,6 +83,8 @@ Green/refactor:
 - Keep SQL parameterized and keep response DTOs camelCase.
 
 ### 3. Close out detail and public reviews (`REST-US-003`)
+
+Status: implemented on 2026-07-08.
 
 Expected work:
 

@@ -133,10 +133,10 @@ render trust badges without guessing. Public responses omit reviewer `userId`.
 | Behavior | Current state | Required Phase 3 closeout |
 | --- | --- | --- |
 | CRUD routes | Present in `server/src/routes/restaurant.js` with auth on mutating routes | Add DB-backed proof and decide production authorization boundary for mutations |
-| Public list | Present with `keyword`, `page`, `pageSize`, ACTIVE-only filtering | Add `lat/lng/radiusMeters`, `minTrustScore`, `sort`, strict validation, and DB proof |
-| `/restaurants/nearby` | Missing route/controller/service | Add route before `/:restaurantId` to avoid route shadowing; add map-bounds tests |
-| Detail | Present via `getRestaurantDetail` | Add DB-backed integration proof and Harness verify command |
-| Public reviews | Present via `listPublicReviewsByRestaurant` | Add DB-backed integration proof for visibility/status filters |
+| Public list | Implemented with `keyword`, `lat/lng/radiusMeters`, `minTrustScore`, `sort`, strict validation, ACTIVE-only filtering, and DB proof | Keep docs, integration proof, and Harness matrix current |
+| `/restaurants/nearby` | Implemented before `/:restaurantId` with strict bounds validation and map-bounds DB proof | Keep route ordering and map-bounds proof current |
+| Detail | Implemented via `getRestaurantDetail` with DB-backed proof for active/soft-delete gates, rating breakdown, and latest owner claim status | Keep DB-backed detail proof current |
+| Public reviews | Implemented via `listPublicReviewsByRestaurant` with DB-backed proof for status/visibility filters and omitted reviewer `userId` | Keep public review proof current |
 
 ## Validation Contract
 
