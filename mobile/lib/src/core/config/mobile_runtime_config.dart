@@ -48,7 +48,6 @@ class MobileRuntimeConfig {
     return parsed.replace(
       pathSegments: alreadyNamespaced ? segments : [...segments, 'api', 'v1'],
       queryParameters: null,
-      fragment: '',
     );
   }
 }
