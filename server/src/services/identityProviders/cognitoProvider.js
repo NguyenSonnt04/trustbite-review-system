@@ -1,5 +1,11 @@
 import crypto from 'node:crypto';
+import {
+  AdminDeleteUserCommand,
+  AdminUserGlobalSignOutCommand,
+  CognitoIdentityProviderClient,
+} from '@aws-sdk/client-cognito-identity-provider';
 import appConfig from '../../config/app.js';
+import awsConfig from '../../config/aws.js';
 import { createHttpError } from '../../utils/httpErrors.js';
 
 let cachedJwks = null;
@@ -10,6 +16,7 @@ const JWKS_TTL_MS = 60 * 60 * 1000;
 const UNKNOWN_KID_REFRESH_COOLDOWN_MS = 30 * 1000;
 
 const isJwkObject = (key) => Boolean(key) && typeof key === 'object' && !Array.isArray(key);
+const isUserNotFoundError = (err) => err?.name === 'UserNotFoundException';
 
 const base64UrlDecode = (value) => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
@@ -173,6 +180,23 @@ const validateAccessTokenClaims = (payload) => {
 export class CognitoIdentityProvider {
   provider = 'cognito';
 
+  constructor({ adminClient = null, userPoolId = appConfig.auth.cognito.userPoolId } = {}) {
+    this.adminClient = adminClient;
+    this.userPoolId = userPoolId;
+  }
+
+  getAdminClient() {
+    if (!this.adminClient) {
+      this.adminClient = new CognitoIdentityProviderClient({
+        region: awsConfig.region,
+        endpoint: awsConfig.endpointUrl,
+        credentials: awsConfig.credentials,
+      });
+    }
+
+    return this.adminClient;
+  }
+
   async verifyAccessToken(token) {
     const parts = token.split('.');
     if (parts.length !== 3) {
@@ -195,6 +219,44 @@ export class CognitoIdentityProvider {
       providerGroups: Array.isArray(payload['cognito:groups']) ? payload['cognito:groups'] : [],
       claims: payload
     };
+  }
+
+  async deleteUser({ username }) {
+    if (!username) {
+      throw Object.assign(
+        new Error('Cognito username is required before account deletion can complete'),
+        {
+          name: 'CognitoUsernameRequiredError',
+          code: 'COGNITO_USERNAME_REQUIRED',
+        },
+      );
+    }
+
+    const input = {
+      UserPoolId: this.userPoolId,
+      Username: username,
+    };
+    const client = this.getAdminClient();
+    let signedOut = false;
+
+    try {
+      await client.send(new AdminUserGlobalSignOutCommand(input));
+      signedOut = true;
+    } catch (err) {
+      if (!isUserNotFoundError(err)) {
+        throw err;
+      }
+    }
+
+    try {
+      await client.send(new AdminDeleteUserCommand(input));
+      return { deleted: true, signedOut };
+    } catch (err) {
+      if (isUserNotFoundError(err)) {
+        return { deleted: false, alreadyMissing: true, signedOut };
+      }
+      throw err;
+    }
   }
 }
 

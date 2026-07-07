@@ -26,6 +26,7 @@ describe('user account deletion request API', () => {
 
   it('creates, exposes, rejects duplicates, blocks profile mutation, and cancels a deletion request', async () => {
     const user = await createUser({ displayName: 'Delete Me' });
+    const blockedRestaurantName = `Deletion Window Restaurant ${user.id}`;
     const session = await query(
       `INSERT INTO user_sessions (user_id, refresh_token_hash, device_label, platform, expires_at)
        VALUES ($1, $2, $3, $4, now() + interval '1 day')
@@ -98,6 +99,13 @@ describe('user account deletion request API', () => {
         .expect(409);
       expect(duplicateResponse.body.error.code).toBe('DELETION_REQUEST_ALREADY_EXISTS');
 
+      const blockedMutationResponse = await requestApp()
+        .post('/api/v1/restaurants')
+        .set(authHeaders(user.id))
+        .send({ name: blockedRestaurantName })
+        .expect(409);
+      expect(blockedMutationResponse.body.error.code).toBe('DELETION_REQUEST_ACTIVE');
+
       const patchResponse = await requestApp()
         .patch('/api/v1/users/me')
         .set(authHeaders(user.id))
@@ -131,6 +139,51 @@ describe('user account deletion request API', () => {
       expect(cancelled.rows[0].status).toBe('CANCELLED');
       expect(cancelled.rows[0].cancelled_at).toBeTruthy();
       expect(cancelled.rows[0].audit_reason).toBeNull();
+    } finally {
+      await query('DELETE FROM restaurants WHERE name = $1', [blockedRestaurantName]);
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('allows deletion status reads and returns the deletion cancellation contract after processing starts', async () => {
+    const user = await createUser({ displayName: 'Processing Delete Me', status: 'DELETED' });
+    const deletionRequest = await query(
+      `INSERT INTO account_deletion_requests (user_id, status, requested_at, scheduled_deletion_at)
+       VALUES ($1, 'PROCESSING', now() - interval '5 minutes', now() - interval '4 minutes')
+       RETURNING id`,
+      [user.id],
+    );
+
+    try {
+      const statusResponse = await requestApp()
+        .get('/api/v1/users/me/deletion-request')
+        .set(authHeaders(user.id))
+        .expect(200);
+      expect(statusResponse.body).toMatchObject({
+        deletionRequestId: deletionRequest.rows[0].id,
+        status: 'PROCESSING',
+      });
+
+      const statusWithTrailingSlashResponse = await requestApp()
+        .get('/api/v1/users/me/deletion-request/')
+        .set(authHeaders(user.id))
+        .expect(200);
+      expect(statusWithTrailingSlashResponse.body).toMatchObject({
+        deletionRequestId: deletionRequest.rows[0].id,
+        status: 'PROCESSING',
+      });
+
+      const cancelResponse = await requestApp()
+        .post('/api/v1/users/me/deletion-request/cancel')
+        .set(authHeaders(user.id))
+        .expect(409);
+      expect(cancelResponse.body.error.code).toBe('DELETION_REQUEST_NOT_CANCELLABLE');
+
+      const cancelWithTrailingSlashResponse = await requestApp()
+        .post('/api/v1/users/me/deletion-request/cancel/')
+        .set(authHeaders(user.id))
+        .expect(409);
+      expect(cancelWithTrailingSlashResponse.body.error.code).toBe('DELETION_REQUEST_NOT_CANCELLABLE');
     } finally {
       await cleanupUser(user.id);
     }

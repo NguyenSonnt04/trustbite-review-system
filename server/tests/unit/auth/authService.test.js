@@ -97,6 +97,34 @@ describe('AuthService local user mapping', () => {
     });
   });
 
+  it('includes active deletion request state in the mapped local user', async () => {
+    pool.query
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [activeUserRow({
+          active_deletion_request_id: '22222222-2222-4222-8222-222222222222',
+          active_deletion_request_status: 'PROCESSING',
+        })],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ role_id: 'USER' }] });
+
+    const service = new AuthService({ verifyAccessToken: vi.fn() });
+
+    await expect(service.mapIdentityToUser({
+      provider: 'cognito',
+      subject: 'cognito-sub-1',
+      phoneNumber: '+849000000001',
+      phoneNumberVerified: true,
+      tokenUse: 'access',
+    }, { enforceStatus: false })).resolves.toMatchObject({
+      id: USER_ID,
+      activeDeletionRequest: {
+        id: '22222222-2222-4222-8222-222222222222',
+        status: 'PROCESSING',
+      },
+    });
+  });
+
   it('verifies a bearer token through the identity provider before local mapping', async () => {
     const identityProvider = {
       verifyAccessToken: vi.fn().mockResolvedValue({
@@ -185,11 +213,15 @@ describe('AuthService local user mapping', () => {
 
     expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
     expect(mockClient.query).toHaveBeenCalledWith(
-      expect.stringContaining('SELECT * FROM users WHERE phone_number = $1 AND cognito_sub IS NULL FOR UPDATE'),
+      expect.stringContaining('WHERE u.phone_number = $1'),
       ['+849000000001'],
     );
     expect(mockClient.query).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE users'),
+      expect.stringContaining('FOR UPDATE OF u'),
+      ['+849000000001'],
+    );
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('active_deletion_request_id'),
       ['new-cognito-sub', USER_ID],
     );
     expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');

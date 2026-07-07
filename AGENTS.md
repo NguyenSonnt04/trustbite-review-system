@@ -49,6 +49,15 @@ Before changing code or product docs:
 - If the repo lacks the needed test runner or local dependency for a story, add the smallest appropriate test harness when practical; otherwise document the blocker and do not claim automated proof.
 - If behavior, schema, API contract, validation expectation, or provider boundary changes, update `docs/product/*`, `docs/stories/*`, decisions when needed, and the Harness matrix/CLI records in the same change.
 
+## Commit And PR Naming
+
+- Use Conventional Commits for commit subjects: `type(scope): imperative summary`.
+- Keep commit subjects lowercase after the prefix, except proper nouns, product names, and acronyms.
+- Use concise product or engineering language in PR titles, like a company-owned change, not an agent artifact.
+- Do not prefix commit subjects, branch names, or PR titles with `codex`, `[codex]`, agent names, or Harness story IDs.
+- Put Harness story IDs, validation proof, and AI/tool attribution in the PR body or trace when useful, not in the title.
+- Prefer PR titles such as `Process account deletions` or `Add mobile runtime configuration` over `TB-...` titles.
+
 ## Validation Commands
 
 Use the smallest relevant set:
