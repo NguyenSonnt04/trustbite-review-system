@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { createHttpError } from '../utils/httpErrors.js';
 
 const REVIEW_SELECT_PROJECTION = `
   SELECT
@@ -23,6 +24,10 @@ const REVIEW_SELECT_PROJECTION = `
   FROM reviews r
 `;
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MIN_VERIFIED_COMMENT_LENGTH = 50;
+const RATING_FIELDS = ['foodRating', 'priceRating', 'serviceRating', 'ambienceRating'];
+
 function toPublicReview(row) {
   return {
     id: row.id,
@@ -44,6 +49,235 @@ function toPublicReview(row) {
   };
 }
 
+function validationDetail(field, code, message) {
+  return { field, code, message };
+}
+
+function assertUuid(value, field, details) {
+  if (typeof value !== 'string' || !UUID_REGEX.test(value)) {
+    details.push(validationDetail(field, 'INVALID_UUID', `${field} must be a valid UUID.`));
+  }
+}
+
+function parseRating(value, field, details) {
+  if (!Number.isInteger(value) || value < 1 || value > 5) {
+    details.push(validationDetail(field, 'RANGE', `${field} must be an integer from 1 to 5.`));
+    return null;
+  }
+  return value;
+}
+
+function parseVisitedAt(value, details) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    details.push(validationDetail('visitedAt', 'INVALID_TYPE', 'visitedAt must be an ISO-8601 datetime string.'));
+    return null;
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    details.push(validationDetail('visitedAt', 'INVALID_DATETIME', 'visitedAt must be a valid ISO-8601 datetime.'));
+    return null;
+  }
+
+  if (date.getTime() > Date.now()) {
+    details.push(validationDetail('visitedAt', 'FUTURE_DATETIME', 'visitedAt must not be in the future.'));
+    return null;
+  }
+
+  return date.toISOString();
+}
+
+function validateCreateReviewPayload(payload = {}) {
+  const details = [];
+  const restaurantId = payload.restaurantId;
+  const branchId = payload.branchId ?? null;
+
+  assertUuid(restaurantId, 'restaurantId', details);
+  if (branchId !== null) assertUuid(branchId, 'branchId', details);
+
+  const ratings = {};
+  for (const field of RATING_FIELDS) {
+    ratings[field] = parseRating(payload[field], field, details);
+  }
+
+  const comment = typeof payload.comment === 'string' ? payload.comment.trim() : '';
+  if (comment.length < MIN_VERIFIED_COMMENT_LENGTH) {
+    details.push(validationDetail(
+      'comment',
+      'MIN_LENGTH',
+      `Comment must be at least ${MIN_VERIFIED_COMMENT_LENGTH} characters.`,
+    ));
+  }
+
+  const visitedAt = parseVisitedAt(payload.visitedAt, details);
+
+  if (details.length > 0) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Review payload is invalid.', details);
+  }
+
+  return {
+    restaurantId,
+    branchId,
+    foodRating: ratings.foodRating,
+    priceRating: ratings.priceRating,
+    serviceRating: ratings.serviceRating,
+    ambienceRating: ratings.ambienceRating,
+    comment,
+    visitedAt,
+  };
+}
+
+async function assertUserCanReview(client, userId) {
+  const result = await client.query(
+    `SELECT id, status, review_restricted_until
+     FROM users
+     WHERE id = $1
+     FOR SHARE`,
+    [userId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(401, 'AUTH_REQUIRED', 'Authenticated user does not exist.');
+  }
+
+  const user = result.rows[0];
+  if (user.status === 'SUSPENDED') {
+    throw createHttpError(403, 'ACCOUNT_SUSPENDED', 'Account is suspended.');
+  }
+  if (user.status === 'DELETED') {
+    throw createHttpError(403, 'ACCOUNT_DELETED', 'Account is deleted.');
+  }
+  if (user.review_restricted_until && new Date(user.review_restricted_until).getTime() > Date.now()) {
+    throw createHttpError(403, 'FORBIDDEN', 'User is temporarily restricted from writing reviews.');
+  }
+}
+
+async function getActiveRestaurant(client, restaurantId) {
+  const result = await client.query(
+    `SELECT id, status
+     FROM restaurants
+     WHERE id = $1
+       AND is_deleted = FALSE
+     FOR SHARE`,
+    [restaurantId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'NOT_FOUND', 'Restaurant not found.');
+  }
+
+  if (result.rows[0].status !== 'ACTIVE') {
+    throw createHttpError(422, 'RESTAURANT_NOT_ACTIVE', 'Restaurant is not active.');
+  }
+
+  return result.rows[0];
+}
+
+async function assertBranchBelongsToRestaurant(client, branchId, restaurantId) {
+  if (!branchId) return;
+
+  const result = await client.query(
+    `SELECT id, status
+     FROM restaurant_branches
+     WHERE id = $1
+       AND parent_restaurant_id = $2
+     FOR SHARE`,
+    [branchId, restaurantId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'branchId must belong to the restaurant.', [
+      validationDetail('branchId', 'INVALID_BRANCH', 'branchId must belong to the restaurant.'),
+    ]);
+  }
+
+  if (result.rows[0].status !== 'ACTIVE') {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Branch is not active.', [
+      validationDetail('branchId', 'BRANCH_NOT_ACTIVE', 'Branch must be ACTIVE.'),
+    ]);
+  }
+}
+
+async function assertNotOwnRestaurant(client, userId, restaurantId) {
+  const result = await client.query(
+    `SELECT 1
+     FROM merchants m
+     JOIN restaurant_merchants rm ON rm.merchant_id = m.id
+     WHERE m.user_id = $1
+       AND rm.restaurant_id = $2
+       AND m.status = 'ACTIVE'
+       AND rm.status = 'ACTIVE'
+     LIMIT 1`,
+    [userId, restaurantId],
+  );
+
+  if (result.rowCount > 0) {
+    throw createHttpError(403, 'FORBIDDEN', 'Merchants cannot review their own restaurant.');
+  }
+}
+
+export async function createReviewForVerificationIntent({ userId, payload }) {
+  const data = validateCreateReviewPayload(payload);
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    await assertUserCanReview(client, userId);
+    await getActiveRestaurant(client, data.restaurantId);
+    await assertBranchBelongsToRestaurant(client, data.branchId, data.restaurantId);
+    await assertNotOwnRestaurant(client, userId, data.restaurantId);
+
+    const result = await client.query(
+      `INSERT INTO reviews (
+         user_id,
+         restaurant_id,
+         branch_id,
+         food_rating,
+         price_rating,
+         service_rating,
+         ambience_rating,
+         comment,
+         status,
+         verification_status,
+         trust_label,
+         public_visibility,
+         trust_weight_bucket,
+         visited_at
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+               'SUBMITTED', 'UNVERIFIED', 'PENDING_VERIFICATION',
+               'PRIVATE_UNTIL_DECISION', 'NONE', $9)
+       RETURNING id, status`,
+      [
+        userId,
+        data.restaurantId,
+        data.branchId,
+        data.foodRating,
+        data.priceRating,
+        data.serviceRating,
+        data.ambienceRating,
+        data.comment,
+        data.visitedAt,
+      ],
+    );
+
+    await client.query('COMMIT');
+
+    return {
+      reviewId: result.rows[0].id,
+      status: result.rows[0].status,
+      nextStep: 'UPLOAD_RECEIPT',
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listPublicReviewsByRestaurant(restaurantId, { status = 'ALL', page = 1, pageSize = 20 } = {}) {
   const safePage = Math.max(1, parseInt(page, 10) || 1);
   const safeSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
@@ -51,7 +285,7 @@ export async function listPublicReviewsByRestaurant(restaurantId, { status = 'AL
 
   const params = [restaurantId];
   let statusCondition = "r.status IN ('VERIFIED', 'REFERENCE_ONLY')";
-  
+
   if (status === 'VERIFIED') {
     statusCondition = "r.status = 'VERIFIED'";
   } else if (status === 'REFERENCE_ONLY') {

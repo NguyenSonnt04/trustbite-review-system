@@ -27,6 +27,8 @@ export default {
   credentials,
   s3: {
     bucketName: process.env.AWS_S3_BUCKET_NAME,
+    endpoint: process.env.AWS_ENDPOINT_URL,
+    forcePathStyle: process.env.AWS_S3_FORCE_PATH_STYLE === 'true'
     allowedHosts: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_HOSTS),
     allowedPrefixes: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_PREFIXES),
     forcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, Boolean(
