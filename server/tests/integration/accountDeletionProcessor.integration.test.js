@@ -1556,6 +1556,66 @@ describe('account deletion processor', () => {
     }
   });
 
+  it('clears restaurant trust score when deletion leaves no eligible public reviews', async () => {
+    const user = await createUser({ displayName: 'Zero Aggregate Target' });
+    const restaurant = await createRestaurant({
+      trustScore: 4.75,
+      verifiedReviewCount: 1,
+    });
+
+    await createReview({
+      userId: user.id,
+      restaurantId: restaurant.id,
+      foodRating: 5,
+      priceRating: 5,
+      serviceRating: 5,
+      ambienceRating: 5,
+      verificationStatus: 'VERIFIED',
+      trustWeightBucket: 'FULL',
+      publicVisibility: 'PUBLIC',
+    });
+    await query(
+      `UPDATE users
+       SET cognito_sub = $2
+       WHERE id = $1`,
+      [user.id, `zero-aggregate-sub-${user.id}`],
+    );
+    await query(
+      `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
+       VALUES ($1, $2, now() - interval '1 minute')`,
+      [user.id, 'Zero aggregate deletion reason'],
+    );
+
+    try {
+      const result = await processDueAccountDeletions({
+        batchSize: 1,
+        identityProvider: {
+          deleteUser: vi.fn().mockResolvedValue({ deleted: true, signedOut: true }),
+        },
+        objectStorage: {
+          deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
+        },
+      });
+
+      expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0 });
+      const restaurantRows = await query(
+        `SELECT trust_score, verified_review_count, reference_review_count
+         FROM restaurants
+         WHERE id = $1`,
+        [restaurant.id],
+      );
+
+      expect(restaurantRows.rows[0].trust_score).toBeNull();
+      expect(restaurantRows.rows[0]).toMatchObject({
+        verified_review_count: 0,
+        reference_review_count: 0,
+      });
+    } finally {
+      await cleanupUser(user.id);
+      await query('DELETE FROM restaurants WHERE id = $1', [restaurant.id]);
+    }
+  });
+
   it('minimizes moderation and audit text while retaining fraud-minimum references', async () => {
     const user = await createUser({ displayName: 'Moderation Retention Target' });
     const restaurant = await createRestaurant();

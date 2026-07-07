@@ -220,12 +220,12 @@ const recomputeAffectedRestaurantAggregates = async (client, userId) => {
           AND r.trust_weight_bucket <> 'NONE'
      )
      UPDATE restaurants restaurant
-     SET trust_score = COALESCE((
+     SET trust_score = (
            SELECT ROUND((SUM(er.average_rating * er.trust_weight) / NULLIF(SUM(er.trust_weight), 0))::numeric, 2)
            FROM eligible_reviews er
            WHERE er.restaurant_id = restaurant.id
              AND er.trust_weight > 0
-         ), 5.00),
+         ),
          verified_review_count = (
            SELECT count(*)::int
             FROM eligible_reviews er
