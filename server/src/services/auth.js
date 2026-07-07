@@ -171,25 +171,27 @@ export class AuthService {
     this.identityProvider = identityProvider;
   }
 
-  async authenticateRequest(req) {
+  async authenticateRequest(req, options = {}) {
     const trustedIdentity = getTrustedDevelopmentIdentity(req);
     if (trustedIdentity) {
-      return this.mapIdentityToUser(trustedIdentity);
+      return this.mapIdentityToUser(trustedIdentity, options);
     }
 
     const token = getBearerToken(req.header('authorization'));
     const identity = await this.identityProvider.verifyAccessToken(token);
-    return this.mapIdentityToUser(identity);
+    return this.mapIdentityToUser(identity, options);
   }
 
-  async mapIdentityToUser(identity) {
+  async mapIdentityToUser(identity, { enforceStatus = true } = {}) {
     const userResult = await findUserByIdentity(identity);
     if (userResult.rowCount === 0) {
       throw createUnmappedIdentityError();
     }
 
     const user = userResult.rows[0];
-    assertAccountCanAuthenticate(user);
+    if (enforceStatus) {
+      assertAccountCanAuthenticate(user);
+    }
 
     const roleResult = await pool.query(
       `SELECT role_id FROM user_roles WHERE user_id = $1`,

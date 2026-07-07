@@ -300,6 +300,18 @@ export class UserService {
     try {
       await client.query('BEGIN');
       const user = await requireUser(client, userId, { forUpdate: true });
+
+      if (user.status === 'DELETED') {
+        const activeRequest = await client.query(
+          'SELECT * FROM account_deletion_requests WHERE user_id = $1 AND status = ANY($2::varchar[]) ORDER BY requested_at DESC LIMIT 1 FOR UPDATE',
+          [userId, ACTIVE_DELETION_STATUSES]
+        );
+
+        if (activeRequest.rowCount > 0) {
+          throw createHttpError(409, 'DELETION_REQUEST_NOT_CANCELLABLE', 'Deletion request cannot be cancelled');
+        }
+      }
+
       validateCurrentUserCanMutate(user);
 
       const current = await client.query(

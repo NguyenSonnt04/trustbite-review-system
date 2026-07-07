@@ -63,7 +63,7 @@ npm run docker:up
 This spawns:
 - **Postgres Database** on `localhost:5432` by default (container port `5432`; Credentials: `trustbite_user` / `your-local-db-password`, Database: `trustbite_db`)
 - **Redis** on `localhost:6379` for OTP rate limits, temporary locks, and local queue/cache workflows
-- **LocalStack Gateway** on `localhost:4566` (Simulating AWS S3, Cognito, SES, and Textract)
+- **LocalStack Gateway** on `localhost:4566` (local AWS simulation; the compose file pins `localstack/localstack:4.4.0` for unauthenticated community S3/SES/Secrets Manager/Textract smoke coverage)
 - **pgAdmin** on `http://localhost:5050` (Login: `admin@trustbite.com` / `your-local-pgadmin-password`)
 
 If another local PostgreSQL instance already owns port `5432`, keep the repository defaults unchanged and override only your local ignored env files:

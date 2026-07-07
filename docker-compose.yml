@@ -42,12 +42,12 @@ services:
 
   # TrustBite LocalStack (AWS mock)
   localstack:
-    image: localstack/localstack:latest
+    image: localstack/localstack:4.4.0
     container_name: trustbite-localstack
     ports:
       - "127.0.0.1:4566:4566"
     environment:
-      - SERVICES=s3,cognito,ses,secretsmanager,textract
+      - SERVICES=s3,cognito-idp,ses,secretsmanager,textract
       - DEBUG=1
       - DATA_DIR=/tmp/localstack/data
       - AWS_DEFAULT_REGION=ap-southeast-1

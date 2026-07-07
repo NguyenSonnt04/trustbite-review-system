@@ -85,11 +85,30 @@ describe('CognitoIdentityProvider', () => {
       providerGroups: ['operators'],
     });
 
-    expect(fetch).toHaveBeenCalledTimes(1);
-  });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
 
-  it('rejects a token whose nbf claim is not a numeric date', async () => {
-    const provider = await loadProvider();
+    it('fails Cognito admin cleanup when the provider username is missing', async () => {
+      const { CognitoIdentityProvider: ProviderClass } = await import(
+        '../../../src/services/identityProviders/cognitoProvider.js'
+      );
+      const adminClient = {
+        send: vi.fn(),
+      };
+      const provider = new ProviderClass({
+        userPoolId: 'pool-1',
+        adminClient,
+      });
+
+      await expect(provider.deleteUser({ username: null })).rejects.toMatchObject({
+        name: 'CognitoUsernameRequiredError',
+        code: 'COGNITO_USERNAME_REQUIRED',
+      });
+      expect(adminClient.send).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token whose nbf claim is not a numeric date', async () => {
+      const provider = await loadProvider();
 
     await expect(provider.verifyAccessToken(signAccessToken({
       nbf: 'not-a-numeric-date',
@@ -291,6 +310,56 @@ describe('CognitoIdentityProvider', () => {
     await expect(provider.verifyAccessToken(signAccessToken())).rejects.toMatchObject({
       statusCode: 503,
       code: 'PROVIDER_UNAVAILABLE',
+    });
+  });
+
+  it('globally signs out and deletes a Cognito user through admin commands', async () => {
+    const { CognitoIdentityProvider: ProviderClass } = await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    );
+    const sentCommands = [];
+    const provider = new ProviderClass({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.deleteUser({ username: 'local-sub-1' })).resolves.toEqual({
+      deleted: true,
+      signedOut: true,
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'AdminUserGlobalSignOutCommand',
+      'AdminDeleteUserCommand',
+    ]);
+    expect(sentCommands[0].input).toEqual({
+      UserPoolId: 'pool-1',
+      Username: 'local-sub-1',
+    });
+  });
+
+  it('treats an already-missing Cognito user as idempotent cleanup', async () => {
+    const { CognitoIdentityProvider: ProviderClass } = await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    );
+    const provider = new ProviderClass({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockRejectedValue(Object.assign(new Error('missing'), {
+          name: 'UserNotFoundException',
+        })),
+      },
+    });
+
+    await expect(provider.deleteUser({ username: 'missing-sub' })).resolves.toEqual({
+      deleted: false,
+      alreadyMissing: true,
+      signedOut: false,
     });
   });
 });
