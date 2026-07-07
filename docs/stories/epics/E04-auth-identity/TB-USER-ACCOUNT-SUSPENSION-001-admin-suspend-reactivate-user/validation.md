@@ -27,8 +27,9 @@ Prove admin authorization, status transitions, audit log writes, local product s
 
 ```text
 npm run db:migrate
-# DB insert/rollback SQL proof for users, user_roles, audit_logs, and local session/token invalidation tables where applicable
-# API smoke commands to be added during implementation
+npm run test:unit --prefix server -- tests/unit/user/userService.test.js
+npm run test:integration --prefix server -- tests/integration/adminUserSuspension.integration.test.js
+npm run server:build
 ```
 
 ## Acceptance Evidence
@@ -74,3 +75,10 @@ Harness row can be marked `implemented` with unit and integration proof. Platfor
 - DB transaction/rollback proof passed for users, user_roles, audit_logs, user_sessions, and push_tokens: inside the transaction counts were users=2, user_roles=1, audit_logs=1, user_sessions=1, push_tokens=1; after rollback residue counts were users=0, audit_logs=0, user_sessions=0, push_tokens=0.
 - `git diff --check` completed with the expected LF/CRLF working-copy warning for `server/tests/integration/adminUserSuspension.integration.test.js`.
 - `npm run harness -- query matrix` passed after the refreshed validation commands.
+
+2026-07-08 Phase 2 backend closeout:
+
+- Replaced the weak Harness `story verify` command for `TB-USER-ACCOUNT-SUSPENSION-001` with a backend proof chain instead of `db:migrate` alone.
+- The verify command runs `db:migrate`, targeted user service unit proof, targeted `adminUserSuspension.integration.test.js`, and `server:build` from the repository root.
+- `npm run harness -- story verify TB-USER-ACCOUNT-SUSPENSION-001` passed: `db:migrate` applied 0 migrations; unit proof reported 13 files / 115 tests passed; integration proof reported 5 files passed, 1 skipped, 43 tests passed, 2 skipped; `server:build` passed for 91 files.
+- This is the backend completion proof for spreadsheet Phase 2.4 account status controls. Admin UI/list ownership remains outside this backend closeout.

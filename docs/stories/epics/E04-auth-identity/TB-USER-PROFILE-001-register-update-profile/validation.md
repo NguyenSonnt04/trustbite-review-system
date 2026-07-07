@@ -29,8 +29,9 @@ Prove Cognito identity mapping finds or safely binds the correct local user, pro
 
 ```text
 npm run db:migrate
-# DB insert/rollback SQL proof for users
-# API smoke commands to be added during implementation
+npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/auth/authService.test.js tests/unit/user/userService.test.js
+npm run test:integration --prefix server -- tests/integration/userProfile.integration.test.js
+npm run server:build
 ```
 
 ## Acceptance Evidence
@@ -99,3 +100,10 @@ npm run db:migrate
 - `npm run server:build` passed; syntax check covered 80 files.
 - `npm run db:migrate` passed with 0 migrations applied.
 - `git diff --check` passed with LF/CRLF warnings only.
+
+2026-07-08 Phase 2 backend closeout:
+
+- Added a Harness `story verify` command for `TB-USER-PROFILE-001` so the profile story no longer relies on manual matrix notes for repeatable proof.
+- The verify command runs `db:migrate`, targeted profile/auth/config/user unit proof, targeted `userProfile.integration.test.js`, and `server:build` from the repository root.
+- `npm run harness -- story verify TB-USER-PROFILE-001` passed: `db:migrate` applied 0 migrations; unit proof reported 13 files / 115 tests passed; integration proof reported 5 files passed, 1 skipped, 43 tests passed, 2 skipped; `server:build` passed for 91 files.
+- Spreadsheet Phase 2.1 and 2.2 remain satisfied through the accepted Cognito-first boundary, not through backend-owned OTP, access-token, refresh-token, or password-reset APIs. Cognito owns those auth flows; this story covers the TrustBite-local `/users/me` profile boundary after Cognito JWT verification.
