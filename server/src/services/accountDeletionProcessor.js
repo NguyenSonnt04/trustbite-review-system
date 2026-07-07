@@ -186,7 +186,9 @@ const listObjectCleanupTargets = async (client, userId) => {
 };
 
 const cleanupExternalResources = async (request, { identityProvider, objectStorage }) => {
-  const providerResult = await identityProvider.deleteUser({ username: request.cognito_sub });
+  const providerResult = request.cognito_sub
+    ? await identityProvider.deleteUser({ username: request.cognito_sub })
+    : { skipped: true, reason: 'no_mapped_cognito_identity' };
   const objectResults = [];
 
   for (const url of request.objectUrls) {
@@ -529,7 +531,7 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
         providerCleanup: cleanupResult.providerResult,
         ownedObjectUrlsProcessed: cleanupResult.objectResults.length,
         ownedObjectsDeleted: cleanupResult.objectResults.filter((result) => result.deleted).length,
-          retainedCognitoSub: true,
+          retainedCognitoSub: Boolean(request.cognito_sub),
           revokedSessions: sessionResult.rowCount,
           inactivatedPushTokens: pushResult.rowCount,
           anonymizedOtpRows: otpResult.rowCount,
@@ -649,10 +651,13 @@ const processOneDueAccountDeletion = async ({
     await client.query('ROLLBACK');
     throw err;
   } finally {
-    if (lockAcquired && request) {
-      await releaseRequestLock(client, request.request_id);
+    try {
+      if (lockAcquired && request) {
+        await releaseRequestLock(client, request.request_id);
+      }
+    } finally {
+      client.release();
     }
-    client.release();
   }
 };
 

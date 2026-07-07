@@ -401,12 +401,86 @@ describe('account deletion processor', () => {
         }
       });
 
-      it('keeps the request retryable when Cognito cleanup cannot identify the provider user', async () => {
-        const user = await createUser({ displayName: 'Missing Cognito Subject Target' });
+      it('completes deletion without Cognito cleanup when no provider identity is mapped', async () => {
+        const user = await createUser({ displayName: 'Phone Only Deletion Target' });
         await query(
           `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
            VALUES ($1, $2, now() - interval '1 minute')`,
-          [user.id, 'Sensitive missing subject deletion reason'],
+          [user.id, 'Sensitive phone-only deletion reason'],
+        );
+        const identityProvider = {
+          deleteUser: vi.fn().mockRejectedValue(new Error('Cognito cleanup should not be called')),
+        };
+        const objectStorage = {
+          deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
+        };
+
+        try {
+          const result = await processDueAccountDeletions({
+            batchSize: 1,
+            identityProvider,
+            objectStorage,
+          });
+
+          expect(result).toMatchObject({
+            processed: 1,
+            completed: 1,
+            skipped: 0,
+            failed: 0,
+          });
+          expect(identityProvider.deleteUser).not.toHaveBeenCalled();
+          expect(objectStorage.deleteOwnedObject).not.toHaveBeenCalled();
+
+          const persisted = await query(
+            `SELECT u.status AS user_status,
+                    u.cognito_sub,
+                    u.deleted_at,
+                    adr.status AS request_status,
+                    adr.cleanup_state,
+                    adr.cleanup_last_error_code,
+                    adr.completed_at,
+                    adr.reason AS request_reason,
+                    a.metadata
+               FROM users u
+               JOIN account_deletion_requests adr ON adr.user_id = u.id
+               JOIN audit_logs a ON a.entity_id = adr.id AND a.action = 'ACCOUNT_DELETION_COMPLETED'
+              WHERE u.id = $1`,
+            [user.id],
+          );
+
+          expect(persisted.rows[0]).toMatchObject({
+            user_status: 'DELETED',
+            cognito_sub: null,
+            request_status: 'COMPLETED',
+            cleanup_state: 'COMPLETED',
+            cleanup_last_error_code: null,
+            request_reason: null,
+          });
+          expect(persisted.rows[0].deleted_at).toBeTruthy();
+          expect(persisted.rows[0].completed_at).toBeTruthy();
+          expect(persisted.rows[0].metadata.providerCleanup).toMatchObject({
+            skipped: true,
+            reason: 'no_mapped_cognito_identity',
+          });
+          expect(persisted.rows[0].metadata.retainedCognitoSub).toBe(false);
+        } finally {
+          await cleanupUser(user.id);
+        }
+      });
+
+      it('keeps the request retryable when Cognito cleanup rejects a mapped provider user', async () => {
+        const user = await createUser({ displayName: 'Cognito Cleanup Failure Target' });
+        const cognitoSub = `failing-provider-sub-${user.id}`;
+        await query(
+          `UPDATE users
+           SET cognito_sub = $2
+           WHERE id = $1`,
+          [user.id, cognitoSub],
+        );
+        await query(
+          `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
+           VALUES ($1, $2, now() - interval '1 minute')`,
+          [user.id, 'Sensitive provider failure deletion reason'],
         );
         const objectStorage = {
           deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
@@ -415,12 +489,11 @@ describe('account deletion processor', () => {
         try {
           const result = await processDueAccountDeletions({
             batchSize: 1,
-            identityProvider: new CognitoIdentityProvider({
-              userPoolId: 'privacy-test-pool',
-              adminClient: {
-                send: vi.fn().mockRejectedValue(new Error('admin client should not be called')),
-              },
-            }),
+            identityProvider: {
+              deleteUser: vi.fn().mockRejectedValue(Object.assign(new Error('provider unavailable'), {
+                name: 'ProviderUnavailable',
+              })),
+            },
             objectStorage,
           });
 
@@ -433,7 +506,7 @@ describe('account deletion processor', () => {
           expect(result.results[0]).toMatchObject({
             status: 'FAILED',
             reason: 'external_cleanup_failed',
-            errorName: 'CognitoUsernameRequiredError',
+            errorName: 'ProviderUnavailable',
           });
           expect(objectStorage.deleteOwnedObject).not.toHaveBeenCalled();
 
@@ -453,7 +526,7 @@ describe('account deletion processor', () => {
 
           expect(persisted.rows[0]).toMatchObject({
             user_status: 'DELETED',
-            cognito_sub: null,
+            cognito_sub: cognitoSub,
             deleted_at: null,
             request_status: 'PROCESSING',
             cleanup_state: 'RETRYABLE',
