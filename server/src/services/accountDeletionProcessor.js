@@ -56,7 +56,7 @@ const selectDueRequest = async (client, excludedRequestIds = []) => {
 
 const acquireRequestLock = async (client, requestId) => {
   const result = await client.query(
-    `SELECT pg_try_advisory_lock(hashtext('account_deletion'), hashtext($1)) AS locked`,
+    `SELECT pg_try_advisory_lock(hashtextextended('account_deletion:' || $1::text, 0)) AS locked`,
     [requestId],
   );
 
@@ -65,7 +65,7 @@ const acquireRequestLock = async (client, requestId) => {
 
 const releaseRequestLock = async (client, requestId) => {
   await client.query(
-    `SELECT pg_advisory_unlock(hashtext('account_deletion'), hashtext($1))`,
+    `SELECT pg_advisory_unlock(hashtextextended('account_deletion:' || $1::text, 0))`,
     [requestId],
   );
 };

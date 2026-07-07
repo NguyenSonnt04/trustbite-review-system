@@ -3,11 +3,6 @@ import awsConfig from '../config/aws.js';
 
 const DEFAULT_ALLOWED_PREFIXES = ['avatars/', 'receipts/', 'review-media/', 'merchant-claims/'];
 
-const parseCsv = (value = '') => value
-  .split(',')
-  .map((item) => item.trim())
-  .filter(Boolean);
-
 const normalizeHost = (value) => value.toLowerCase();
 
 const normalizeKey = (value) => value.replace(/^\/+/, '');
@@ -35,8 +30,8 @@ export class S3BucketConfigurationError extends Error {
 export function parseOwnedObjectUrl(value, {
   bucketName = awsConfig.s3.bucketName,
   region = awsConfig.region,
-  allowedHosts = parseCsv(process.env.TRUSTBITE_S3_ALLOWED_HOSTS),
-  allowedPrefixes = parseCsv(process.env.TRUSTBITE_S3_ALLOWED_PREFIXES),
+  allowedHosts = awsConfig.s3.allowedHosts ?? [],
+  allowedPrefixes = awsConfig.s3.allowedPrefixes ?? [],
 } = {}) {
   if (!value) {
     return { owned: false, reason: 'missing_url' };
@@ -91,10 +86,18 @@ export function parseOwnedObjectUrl(value, {
 }
 
 export class S3ObjectStorage {
-  constructor({ client = null, bucketName = awsConfig.s3.bucketName, region = awsConfig.region } = {}) {
+  constructor({
+    client = null,
+    bucketName = awsConfig.s3.bucketName,
+    region = awsConfig.region,
+    allowedHosts = awsConfig.s3.allowedHosts ?? [],
+    allowedPrefixes = awsConfig.s3.allowedPrefixes ?? [],
+  } = {}) {
     this.client = client;
     this.bucketName = bucketName;
     this.region = region;
+    this.allowedHosts = allowedHosts;
+    this.allowedPrefixes = allowedPrefixes;
   }
 
   getClient() {
@@ -114,6 +117,8 @@ export class S3ObjectStorage {
     const parsed = parseOwnedObjectUrl(url, {
       bucketName: this.bucketName,
       region: this.region,
+      allowedHosts: this.allowedHosts,
+      allowedPrefixes: this.allowedPrefixes,
     });
 
     if (!parsed.owned) {

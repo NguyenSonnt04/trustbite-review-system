@@ -1127,7 +1127,7 @@ describe('account deletion processor', () => {
 
       try {
         await lockClient.query(
-          `SELECT pg_advisory_lock(hashtext('account_deletion'), hashtext($1))`,
+          `SELECT pg_advisory_lock(hashtextextended('account_deletion:' || $1::text, 0))`,
           [lockedRequest.rows[0].id],
         );
 
@@ -1165,7 +1165,7 @@ describe('account deletion processor', () => {
         ]);
       } finally {
         await lockClient.query(
-          `SELECT pg_advisory_unlock(hashtext('account_deletion'), hashtext($1))`,
+          `SELECT pg_advisory_unlock(hashtextextended('account_deletion:' || $1::text, 0))`,
           [lockedRequest.rows[0].id],
         );
         lockClient.release();

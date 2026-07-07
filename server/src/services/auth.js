@@ -63,16 +63,43 @@ const getIdentityProvider = () => {
   throw createHttpError(500, 'AUTH_PROVIDER_UNSUPPORTED', 'Configured auth provider is not supported');
 };
 
+const USER_WITH_ACTIVE_DELETION_REQUEST_SELECT = `
+  SELECT
+    u.*,
+    adr.id AS active_deletion_request_id,
+    adr.status AS active_deletion_request_status
+  FROM users u
+  LEFT JOIN LATERAL (
+    SELECT id, status
+    FROM account_deletion_requests
+    WHERE user_id = u.id
+      AND status IN ('REQUESTED', 'PROCESSING')
+    ORDER BY requested_at DESC
+    LIMIT 1
+  ) adr ON true`;
+
+const selectUserByLocalId = (localUserId, queryable = pool) => queryable.query(
+  `${USER_WITH_ACTIVE_DELETION_REQUEST_SELECT}
+   WHERE u.id = $1`,
+  [localUserId],
+);
+
+const selectUserByCognitoSubject = (subject, queryable = pool) => queryable.query(
+  `${USER_WITH_ACTIVE_DELETION_REQUEST_SELECT}
+   WHERE u.cognito_sub = $1`,
+  [subject],
+);
+
 const findUserByIdentity = async (identity) => {
   if (identity.localUserId) {
     if (!UUID_REGEX.test(identity.localUserId)) {
       throw createUnmappedIdentityError();
     }
-    return pool.query('SELECT * FROM users WHERE id = $1', [identity.localUserId]);
+    return selectUserByLocalId(identity.localUserId);
   }
 
   if (identity.subject) {
-    const subjectResult = await pool.query('SELECT * FROM users WHERE cognito_sub = $1', [identity.subject]);
+    const subjectResult = await selectUserByCognitoSubject(identity.subject);
     if (subjectResult.rowCount > 0 || !identity.phoneNumber) {
       return subjectResult;
     }
@@ -88,24 +115,39 @@ const findUserByIdentity = async (identity) => {
     try {
       await client.query('BEGIN');
       const phoneResult = await client.query(
-        'SELECT * FROM users WHERE phone_number = $1 AND cognito_sub IS NULL FOR UPDATE',
+        `${USER_WITH_ACTIVE_DELETION_REQUEST_SELECT}
+         WHERE u.phone_number = $1
+           AND u.cognito_sub IS NULL
+         FOR UPDATE OF u`,
         [identity.phoneNumber]
       );
 
       if (phoneResult.rowCount === 0) {
-        const remappedResult = await client.query(
-          'SELECT * FROM users WHERE cognito_sub = $1',
-          [identity.subject]
-        );
+        const remappedResult = await selectUserByCognitoSubject(identity.subject, client);
         await client.query('COMMIT');
         return remappedResult;
       }
 
       const mappedResult = await client.query(
-        `UPDATE users
-         SET cognito_sub = $1
-         WHERE id = $2 AND cognito_sub IS NULL
-         RETURNING *`,
+        `WITH updated_user AS (
+           UPDATE users
+           SET cognito_sub = $1
+           WHERE id = $2 AND cognito_sub IS NULL
+           RETURNING *
+         )
+         SELECT
+           u.*,
+           adr.id AS active_deletion_request_id,
+           adr.status AS active_deletion_request_status
+         FROM updated_user u
+         LEFT JOIN LATERAL (
+           SELECT id, status
+           FROM account_deletion_requests
+           WHERE user_id = u.id
+             AND status IN ('REQUESTED', 'PROCESSING')
+           ORDER BY requested_at DESC
+           LIMIT 1
+         ) adr ON true`,
         [identity.subject, phoneResult.rows[0].id]
       );
 
@@ -166,6 +208,15 @@ const mapProviderRoles = (identity) => {
   return Array.isArray(identity.roles) ? normalizeRoleList(identity.roles) : [];
 };
 
+const mapActiveDeletionRequest = (user) => (
+  user.active_deletion_request_id
+    ? {
+      id: user.active_deletion_request_id,
+      status: user.active_deletion_request_status,
+    }
+    : null
+);
+
 export class AuthService {
   constructor(identityProvider = getIdentityProvider()) {
     this.identityProvider = identityProvider;
@@ -207,6 +258,7 @@ export class AuthService {
       displayName: user.display_name,
       cognitoSub: user.cognito_sub || null,
       status: user.status,
+      activeDeletionRequest: mapActiveDeletionRequest(user),
       roles: normalizeRoleList([...databaseRoles, ...providerRoles]),
       databaseRoles,
       providerRoles,
