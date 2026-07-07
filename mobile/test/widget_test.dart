@@ -1,12 +1,23 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:trustbite_mobile/src/app.dart';
+import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 
 void main() {
-  testWidgets('renders TrustBite home screen', (tester) async {
-    await tester.pumpWidget(const TrustBiteApp());
+  testWidgets('shows the separate TrustBite login entry screen',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
 
-    expect(find.text('TrustBite'), findsOneWidget);
-    expect(find.text('Trust in every bite'), findsOneWidget);
-    expect(find.text('Verified reviews'), findsOneWidget);
+    expect(find.text('Đăng nhập'), findsWidgets);
+    expect(find.text('Đăng ký'), findsOneWidget);
+    expect(find.text('Số điện thoại'), findsOneWidget);
+    expect(
+        find.text('Nhập số điện thoại để nhận mã đăng nhập.'), findsOneWidget);
+    expect(find.text('Tiếp tục với Google'), findsOneWidget);
+
+    await tester.tap(find.text('Đăng ký'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tạo tài khoản mới bằng số điện thoại của bạn.'),
+        findsOneWidget);
   });
 }

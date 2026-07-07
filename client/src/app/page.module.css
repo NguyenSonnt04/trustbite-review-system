@@ -62,6 +62,14 @@
   gap: 6px;
 }
 
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
 /* Layout Split-Screen default >= 1024px */
 .mainLayout {
   display: flex;
@@ -131,13 +139,18 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .filterBtn:hover, .filterActive {
   background: rgba(0, 242, 254, 0.1);
   border-color: var(--secondary);
   color: var(--secondary);
+}
+
+.filterBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 /* Restaurant List Section */
@@ -152,7 +165,7 @@
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   padding: 20px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease, box-shadow 0.3s ease;
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -163,6 +176,11 @@
   transform: translateY(-2px);
   border-color: hsla(180, 100%, 50%, 0.3);
   box-shadow: var(--shadow-lg), 0 0 15px rgba(0, 242, 254, 0.1);
+}
+
+.cardActive {
+  border-color: var(--secondary);
+  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
 }
 
 .restaurantHeader {
@@ -256,7 +274,7 @@
   flex-direction: column;
   align-items: center;
   transform: translate(-50%, -100%);
-  transition: all 0.3s ease;
+  transition: z-index 0.3s ease;
 }
 
 .mapPin:hover {
@@ -274,12 +292,12 @@
   justify-content: center;
   border: 2px solid #fff;
   box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .pinIconActive {
-  background: var(--secondary) !important;
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.8) !important;
+  background: var(--secondary);
+  box-shadow: 0 0 15px rgba(0, 242, 254, 0.8);
   transform: rotate(-45deg) scale(1.15);
 }
 
@@ -293,15 +311,15 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: rgba(0, 242, 254, 0.5);
+  background: rgba(0, 242, 254, 0.35);
   bottom: -4px;
-  transform: scaleY(0.5);
-  animation: pulseGlow 2s infinite;
+  opacity: 0;
+  transform: scaleY(0.5) scale(1.8);
+  transition: opacity 0.2s ease;
 }
 
-@keyframes pulseGlow {
-  0% { transform: scaleY(0.5) scale(1); opacity: 0.8; }
-  100% { transform: scaleY(0.5) scale(3.5); opacity: 0; }
+.pinGlowActive {
+  opacity: 0.7;
 }
 
 .pinPopup {
@@ -338,6 +356,71 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.fraudDescription,
+.emptyText {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.emptyText {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.formStack,
+.actionRow {
+  display: flex;
+  gap: 8px;
+}
+
+.formStack {
+  flex-direction: column;
+}
+
+.fileInput {
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.actionRow .filterBtn {
+  flex: 1;
+  font-size: 0.75rem;
+}
+
+.verifyButton {
+  width: 100%;
+  padding: 10px 0;
+  border-color: rgba(0, 242, 254, 0.4);
+}
+
+.logPanel {
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.resultBanner {
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.successBanner {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--success);
+  color: var(--success);
+}
+
+.failBanner {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--danger);
+  color: var(--danger);
 }
 
 .stepList {
@@ -381,6 +464,14 @@
   background-color: rgba(255, 255, 255, 0.05);
   color: var(--muted);
   border: 1px solid var(--card-border);
+}
+
+.stepMessageDone {
+  color: #fff;
+}
+
+.stepMessageFail {
+  color: var(--danger);
 }
 
 /* Responsiveness <= 1024px */
