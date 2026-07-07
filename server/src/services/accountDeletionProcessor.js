@@ -6,6 +6,7 @@ import { s3ObjectStorage } from './objectStorage.js';
 
 const DEFAULT_BATCH_SIZE = 10;
 const MAX_BATCH_SIZE = 100;
+const MAX_CLEANUP_ATTEMPTS = 5;
 const COMPLETION_RETAINED_DATA_REASON = 'security audit minimum; fraud minimum; retained Cognito subject deny mapping and audit/fraud references';
 
 const clampBatchSize = (value) => {
@@ -44,11 +45,12 @@ const selectDueRequest = async (client, excludedRequestIds = []) => {
       WHERE adr.status IN ('REQUESTED', 'PROCESSING')
         AND (adr.scheduled_deletion_at IS NULL OR adr.scheduled_deletion_at <= now())
         AND (adr.legal_hold = false OR adr.cleanup_state <> 'LEGAL_HOLD')
+        AND adr.cleanup_attempts < $2
         AND adr.id <> ALL($1::uuid[])
       ORDER BY adr.requested_at ASC
       LIMIT 1
      FOR UPDATE OF adr, u SKIP LOCKED`,
-    [excludedRequestIds],
+    [excludedRequestIds, MAX_CLEANUP_ATTEMPTS],
   );
 
   return result.rows[0] ?? null;
@@ -383,15 +385,20 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
       [request.user_id],
     );
     const restaurantAggregateCount = await recomputeAffectedRestaurantAggregates(client, request.user_id);
-      await client.query(
-        `UPDATE receipt_verifications
-         SET file_url = 'deleted:receipt-file:' || id::text,
+    // Keep only previously verified transaction hashes as fraud-minimum evidence
+    // so deleted verified receipts still block replay of the same transaction.
+    await client.query(
+      `UPDATE receipt_verifications
+          SET file_url = 'deleted:receipt-file:' || id::text,
           file_hash_sha256 = encode(digest('trustbite-deleted-receipt-file-hash:' || id::text, 'sha256'), 'hex'),
-          transaction_unique_hash = NULL,
-           redacted_file_url = CASE
-             WHEN redacted_file_url IS NULL THEN NULL
-             ELSE 'deleted:receipt-redacted:' || id::text
-           END,
+          transaction_unique_hash = CASE
+            WHEN status = 'VERIFIED' THEN transaction_unique_hash
+            ELSE NULL
+          END,
+          redacted_file_url = CASE
+            WHEN redacted_file_url IS NULL THEN NULL
+            ELSE 'deleted:receipt-redacted:' || id::text
+          END,
           status = 'DELETED',
           ocr_text = NULL,
           ocr_restaurant_name = NULL,

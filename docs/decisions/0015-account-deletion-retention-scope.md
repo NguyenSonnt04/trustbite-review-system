@@ -20,6 +20,7 @@ For this story, completion is scoped to the migrated schema fields that can be p
 - TrustBite-owned S3 object cleanup remains in scope for profile avatar, receipt raw/redacted files, review media, and merchant claim evidence because those fields are reachable from the deleting user in the migrated schema.
 - `restaurant_images.image_url` / `restaurant_images.caption` and broader restaurant, menu, branch, operating-hours, category, amenity, and payment-method content are not account-owned data for this story because the migrated schema lacks a user or merchant ownership column for those rows. They must not be deleted or rewritten by account deletion guesswork.
 - Fraud and audit references tied to the deleted user, review, or receipt are retained as fraud/audit minimum records under the deletion request retained-data reason. Per-category expiry is a future retention-policy story.
+- Receipt `transaction_unique_hash` values for deleted verified receipts are retained as fraud-minimum duplicate-prevention evidence. The duplicate transaction unique index continues to cover `DELETED` receipt rows so account deletion cannot make a previously verified transaction replayable by another account.
 
 ## Consequences
 

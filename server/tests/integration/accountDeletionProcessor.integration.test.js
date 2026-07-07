@@ -1335,6 +1335,100 @@ describe('account deletion processor', () => {
       }
     });
 
+    it('skips maxed retryable requests so later due cleanup can run', async () => {
+      const maxedUser = await createUser({ displayName: 'Maxed Retry Target' });
+      const dueUser = await createUser({ displayName: 'After Maxed Retry Target' });
+      await query(
+        `UPDATE users
+         SET status = 'DELETED',
+             cognito_sub = $2
+         WHERE id = $1`,
+        [maxedUser.id, `maxed-retry-sub-${maxedUser.id}`],
+      );
+      await query(
+        `UPDATE users
+         SET cognito_sub = $2
+         WHERE id = $1`,
+        [dueUser.id, `after-maxed-retry-sub-${dueUser.id}`],
+      );
+      await query(
+        `INSERT INTO account_deletion_requests (
+           user_id,
+           status,
+           cleanup_state,
+           cleanup_attempts,
+           cleanup_last_error_code,
+           reason,
+           requested_at,
+           scheduled_deletion_at
+         )
+         VALUES ($1, 'PROCESSING', 'RETRYABLE', 5, 'EXTERNAL_CLEANUP_FAILED', $2, now() - interval '3 minutes', now() - interval '2 minutes')`,
+        [maxedUser.id, 'Sensitive maxed retry reason'],
+      );
+      await query(
+        `INSERT INTO account_deletion_requests (
+           user_id,
+           reason,
+           requested_at,
+           scheduled_deletion_at
+         )
+         VALUES ($1, $2, now() - interval '2 minutes', now() - interval '1 minute')`,
+        [dueUser.id, 'Sensitive due after maxed retry reason'],
+      );
+      const identityProvider = {
+        deleteUser: vi.fn().mockImplementation(({ username }) => {
+          if (username === `maxed-retry-sub-${maxedUser.id}`) {
+            return Promise.reject(Object.assign(new Error('provider still down'), {
+              name: 'ProviderUnavailable',
+            }));
+          }
+          return Promise.resolve({ deleted: true, signedOut: true });
+        }),
+      };
+      const objectStorage = {
+        deleteOwnedObject: vi.fn().mockResolvedValue({ deleted: true }),
+      };
+
+      try {
+        const result = await processDueAccountDeletions({
+          batchSize: 1,
+          identityProvider,
+          objectStorage,
+        });
+
+        expect(result).toMatchObject({ processed: 1, completed: 1, failed: 0, skipped: 0 });
+        expect(identityProvider.deleteUser).toHaveBeenCalledWith({
+          username: `after-maxed-retry-sub-${dueUser.id}`,
+        });
+
+        const rows = await query(
+          `SELECT adr.status, adr.cleanup_state, adr.cleanup_attempts, u.status AS user_status
+           FROM account_deletion_requests adr
+           JOIN users u ON u.id = adr.user_id
+           WHERE u.id IN ($1, $2)
+           ORDER BY adr.requested_at ASC`,
+          [maxedUser.id, dueUser.id],
+        );
+
+        expect(rows.rows).toEqual([
+          expect.objectContaining({
+            status: 'PROCESSING',
+            cleanup_state: 'RETRYABLE',
+            cleanup_attempts: 5,
+            user_status: 'DELETED',
+          }),
+          expect.objectContaining({
+            status: 'COMPLETED',
+            cleanup_state: 'COMPLETED',
+            user_status: 'DELETED',
+          }),
+        ]);
+      } finally {
+        await cleanupUser(maxedUser.id);
+        await cleanupUser(dueUser.id);
+      }
+    });
+
     it('removes relationship and system rows that would keep deleted-account state active', async () => {
       const user = await createUser({ displayName: 'Relationship Retention Target' });
     const otherUser = await createUser({ displayName: 'Relationship Retention Other' });
@@ -1875,6 +1969,24 @@ describe('account deletion processor', () => {
         user.id,
       ],
     );
+    const rejectedReceipt = await query(
+      `INSERT INTO receipt_verifications (
+         review_id, user_id, restaurant_id, file_url, file_hash_sha256,
+         transaction_unique_hash, status, decision
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       RETURNING id`,
+      [
+        review.id,
+        user.id,
+        restaurant.id,
+        's3://trustbite-invoices/receipts/rejected-receipt-proof.png',
+        'a'.repeat(64),
+        'b'.repeat(64),
+        'REJECTED',
+        'REJECTED',
+      ],
+    );
     const otherMerchant = await query(
       `INSERT INTO merchants (user_id, business_name, status)
        VALUES ($1, $2, $3)
@@ -1954,6 +2066,12 @@ describe('account deletion processor', () => {
          WHERE id = $1`,
         [otherReceipt.rows[0].id],
       );
+      const rejectedReceiptRows = await query(
+        `SELECT transaction_unique_hash, status
+         FROM receipt_verifications
+         WHERE id = $1`,
+        [rejectedReceipt.rows[0].id],
+      );
       const otherClaimRows = await query(
         `SELECT evidence_url, admin_note, decided_by
          FROM restaurant_claims
@@ -1983,7 +2101,6 @@ describe('account deletion processor', () => {
         visited_at: null,
       });
       expect(receiptRows.rows[0]).toMatchObject({
-        transaction_unique_hash: null,
         status: 'DELETED',
         fraud_risk_score: 0,
         decision: null,
@@ -1992,6 +2109,45 @@ describe('account deletion processor', () => {
       });
       expect(receiptRows.rows[0].file_hash_sha256).toMatch(/^[0-9a-f]{64}$/);
       expect(receiptRows.rows[0].file_hash_sha256).not.toBe('c'.repeat(64));
+      expect(receiptRows.rows[0].transaction_unique_hash).toBe('d'.repeat(64));
+      await expect(query(
+        `INSERT INTO receipt_verifications (
+           review_id, user_id, restaurant_id, file_url, file_hash_sha256,
+           transaction_unique_hash, status, decision
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          otherReview.id,
+          otherUser.id,
+          restaurant.id,
+          's3://trustbite-invoices/receipts/replayed-transaction.png',
+          'f'.repeat(64),
+          'd'.repeat(64),
+          'VERIFIED',
+          'VERIFIED',
+        ],
+      )).rejects.toMatchObject({ code: '23505' });
+      expect(rejectedReceiptRows.rows[0]).toMatchObject({
+        transaction_unique_hash: null,
+        status: 'DELETED',
+      });
+      await expect(query(
+        `INSERT INTO receipt_verifications (
+           review_id, user_id, restaurant_id, file_url, file_hash_sha256,
+           transaction_unique_hash, status, decision
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          otherReview.id,
+          otherUser.id,
+          restaurant.id,
+          's3://trustbite-invoices/receipts/rejected-transaction-retry.png',
+          '1'.repeat(64),
+          'b'.repeat(64),
+          'VERIFIED',
+          'VERIFIED',
+        ],
+      )).resolves.toMatchObject({ rowCount: 1 });
       expect(otherReceiptRows.rows[0]).toMatchObject({
         file_hash_sha256: 'e'.repeat(64),
         decision_reason: 'Other receipt decision reason',
