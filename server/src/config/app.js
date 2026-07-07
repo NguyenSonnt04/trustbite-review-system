@@ -17,9 +17,16 @@ const parseCsv = (value = '') => value
   .map((item) => item.trim())
   .filter(Boolean);
 
-const parseBoolean = (value = '') => value.trim().toLowerCase() === 'true';
+const parseBoolean = (value, defaultValue = false) => {
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+  return value.trim().toLowerCase() === 'true';
+};
 
-const env = process.env.NODE_ENV || 'development';
+const explicitNodeEnv = process.env.NODE_ENV;
+const env = explicitNodeEnv || 'development';
+const phoneFallbackDefault = ['development', 'test'].includes(explicitNodeEnv);
 
 const avatarAllowedHosts = parseCsv(process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS)
   .map((host) => host.toLowerCase());
@@ -38,6 +45,7 @@ export default {
   trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
   auth: {
     provider: 'cognito',
+    phoneFallbackEnabled: parseBoolean(process.env.AUTH_PHONE_FALLBACK_ENABLED, phoneFallbackDefault),
     cognito: {
       userPoolId: cognitoUserPoolId,
       clientId: cognitoClientId,

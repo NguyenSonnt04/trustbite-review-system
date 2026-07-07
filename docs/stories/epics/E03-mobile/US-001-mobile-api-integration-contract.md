@@ -64,7 +64,7 @@ The Flutter mobile app must integrate with the Express backend through documente
 ## Validation
 
 When updating durable proof status, use numeric booleans:
-`scripts/bin/harness-cli story update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0`.
+`npm run harness -- story update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0`.
 
 | Layer | Expected proof |
 | --- | --- |
@@ -81,3 +81,5 @@ Harness CLI is not installed in `scripts/bin/` in this workspace, so no durable 
 ## Evidence
 
 - Story created to document planned mobile/backend API contract before implementation.
+- 2026-07-07 review follow-up added `MobileRuntimeConfig` with API v1 URI normalization, null-query filtering, and Cognito config readiness checks to satisfy the existing Flutter contract test. Local validation remains blocked because `flutter` is not on PATH, so `npm run mobile:test` cannot run on this machine.
+- 2026-07-07 review follow-up tightened `MobileRuntimeConfig.hasCognitoConfig` so mobile auth is only enabled when `awsRegion`, `cognitoUserPoolId`, and `cognitoClientId` are all non-empty. Added a Flutter contract test for the missing-region case. Local validation remains blocked because neither `flutter` nor `dart` is on PATH.

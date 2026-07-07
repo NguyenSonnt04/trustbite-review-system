@@ -24,7 +24,7 @@ The TrustBite repository has a GitHub Actions baseline that validates pull reque
 - A CI workflow exists under `.github/workflows/` and runs on pull requests and pushes to `main`.
 - CI installs Node dependencies with npm cache support and runs the currently available checks without claiming unavailable backend proof.
 - Client lint and build are included because `client/package.json` exposes `lint` and `build` scripts.
-- Server dependency installation is included, but backend build/test proof is explicitly omitted until server scripts exist.
+- Server dependency installation, server syntax build, database migration, and server tests are included because `server/package.json` now exposes build/test scripts.
 - Mobile tests run in a separate job after GitHub Actions installs Flutter, so Node/web CI and mobile proof remain separated.
 - Harness matrix query runs in CI after installing the local Harness CLI from the pinned installer revision.
 - A security workflow exists for CodeQL and dependency review without AWS secrets or deploy permissions.
@@ -38,6 +38,9 @@ The TrustBite repository has a GitHub Actions baseline that validates pull reque
   - `npm run lint --prefix client`
   - `npm run build --prefix client`
   - `npm ci --prefix server`
+  - `npm run build --prefix server`
+  - `npm run db:migrate --prefix server` against the CI PostGIS service.
+  - `npm run test --prefix server`
   - pinned Harness CLI installer, then `npm run harness -- query matrix`
   - `flutter test` in the mobile job after `subosito/flutter-action` installs Flutter.
 - Queries:
@@ -100,3 +103,6 @@ Observed results:
 - Review fix: story wording was aligned with the actual workflow, where Flutter is installed in CI rather than pre-detected.
 - PR #4 fix: CI installs the pinned Harness CLI and initializes/imports brownfield Harness records before querying the matrix; CodeQL permissions include `actions: read`; dependency review and CodeQL upload remain visible but non-blocking when unsupported by repository security settings.
 - PR #13 fix: CodeQL action pin was refreshed from v4.35.1 to v4.36.2 after the older pin failed during feature-enable init with `Requires authentication`; `security.yml` actionlint validation continued to pass locally.
+- 2026-07-05 refresh: local Harness CLI v0.1.10 installed and `node scripts/harness.mjs import brownfield` populated the local matrix.
+- 2026-07-05 refresh: `npm run lint --prefix client`, `npm run client:build`, `npm run server:build`, `npm run server:test`, `npm run mobile:test`, `npm run docker:up`, and `npm run db:migrate` passed locally.
+- 2026-07-05 refresh: CI now provisions a PostGIS PostgreSQL service, runs server migrations, and runs the full server Vitest suite instead of only syntax-checking server sources.

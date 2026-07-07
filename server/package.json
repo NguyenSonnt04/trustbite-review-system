@@ -8,10 +8,11 @@
     "dev": "nodemon src/server.js",
     "build": "node scripts/check-syntax.mjs",
     "db:migrate": "node scripts/migrate.js",
-    "test": "vitest run",
+    "deletions:process": "node scripts/process-deletions.mjs",
+    "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run tests/integration"
+    "test:integration": "vitest run --no-file-parallelism tests/integration"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.0.0",
@@ -26,6 +27,7 @@
     "express": "^4.19.2",
     "helmet": "^7.1.0",
     "ioredis": "5.11.1",
+    "multer": "^2.2.0",
     "pg": "^8.11.5"
   },
   "devDependencies": {

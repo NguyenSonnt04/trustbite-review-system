@@ -86,7 +86,7 @@ Policy documents describe how to work. The durable layer stores what happened.
 
 Operational data — intake classifications, story status, decision outcomes,
 backlog items, and execution traces — lives in a SQLite database (`harness.db`)
-managed by the Rust Harness CLI at `scripts/bin/harness-cli`. Agents and humans
+managed by the Rust Harness CLI at `npm run harness -- ...`. Agents and humans
 should use that binary for Harness work. The database is local to each project
 instance and `.gitignore`d. The schema is version-controlled under
 `scripts/schema/`.
@@ -124,7 +124,7 @@ After cloning the repository, install or refresh the local Harness CLI from the 
 
 ```bash
 # macOS/Linux
-HARNESS_INSTALLER_REV=79c9bb2938e3b1669af83be59a05d4b1988bf0ca
+HARNESS_INSTALLER_REV=f07cd06db8f329cbe4009b730704d67ed8c3016e
 curl -fsSLo /tmp/install-harness.sh "https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}/scripts/install-harness.sh"
 less /tmp/install-harness.sh
 HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-harness/${HARNESS_INSTALLER_REV}" \
@@ -133,7 +133,7 @@ HARNESS_SOURCE_BASE_URL="https://raw.githubusercontent.com/hoangnb24/repository-
 
 ```powershell
 # Windows PowerShell
-$HarnessInstallerRev = "79c9bb2938e3b1669af83be59a05d4b1988bf0ca"
+$HarnessInstallerRev = "f07cd06db8f329cbe4009b730704d67ed8c3016e"
 $Installer = "$env:TEMP\install-harness.ps1"
 Invoke-WebRequest -Uri "https://raw.githubusercontent.com/hoangnb24/repository-harness/$HarnessInstallerRev/scripts/install-harness.ps1" -OutFile $Installer
 Get-Content $Installer
@@ -141,34 +141,40 @@ $env:HARNESS_SOURCE_BASE_URL = "https://raw.githubusercontent.com/hoangnb24/repo
 & $Installer -Merge -Yes
 ```
 
-Initialize the database if it does not exist:
+Initialize the database if it does not exist, then apply any schema migrations shipped by the refreshed Harness docs:
 
 ```bash
 npm run harness -- init
+npm run harness -- migrate
+npm run harness -- --version
 ```
+
+This repository currently pins `harness-cli-v0.1.10`. After a refresh, `npm run harness -- --version` should print `harness-cli 0.1.10`. If the version is older, reinstall the CLI from the pinned installer commands above or set `HARNESS_CLI_RELEASE_TAG=harness-cli-v0.1.10` before running the installer.
 
 Common commands:
 
 ```bash
-scripts/bin/harness-cli intake  --type <type> --summary <text> --lane <lane>
-scripts/bin/harness-cli story   add --id <id> --title <text> --lane <lane>
-scripts/bin/harness-cli story   update --id <id> --status <status>
-scripts/bin/harness-cli story   update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0
-scripts/bin/harness-cli story   verify <id>
-scripts/bin/harness-cli story   verify-all
-scripts/bin/harness-cli decision add --id <id> --title <text> --doc docs/decisions/<file>.md
-scripts/bin/harness-cli trace   --summary <text> --outcome <outcome>
-scripts/bin/harness-cli score-trace
-scripts/bin/harness-cli score-context <trace-id>
-scripts/bin/harness-cli audit
-scripts/bin/harness-cli propose
-scripts/bin/harness-cli query   matrix
-scripts/bin/harness-cli query   matrix --numeric
-scripts/bin/harness-cli query   backlog
-scripts/bin/harness-cli query   tools --summary
-scripts/bin/harness-cli query   interventions
-scripts/bin/harness-cli query   stats
-scripts/bin/harness-cli --version
+npm run harness -- intake  --type <type> --summary <text> --lane <lane>
+npm run harness -- story   add --id <id> --title <text> --lane <lane>
+npm run harness -- story   update --id <id> --status <status>
+npm run harness -- story   update --id <id> --unit 1 --integration 1 --e2e 0 --platform 0
+npm run harness -- story   verify <id>
+npm run harness -- story   verify-all
+npm run harness -- decision add --id <id> --title <text> --doc docs/decisions/<file>.md
+npm run harness -- trace   --summary <text> --outcome <outcome>
+npm run harness -- score-trace
+npm run harness -- score-context <trace-id>
+npm run harness -- audit
+npm run harness -- propose
+npm run harness -- query   matrix
+npm run harness -- query   matrix --numeric
+npm run harness -- query   backlog
+npm run harness -- tool    check
+npm run harness -- query   tools --summary
+npm run harness -- query   tools --capability <name> --status present
+npm run harness -- query   interventions
+npm run harness -- query   stats
+npm run harness -- --version
 ```
 
 ## Source Hierarchy
@@ -183,7 +189,7 @@ docs/product/*
 docs/stories/*
   story-sized work packets and historical evidence
 
-scripts/bin/harness-cli query matrix
+npm run harness -- query matrix
   behavior-to-proof control panel backed by the durable layer
 
 docs/decisions/*
@@ -232,7 +238,7 @@ Large product areas should use scoped initiative notes instead of a second
 monolithic specification. An initiative should explain the goal, affected
 product docs, candidate stories, validation shape, open decisions, and exit
 criteria. If initiative work becomes a repeated pattern, add a template or
-record the proposal with `scripts/bin/harness-cli backlog add`.
+record the proposal with `npm run harness -- backlog add`.
 
 ## Growth Rule
 
@@ -243,7 +249,7 @@ command, discovers a missing rule, or sees a recurring failure pattern, it must
 either improve the harness directly or record the friction:
 
 ```bash
-scripts/bin/harness-cli backlog add --title "<short name>" --pain "<what was hard>"
+npm run harness -- backlog add --title "<short name>" --pain "<what was hard>"
 ```
 
 Use the backlog outcome loop for improvements that are expected to change agent
@@ -253,15 +259,15 @@ behavior or validation results:
    impact expected from the improvement.
 2. When closing the item, fill `--outcome` with the actual measured result or
    review evidence.
-3. Use `scripts/bin/harness-cli query backlog --open` to review proposed and accepted
-   items, and `scripts/bin/harness-cli query backlog --closed` to compare predictions
+3. Use `npm run harness -- query backlog --open` to review proposed and accepted
+   items, and `npm run harness -- query backlog --closed` to compare predictions
    with outcomes after implementation.
 
 The `harness_friction` field on traces also captures per-task friction so
 patterns can be queried later:
 
 ```bash
-scripts/bin/harness-cli query friction
+npm run harness -- query friction
 ```
 
 Backlog risk uses the same lane vocabulary as intake and stories:
@@ -273,29 +279,48 @@ items; `low` is not a valid lane.
 For every task:
 
 1. Classify the request with `docs/FEATURE_INTAKE.md`.
-2. Record the classification with `scripts/bin/harness-cli intake`.
+2. Record the classification with `npm run harness -- intake`.
 3. Locate the affected product docs and story files.
-4. Check proof status with `scripts/bin/harness-cli query matrix`.
+4. Check proof status with `npm run harness -- query matrix`.
 5. Work only inside the selected lane: tiny, normal, or high-risk.
 6. Before finishing, ask whether product truth, validation expectations,
    architecture rules, repeated failure patterns, or next-agent instructions
    changed.
-7. Record a trace with `scripts/bin/harness-cli trace`, using
+7. Record a trace with `npm run harness -- trace`, using
    `docs/TRACE_SPEC.md` for the expected trace tier and field depth.
-8. Review the trace score printed by `scripts/bin/harness-cli trace`; use
-   `scripts/bin/harness-cli score-trace --id <id>` only when re-checking a
+8. Review the trace score printed by `npm run harness -- trace`; use
+   `npm run harness -- score-trace --id <id>` only when re-checking a
    specific historical trace.
 9. If harness friction was found, either fix it directly or record it with
-   `scripts/bin/harness-cli backlog add`.
+   `npm run harness -- backlog add`.
+
+## Tool Registry And Optional Capabilities
+
+Harness v0.1.10 adds an inbound tool registry. Use it to record optional project tools and scan whether they are available on the current machine. A missing optional tool is a clean degrade path, not a Harness failure.
+
+```bash
+npm run harness -- tool register \
+  --name deploy-check \
+  --kind cli \
+  --capability deploy-verification \
+  --command ./scripts/deploy-check.sh \
+  --description "Verify deploy health before release" \
+  --responsibility Verification
+
+npm run harness -- tool check
+npm run harness -- query tools --capability deploy-verification --status present
+```
+
+Tool kinds are `cli`, `binary`, `mcp`, `skill`, and `http`. For `mcp`, `skill`, or `http`, pass `--scan <path-or-url>` so `tool check` can persist `present`, `missing`, or `unknown`. See `docs/TOOL_REGISTRY.md` for the degrade ladder and full command reference.
 
 ## Story Verification
 
 Stories may carry a mechanical proof command:
 
 ```bash
-scripts/bin/harness-cli story add --id US-012 --title "Story verification" --lane normal --verify "cargo test --workspace"
-scripts/bin/harness-cli story update --id US-012 --verify "cargo test --workspace"
-scripts/bin/harness-cli story verify US-012
+npm run harness -- story add --id US-012 --title "Story verification" --lane normal --verify "cargo test --workspace"
+npm run harness -- story update --id US-012 --verify "cargo test --workspace"
+npm run harness -- story verify US-012
 ```
 
 `story verify` runs the command from the repository root, records
@@ -308,7 +333,7 @@ passed, the trace still records but prints an advisory warning before close.
 `story update`, using numeric values: `1` means yes and `0` means no. The Rust
 CLI rejects text values such as `yes` and `no`.
 
-Use `scripts/bin/harness-cli query matrix --numeric` when copying proof values
+Use `npm run harness -- query matrix --numeric` when copying proof values
 back into `story update`. The default matrix output is human-readable
 `yes`/`no`; the numeric output mirrors CLI input.
 
@@ -323,7 +348,7 @@ validation changes, record the decision in both places:
 2. Add or refresh the durable record:
 
 ```bash
-scripts/bin/harness-cli decision add \
+npm run harness -- decision add \
   --id 0008-auth-boundary \
   --title "Auth Boundary" \
   --doc docs/decisions/0008-auth-boundary.md \
@@ -338,13 +363,13 @@ record requirement.
 
 Agents may update directly:
 
-- Story status and evidence via `scripts/bin/harness-cli story update`.
-- Test matrix rows via `scripts/bin/harness-cli story add` and
-  `scripts/bin/harness-cli story update`.
+- Story status and evidence via `npm run harness -- story update`.
+- Test matrix rows via `npm run harness -- story add` and
+  `npm run harness -- story update`.
 - Links from story packets to product docs.
 - Validation notes and reports.
 - Small clarifications tied to the current task.
-- Intake records, traces, and backlog items via `scripts/bin/harness-cli`.
+- Intake records, traces, and backlog items via `npm run harness -- ...`.
 
 Agents should ask for human confirmation before:
 
@@ -361,9 +386,9 @@ A task is done only when:
 - The requested change is completed or the blocker is documented.
 - Relevant docs, stories, and test matrix entries remain current.
 - Validation commands were run when they exist.
-- A trace has been recorded with `scripts/bin/harness-cli trace`.
+- A trace has been recorded with `npm run harness -- trace`.
 - Missing harness capabilities were recorded with
-  `scripts/bin/harness-cli backlog add`.
+  `npm run harness -- backlog add`.
 - The final response says what changed and what was not attempted.
 
 ## Future Validation Ladder

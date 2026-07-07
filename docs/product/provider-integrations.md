@@ -31,7 +31,9 @@ Cognito verification lives behind the identity provider adapter boundary accepte
 
 ## LocalStack And Test Doubles
 
-LocalStack is configured for local AWS simulation. Cognito coverage may differ from production AWS. When LocalStack cannot prove a Cognito behavior, use an explicit Cognito-compatible test double that preserves JWT claim and JWKS semantics for tests.
+LocalStack is configured for local AWS simulation. Cognito coverage may differ from production AWS. When LocalStack cannot prove a Cognito behavior, use an explicit Cognito-compatible test double that preserves the relevant provider semantics for tests. For token verification this means JWT claim and JWKS behavior; for account cleanup this means the real Cognito provider boundary issues global sign-out before admin delete and treats `UserNotFoundException` as idempotent.
+
+The local Docker Compose environment pins `localstack/localstack:4.4.0` instead of `latest` because current `latest` images require a LocalStack auth token before startup. In the current community image, S3 provider smoke is available, but Cognito IdP is not exposed in the health output and returns an `InternalFailure` license/emulation error for admin APIs. Cognito admin cleanup is therefore proven locally with a Cognito-compatible admin client test double unless real AWS smoke or a configured LocalStack auth-token/pro environment is available.
 
 Rules for local/test provider behavior:
 

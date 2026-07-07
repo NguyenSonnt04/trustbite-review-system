@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import { createHttpError } from '../utils/httpErrors.js';
+import { createReviewHandler } from '../controllers/review.js';
+import { authMiddleware } from '../middlewares/auth.js';
 
 const router = Router();
 
-router.use(() => {
-  throw createHttpError(501, 'ROUTE_NOT_IMPLEMENTED', 'Review routes are not implemented yet');
-});
+router.post('/', authMiddleware, createReviewHandler);
 
 export default router;

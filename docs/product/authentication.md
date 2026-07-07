@@ -56,6 +56,7 @@ Reject requests when:
 - the token is missing, malformed, expired, wrong issuer, wrong client id, wrong token use, or has an invalid signature,
 - the Cognito subject cannot be mapped to an allowed TrustBite user for routes that require a local account,
 - the local user has `status = SUSPENDED` or `status = DELETED`,
+- the local user has an active account deletion request in `REQUESTED` or `PROCESSING`, except for the account deletion request lifecycle endpoints that expose status and cancellation rules,
 - the user lacks the product role/permission for the requested action.
 
 Never log raw access tokens, ID tokens, refresh tokens, OTP codes, or full sensitive identity values.

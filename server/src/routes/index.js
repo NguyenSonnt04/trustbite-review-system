@@ -7,6 +7,7 @@ import { Router } from 'express';
 import adminRoutes from './admin.js';
 import authRoutes from './auth.js';
 import awsRoutes from './aws.js';
+import receiptRoutes from './receipt.js';
 import restaurantRoutes from './restaurant.js';
 import reviewRoutes from './review.js';
 import userRoutes from './user.js';
@@ -18,6 +19,7 @@ router.use('/auth', authRoutes);
 router.use('/aws', awsRoutes);
 // Restaurant CRUD — Task 3.1 (PHASE 3 — Restaurant & Search)
 router.use('/restaurants', restaurantRoutes);
+router.use('/receipts', receiptRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/users', userRoutes);
 

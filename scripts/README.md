@@ -34,6 +34,12 @@ or `high-risk`. Use `tiny` instead of `low`. `query matrix` defaults to
 human-readable `yes`/`no`; use `query matrix --numeric` when copying values into
 `story update`.
 
+Harness CLI v0.1.10 adds `tool check` and `query tools --capability/--status`.
+After refreshing Harness, run `npm run harness -- migrate` so
+`scripts/schema/005-tool-extensions.sql` adds `kind`, `capability`,
+`scan_target`, `status`, and `checked_at` to the local tool registry. Then run
+`npm run harness -- tool check` to scan optional tools on the current machine.
+
 The schema lives in `scripts/schema/` and is version-controlled. The database
 file (`harness.db`) is `.gitignore`d.
 
@@ -59,6 +65,7 @@ npm run harness -- decision verify ...
 npm run harness -- backlog add ...
 npm run harness -- backlog close ...
 npm run harness -- tool register ...
+npm run harness -- tool check
 npm run harness -- tool remove ...
 npm run harness -- intervention add ...
 npm run harness -- trace ...
@@ -139,7 +146,7 @@ current platform into `scripts/bin/harness-cli` on macOS/Linux or
 `scripts/bin/harness-cli.exe` on Windows, then verifies its `.sha256` checksum.
 A source branch can pin the release used by the installer through
 `scripts/harness-cli-release-tag`; this repository currently pins
-`harness-cli-v0.1.9`. Set `HARNESS_CLI_RELEASE_TAG` to override that tag, or
+`harness-cli-v0.1.10`. Set `HARNESS_CLI_RELEASE_TAG` to override that tag, or
 set `HARNESS_CLI_BASE_URL` to point at an alternate artifact directory, such as
 a local `file:///.../dist` directory created by
 `scripts/build-harness-cli-release.sh`.
