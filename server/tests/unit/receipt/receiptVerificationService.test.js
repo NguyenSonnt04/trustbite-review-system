@@ -212,6 +212,12 @@ describe('verifyReceipt orchestrator', () => {
     expect(result.decision).toBe('REJECTED');
     expect(result.verificationStatus).toBe('DUPLICATE_REJECTED');
 
+    const duplicateLookup = calls.find((c) => (
+      /FROM\s+receipt_verifications/i.test(String(c.sql))
+      && /transaction_unique_hash\s*=/i.test(String(c.sql))
+    ));
+    expect(String(duplicateLookup.sql)).toMatch(/status\s+IN\s*\(\s*'VERIFIED'\s*,\s*'DELETED'\s*\)/i);
+
     const rev = reviewUpdate(calls);
     expect(rev.params).toEqual(expect.arrayContaining(['REJECTED', 'DUPLICATE_REJECTED', 'PRIVATE', 'NONE']));
 

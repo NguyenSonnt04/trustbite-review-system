@@ -232,14 +232,14 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
         })
       : null;
 
-    // --- Hard rule: duplicate transaction hash vs a prior VERIFIED receipt ---
-    // Intentional per TB-RECEIPT-VERIFY-001: REFERENCE_ONLY receipts do not block
-    // resubmission unless/until a prior receipt is promoted to VERIFIED.
+    // --- Hard rule: duplicate transaction hash vs a retained verified transaction ---
+    // Intentional per TB-RECEIPT-VERIFY-001 and migration 005: REFERENCE_ONLY receipts
+    // do not block resubmission, but VERIFIED and retained DELETED receipts do.
     if (transactionHash) {
       const dupResult = await client.query(
         `SELECT id FROM receipt_verifications
          WHERE transaction_unique_hash = $1
-           AND status = 'VERIFIED'
+           AND status IN ('VERIFIED', 'DELETED')
            AND id <> $2
          LIMIT 1`,
         [transactionHash, receipt.id],
@@ -255,7 +255,7 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
           publicVisibility: 'PRIVATE',
           trustWeightBucket: 'NONE',
         };
-        const reason = 'Duplicate transaction hash matches a previously verified receipt.';
+        const reason = 'Duplicate transaction hash matches a previously verified or retained deleted receipt.';
 
         await writeDecision(client, {
           receipt,
