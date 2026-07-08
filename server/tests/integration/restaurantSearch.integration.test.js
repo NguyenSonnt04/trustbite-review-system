@@ -149,6 +149,42 @@ describe('restaurant search API', () => {
     }
   });
 
+  it('matches Vietnamese restaurant names when the keyword omits diacritics', async () => {
+    const restaurant = await createSearchRestaurant({
+      name: 'Bún Chả Hương Liên',
+      address: '24 Lê Văn Hưu, Hà Nội',
+    });
+    const decomposedRestaurant = await createSearchRestaurant({
+      name: 'Phở Gà Kỳ Đồng'.normalize('NFD'),
+      address: 'Kỳ Đồng, Quận 3, TP.HCM',
+    });
+
+    try {
+      const response = await requestApp()
+        .get('/api/v1/restaurants')
+        .query({ keyword: 'bun cha huong lien' })
+        .expect(200);
+
+      expect(response.body.items).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: restaurant.id,
+            name: 'Bún Chả Hương Liên',
+          }),
+        ]),
+      );
+
+      const decomposedResponse = await requestApp()
+        .get('/api/v1/restaurants')
+        .query({ keyword: 'pho ga ky dong' })
+        .expect(200);
+
+      expect(decomposedResponse.body.items.map((item) => item.id)).toContain(decomposedRestaurant.id);
+    } finally {
+      await cleanupRestaurants([restaurant.id, decomposedRestaurant.id]);
+    }
+  });
+
   it('filters by minimum trust score', async () => {
     const token = `Trust Filter ${Date.now()}`;
     const trusted = await createSearchRestaurant({ name: `${token} Trusted`, trustScore: 4.75 });

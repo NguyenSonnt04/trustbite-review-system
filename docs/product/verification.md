@@ -26,6 +26,20 @@ Receipt `capturedAt` is optional client-supplied capture metadata. When supplied
 
 Receipt image SHA-256 hashes are unique for receipt verification records whose status is not `OCR_FAILED`. A matching non-failed hash is rejected as `DUPLICATE_RECEIPT_HASH` and creates a fraud flag for review.
 
+## Vietnam Receipt Parsing
+
+Textract `AnalyzeExpense` field names remain provider-defined, but mapped receipt
+values must tolerate common Vietnam receipt formats:
+
+- VND amounts may use dot or comma thousands separators and may include `VND`,
+  `đ`, or other currency symbols.
+- Receipt line-item quantities may be fractional with dot or comma decimal
+  separators and must not be parsed with currency thousands heuristics.
+- OCR receipt dates may arrive as ISO-like `yyyy-mm-dd` or Vietnam
+  day-month-year forms such as `dd/MM/yyyy`.
+- Client-supplied API timestamps such as `visitedAt` and `capturedAt` remain
+  ISO-8601 strings at the HTTP boundary.
+
 ## Current Scope
 
 `TB-FRAUD-002` only establishes the backend GPS proximity rule and unit proof. `TB-FRAUD-003` adds timestamp integrity and duplicate-hash proof for receipt/review creation. OCR extraction, receipt age scoring, GPS evidence persistence, public verification APIs, review status finalization, and trust score updates remain part of later review/verification stories.

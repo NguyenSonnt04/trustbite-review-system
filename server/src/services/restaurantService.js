@@ -42,6 +42,24 @@ export class ConflictError extends Error {
 
 const MAX_SLUG_ATTEMPTS = 5;
 
+const VIETNAMESE_SEARCH_CHAR_GROUPS = [
+  ['a', 'àáạảãâầấậẩẫăằắặẳẵ'],
+  ['e', 'èéẹẻẽêềếệểễ'],
+  ['i', 'ìíịỉĩ'],
+  ['o', 'òóọỏõôồốộổỗơờớợởỡ'],
+  ['u', 'ùúụủũưừứựửữ'],
+  ['y', 'ỳýỵỷỹ'],
+  ['d', 'đ'],
+];
+
+const VIETNAMESE_SEARCH_SOURCE = VIETNAMESE_SEARCH_CHAR_GROUPS
+  .map(([, chars]) => chars)
+  .join('');
+const VIETNAMESE_SEARCH_TARGET = VIETNAMESE_SEARCH_CHAR_GROUPS
+  .flatMap(([base, chars]) => [...chars].map(() => base))
+  .join('');
+const VIETNAMESE_COMBINING_MARKS = '\u0300\u0301\u0303\u0309\u0323\u0302\u0306\u031B';
+
 function isSlugConflict(err) {
   return err.code === '23505' && err.constraint === 'restaurants_slug_key';
 }
@@ -71,6 +89,14 @@ function generateSlug(name) {
   const base = slugify(name) || 'restaurant';
   const suffix = crypto.randomBytes(3).toString('hex');
   return `${base}-${suffix}`;
+}
+
+function normalizeVietnameseSearchText(value) {
+  return String(value)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/đ/gi, 'd')
+    .toLowerCase();
 }
 
 /** Common SELECT projection for a restaurant and its aggregated category IDs. */
@@ -193,8 +219,19 @@ export async function listRestaurants({
   let distanceExpression = '';
 
   if (keyword && keyword.trim()) {
-    params.push(`%${keyword.trim()}%`);
-    conditions.push(`r.name ILIKE $${params.length}`);
+    const rawKeywordParam = params.push(`%${keyword.trim()}%`);
+    const sourceParam = params.push(VIETNAMESE_SEARCH_SOURCE);
+    const targetParam = params.push(VIETNAMESE_SEARCH_TARGET);
+    const combiningMarksParam = params.push(VIETNAMESE_COMBINING_MARKS);
+    const normalizedKeywordParam = params.push(`%${normalizeVietnameseSearchText(keyword.trim())}%`);
+    conditions.push(`(
+      r.name ILIKE $${rawKeywordParam}
+      OR translate(
+        translate(lower(r.name), $${sourceParam}, $${targetParam}),
+        $${combiningMarksParam},
+        ''
+      ) LIKE $${normalizedKeywordParam}
+    )`);
   }
 
   if (hasLocation) {

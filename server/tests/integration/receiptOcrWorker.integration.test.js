@@ -1,0 +1,222 @@
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { query, deleteByIds, closeDbPool } from '../helpers/db.js';
+import { createUser, createRestaurant, createReview, createReceiptVerification } from '../helpers/factories/index.js';
+import { mockOcrProvider, registerMockReceipt, clearMockReceipts } from '../../src/services/providers/__mocks__/mockOcrProvider.js';
+import { runReceiptOcrJob, markPendingAdminReview } from '../../src/services/queue/receiptOcrWorker.js';
+
+const created = { users: [], restaurants: [], reviews: [], receipts: [] };
+
+async function seedReceipt() {
+  const user = await createUser();
+  const restaurant = await createRestaurant({ name: 'Pho 24', latitude: 10.77, longitude: 106.7 });
+  const review = await createReview({
+    userId: user.id,
+    restaurantId: restaurant.id,
+    status: 'SUBMITTED',
+    verificationStatus: 'PROCESSING',
+    trustLabel: 'PROCESSING',
+    publicVisibility: 'PRIVATE_UNTIL_DECISION',
+    trustWeightBucket: 'NONE',
+  });
+  const receipt = await createReceiptVerification({ reviewId: review.id, userId: user.id, restaurantId: restaurant.id });
+  created.users.push(user.id); created.restaurants.push(restaurant.id);
+  created.reviews.push(review.id); created.receipts.push(receipt.id);
+  return { user, restaurant, review, receipt };
+}
+
+const recRow = async (id) => (await query(`SELECT * FROM receipt_verifications WHERE id=$1`, [id])).rows[0];
+const revRow = async (id) => (await query(`SELECT * FROM reviews WHERE id=$1`, [id])).rows[0];
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+beforeEach(() => clearMockReceipts());
+
+afterEach(async () => {
+  await query(`DELETE FROM audit_logs WHERE entity_id = ANY($1::uuid[])`, [created.receipts]);
+  await deleteByIds('receipt_verifications', 'id', created.receipts);
+  await deleteByIds('reviews', 'id', created.reviews);
+  await deleteByIds('restaurants', 'id', created.restaurants);
+  await deleteByIds('users', 'id', created.users);
+  created.users = []; created.restaurants = []; created.reviews = []; created.receipts = [];
+});
+
+afterAll(async () => { await closeDbPool(); });
+
+describe('receipt OCR worker degrade behavior', () => {
+  it('markPendingAdminReview parks receipt + review without a fraud flag', async () => {
+    const { receipt, review } = await seedReceipt();
+
+    await markPendingAdminReview(receipt.id, 'OCR provider unavailable after retries');
+
+    const rec = await recRow(receipt.id);
+    const rev = await revRow(review.id);
+    expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+    expect(rev.status).toBe('PENDING_ADMIN_REVIEW');
+    expect(rev.public_visibility).toBe('PRIVATE_UNTIL_DECISION');
+    expect(rev.trust_weight_bucket).toBe('NONE');
+
+    const flags = await query(
+      `SELECT 1 FROM fraud_flag_entities WHERE entity_id=$1 AND entity_type='RECEIPT_VERIFICATION'`,
+      [receipt.id],
+    );
+    expect(flags.rows).toHaveLength(0);
+  });
+
+  it('markPendingAdminReview does not overwrite an already-final receipt decision', async () => {
+    const { receipt, review } = await seedReceipt();
+    await query(
+      `UPDATE receipt_verifications
+       SET status='VERIFIED', decision='VERIFIED', fraud_risk_score=0
+       WHERE id=$1`,
+      [receipt.id],
+    );
+    await query(
+      `UPDATE reviews
+       SET status='VERIFIED', verification_status='VERIFIED',
+           trust_label='VERIFIED', public_visibility='PUBLIC',
+           trust_weight_bucket='HIGH'
+       WHERE id=$1`,
+      [review.id],
+    );
+
+    const result = await markPendingAdminReview(receipt.id, 'late timeout');
+
+    const rec = await recRow(receipt.id);
+    const rev = await revRow(review.id);
+    expect(result).toMatchObject({ skipped: true, status: 'VERIFIED' });
+    expect(rec.status).toBe('VERIFIED');
+    expect(rec.decision).toBe('VERIFIED');
+    expect(rev.status).toBe('VERIFIED');
+    expect(rev.public_visibility).toBe('PUBLIC');
+
+    const audit = await query(
+      `SELECT 1 FROM audit_logs WHERE entity_id=$1 AND action='RECEIPT_OCR_DEGRADED'`,
+      [receipt.id],
+    );
+    expect(audit.rows).toHaveLength(0);
+  });
+
+    it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW and zombie OCR cannot overwrite it', async () => {
+      const { receipt, review } = await seedReceipt();
+      // Mock provider sleeps far past the job timeout.
+      registerMockReceipt(receipt.file_url, { delayMs: 200, struct: { lineItems: [] } });
+
+    const job = {
+      data: { receiptVerificationId: receipt.id },
+      attemptsMade: 2, // final attempt when attempts=3
+      opts: { attempts: 3 },
+    };
+
+    await runReceiptOcrJob(job, { provider: mockOcrProvider, timeoutMs: 20 });
+
+    expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+    await delay(250);
+
+    const rec = await recRow(receipt.id);
+    expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
+
+    it('loadFile timeout continuation cannot enter hash-check after final degrade', async () => {
+      const { receipt, review } = await seedReceipt();
+      let analyzed = false;
+      const provider = {
+        async loadFile() {
+          await delay(80);
+          return Buffer.from(`valid-receipt-${receipt.id}`, 'utf8');
+        },
+        async analyzeExpense() {
+          analyzed = true;
+          return {
+            rawText: 'receipt text',
+            restaurantName: 'Pho 24',
+            receiptTime: new Date('2026-06-12T08:00:00.000Z'),
+            invoiceNo: 'INV-TIMEOUT-CONTINUATION',
+            totalAmount: 120000,
+            lineItems: [],
+          };
+        },
+      };
+      const job = {
+        data: { receiptVerificationId: receipt.id },
+        attemptsMade: 2,
+        opts: { attempts: 3 },
+      };
+
+      await runReceiptOcrJob(job, { provider, timeoutMs: 20 });
+
+      expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+      await delay(140);
+
+      const rec = await recRow(receipt.id);
+      expect(analyzed).toBe(false);
+      expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
+
+      it('oversized zombie load cannot overwrite a final timeout degrade', async () => {
+        const previousMax = process.env.OCR_MAX_FILE_BYTES;
+        process.env.OCR_MAX_FILE_BYTES = '10';
+      const { receipt, review } = await seedReceipt();
+      const provider = {
+        async loadFile() {
+          await delay(80);
+          return Buffer.from('01234567890', 'utf8');
+        },
+        async analyzeExpense() {
+          throw new Error('oversized file should not reach OCR');
+        },
+      };
+      const job = {
+        data: { receiptVerificationId: receipt.id },
+        attemptsMade: 2,
+        opts: { attempts: 3 },
+      };
+
+      try {
+        await runReceiptOcrJob(job, { provider, timeoutMs: 20 });
+        expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+        expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+        await delay(120);
+      } finally {
+        if (previousMax == null) delete process.env.OCR_MAX_FILE_BYTES;
+        else process.env.OCR_MAX_FILE_BYTES = previousMax;
+      }
+
+      const rec = await recRow(receipt.id);
+      expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
+
+    it('provider error on a non-final attempt rethrows for retry (no degrade yet)', async () => {
+      const { receipt } = await seedReceipt();
+      registerMockReceipt(receipt.file_url, { behavior: 'error', errorMessage: 'transient' });
+
+    const job = { data: { receiptVerificationId: receipt.id }, attemptsMade: 0, opts: { attempts: 3 } };
+
+    await expect(runReceiptOcrJob(job, { provider: mockOcrProvider, timeoutMs: 5000 })).rejects.toThrow('transient');
+    const rec = await recRow(receipt.id);
+    // Still mid-pipeline; not degraded to pending on a retryable attempt.
+    expect(rec.status).not.toBe('PENDING_ADMIN_REVIEW');
+  });
+
+  it('provider error on the final attempt degrades to PENDING_ADMIN_REVIEW', async () => {
+    const { receipt, review } = await seedReceipt();
+    registerMockReceipt(receipt.file_url, { behavior: 'error', errorMessage: 'still failing' });
+
+    const job = { data: { receiptVerificationId: receipt.id }, attemptsMade: 2, opts: { attempts: 3 } };
+
+    await runReceiptOcrJob(job, { provider: mockOcrProvider, timeoutMs: 5000 });
+
+    expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+  });
+});
