@@ -1,4 +1,5 @@
 import { userService } from '../services/userService.js';
+import { avatarUploadService } from '../services/avatarStorageService.js';
 import { sendAccepted, sendSuccess } from '../utils/responses.js';
 
 export const getMe = async (req, res, next) => {
@@ -14,6 +15,19 @@ export const updateMe = async (req, res, next) => {
   try {
     const user = await userService.updateCurrentUser(req.user.id, req.body || {});
     sendSuccess(res, user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const createAvatarUploadUrl = async (req, res, next) => {
+  try {
+    const upload = await avatarUploadService.createUploadUrl({
+      userId: req.user.id,
+      contentType: req.body?.contentType,
+      fileSizeBytes: req.body?.fileSizeBytes,
+    });
+    sendSuccess(res, upload);
   } catch (err) {
     next(err);
   }

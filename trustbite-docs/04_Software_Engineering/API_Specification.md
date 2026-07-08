@@ -169,8 +169,28 @@ Ghi chú triển khai:
 
 - Chỉ cập nhật các cột có trong schema `users`: `display_name`, `avatar_url`.
 - `avatarUrl` phải là URL TrustBite-owned/allowlisted hoặc URL được tạo bởi avatar upload flow; không nhận arbitrary external URL.
+- Với custom CDN hoặc path-style S3 host, `avatarUrl` do avatar upload flow trả về phải giữ dạng `/<bucket>/avatars/...` để account deletion cleanup nhận diện và xóa object thuộc TrustBite.
 - User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED`.
 - User `REVIEW_RESTRICTED` vẫn được xem/cập nhật hồ sơ nếu không bị suspend/delete.
+
+### POST /users/me/avatar-upload-url
+
+Auth: người dùng hiện tại. Endpoint trả signed S3 PUT URL ngắn hạn cho avatar object thuộc TrustBite; không tự cập nhật `users.avatar_url`.
+
+Yêu cầu:
+
+```json
+{
+  "contentType": "image/webp",
+  "fileSizeBytes": 2048
+}
+```
+
+Ghi chú triển khai:
+
+- `contentType` chỉ nhận `image/jpeg`, `image/png`, hoặc `image/webp`.
+- `fileSizeBytes` là bắt buộc, phải là số nguyên trong `1..5242880`, và phải được bind vào signed S3 request dưới dạng `ContentLength`.
+- Thiếu hoặc sai `fileSizeBytes` trả `422 AVATAR_FILE_SIZE_INVALID` và không được tạo signed URL.
 
 ### POST /users/me/deletion-request
 
