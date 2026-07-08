@@ -49,6 +49,34 @@ function toPublicReview(row) {
   };
 }
 
+function toVerificationStatus(row) {
+  return {
+    reviewId: row.reviewId,
+    restaurantId: row.restaurantId,
+    branchId: row.branchId,
+    status: row.status,
+    verificationStatus: row.verificationStatus,
+    trustLabel: row.trustLabel,
+    publicVisibility: row.publicVisibility,
+    trustWeightBucket: row.trustWeightBucket,
+    visitedAt: row.visitedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    receipt: row.receiptVerificationId
+      ? {
+          receiptVerificationId: row.receiptVerificationId,
+          status: row.receiptStatus,
+          decision: row.receiptDecision,
+          decisionReason: row.receiptDecisionReason,
+          capturedAt: row.receiptCapturedAt,
+          decidedAt: row.receiptDecidedAt,
+          createdAt: row.receiptCreatedAt,
+          updatedAt: row.receiptUpdatedAt,
+        }
+      : null,
+  };
+}
+
 function validationDetail(field, code, message) {
   return { field, code, message };
 }
@@ -276,6 +304,55 @@ export async function createReviewForVerificationIntent({ userId, payload }) {
   } finally {
     client.release();
   }
+}
+
+export async function getReviewVerificationStatus({ userId, reviewId }) {
+  const details = [];
+  assertUuid(reviewId, 'reviewId', details);
+  if (details.length > 0) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Review id is invalid.', details);
+  }
+
+  const result = await pool.query(
+    `SELECT
+       r.id AS "reviewId",
+       r.restaurant_id AS "restaurantId",
+       r.branch_id AS "branchId",
+       r.status,
+       r.verification_status AS "verificationStatus",
+       r.trust_label AS "trustLabel",
+       r.public_visibility AS "publicVisibility",
+       r.trust_weight_bucket AS "trustWeightBucket",
+       r.visited_at AS "visitedAt",
+       r.created_at AS "createdAt",
+       r.updated_at AS "updatedAt",
+       rv.id AS "receiptVerificationId",
+       rv.status AS "receiptStatus",
+       rv.decision AS "receiptDecision",
+       rv.decision_reason AS "receiptDecisionReason",
+       rv.captured_at AS "receiptCapturedAt",
+       rv.decided_at AS "receiptDecidedAt",
+       rv.created_at AS "receiptCreatedAt",
+       rv.updated_at AS "receiptUpdatedAt"
+     FROM reviews r
+     LEFT JOIN LATERAL (
+       SELECT *
+       FROM receipt_verifications
+       WHERE review_id = r.id
+       ORDER BY created_at DESC
+       LIMIT 1
+     ) rv ON true
+     WHERE r.id = $1
+       AND r.user_id = $2
+       AND r.status <> 'DELETED'`,
+    [reviewId, userId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'NOT_FOUND', 'Review not found.');
+  }
+
+  return toVerificationStatus(result.rows[0]);
 }
 
 export async function listPublicReviewsByRestaurant(restaurantId, { status = 'ALL', page = 1, pageSize = 20 } = {}) {
