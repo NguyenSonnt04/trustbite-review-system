@@ -2,9 +2,17 @@ import { HttpError } from '../utils/httpErrors.js';
 
 const safeMessage = (err, fallback) => (typeof err.message === 'string' && err.message ? err.message : fallback);
 
+const hasClientErrorShape = (err) => (
+  Number.isInteger(err.statusCode)
+  && err.statusCode >= 400
+  && err.statusCode < 500
+  && typeof err.code === 'string'
+  && err.code.length > 0
+);
+
 const getErrorStatusCode = (err, isHttpError) => {
   const statusCode = err.statusCode ?? err.status;
-  if ((isHttpError || err.type === 'entity.parse.failed' || err.type === 'entity.too.large') && Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599) {
+  if ((isHttpError || hasClientErrorShape(err) || err.type === 'entity.parse.failed' || err.type === 'entity.too.large') && Number.isInteger(statusCode) && statusCode >= 400 && statusCode <= 599) {
     return statusCode;
   }
 
@@ -13,6 +21,7 @@ const getErrorStatusCode = (err, isHttpError) => {
 
 const getErrorCode = (err, isHttpError, statusCode) => {
   if (isHttpError && err.code) return err.code;
+  if (hasClientErrorShape(err)) return err.code;
   if (err.type === 'entity.parse.failed') return 'INVALID_JSON';
   if (err.type === 'entity.too.large') return 'PAYLOAD_TOO_LARGE';
   if (statusCode === 404) return 'NOT_FOUND';

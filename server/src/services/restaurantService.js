@@ -133,11 +133,14 @@ function toPublic(row) {
     trustScore: row.trust_score !== null ? parseFloat(row.trust_score) : null,
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
-    categoryIds: row.category_ids ?? [],
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
+      categoryIds: row.category_ids ?? [],
+      ...(row.distance_meters !== undefined && row.distance_meters !== null
+        ? { distanceMeters: parseFloat(row.distance_meters) }
+        : {}),
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
 
 async function validateCategoryIds(client, categoryIds) {
   const ids = uniqueIds(categoryIds);
@@ -186,18 +189,34 @@ async function insertCategoryMappings(client, restaurantId, categoryIds) {
  *
  * @param {object} opts
  * @param {string}  [opts.keyword]   - Optional name filter (case-insensitive substring).
- * @param {string}  [opts.status]    - Public list is forced to ACTIVE (BR-REST-001).
- * @param {number}  [opts.page]      - 1-based page number. Default 1.
- * @param {number}  [opts.pageSize]  - Items per page. Default 20, max 100.
+ * @param {number}  [opts.latitude]       - Optional latitude for radius/distance search.
+ * @param {number}  [opts.longitude]      - Optional longitude for radius/distance search.
+ * @param {number}  [opts.radiusMeters]   - Optional radius. Defaults to 5000 when latitude/longitude are supplied.
+ * @param {number}  [opts.minTrustScore]  - Optional public trust-score lower bound.
+ * @param {string}  [opts.sort]           - name | trustScoreDesc | distanceAsc.
+ * @param {number}  [opts.page]           - 1-based page number. Default 1.
+ * @param {number}  [opts.pageSize]       - Items per page. Default 20, max 100.
  * @returns {Promise<{ items: object[], page: number, pageSize: number, total: number }>}
  */
-export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {}) {
+export async function listRestaurants({
+  keyword,
+  latitude,
+  longitude,
+  radiusMeters,
+  minTrustScore,
+  sort = 'name',
+  page = 1,
+  pageSize = 20,
+} = {}) {
   const safePage = Math.max(1, parseInt(page, 10) || 1);
   const safeSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 20));
   const offset = (safePage - 1) * safeSize;
 
   const params = [];
   const conditions = [PUBLIC_RESTAURANT_CONDITION];
+  const hasLocation = latitude !== undefined && longitude !== undefined;
+  let distanceProjection = '';
+  let distanceExpression = '';
 
   if (keyword && keyword.trim()) {
     const rawKeywordParam = params.push(`%${keyword.trim()}%`);
@@ -215,16 +234,54 @@ export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {})
     )`);
   }
 
+  if (hasLocation) {
+    params.push(latitude);
+    const latParam = `$${params.length}::double precision`;
+    params.push(longitude);
+    const lngParam = `$${params.length}::double precision`;
+    const pointExpression = `ST_SetSRID(ST_MakePoint(${lngParam}, ${latParam}), 4326)::geography`;
+    const effectiveRadiusMeters = radiusMeters ?? 5000;
+
+    distanceExpression = `ST_Distance(r.geo, ${pointExpression})`;
+    distanceProjection = `,
+      ${distanceExpression} AS distance_meters`;
+    params.push(effectiveRadiusMeters);
+    conditions.push('r.geo IS NOT NULL');
+    conditions.push(`ST_DWithin(r.geo, ${pointExpression}, $${params.length}::double precision)`);
+  }
+
+  if (minTrustScore !== undefined) {
+    params.push(minTrustScore);
+    conditions.push(`r.trust_score >= $${params.length}::numeric`);
+  }
+
   const whereClause = `WHERE ${conditions.join(' AND ')}`;
+  const orderClause = (() => {
+    if (sort === 'trustScoreDesc') {
+      return 'ORDER BY r.trust_score DESC NULLS LAST, r.name ASC, r.id ASC';
+    }
+    if (sort === 'distanceAsc' && hasLocation) {
+      return `ORDER BY ${distanceExpression} ASC, r.name ASC, r.id ASC`;
+    }
+    return 'ORDER BY r.name ASC, r.id ASC';
+  })();
 
   const dataQuery = `
-    ${RESTAURANT_SELECT_PROJECTION}
-    ${whereClause}
-    GROUP BY r.id
-    ORDER BY r.name ASC
-    LIMIT $${params.length + 1}
-    OFFSET $${params.length + 2}
-  `;
+      SELECT
+        r.*,
+        COALESCE(
+          ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
+          '{}'::integer[]
+        ) AS category_ids
+        ${distanceProjection}
+      FROM restaurants r
+      LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
+      ${whereClause}
+      GROUP BY r.id
+      ${orderClause}
+      LIMIT $${params.length + 1}
+      OFFSET $${params.length + 2}
+    `;
 
   const countQuery = `
     SELECT COUNT(*) AS total
@@ -238,6 +295,70 @@ export async function listRestaurants({ keyword, page = 1, pageSize = 20 } = {})
   const [dataResult, countResult] = await Promise.all([
     pool.query(dataQuery, dataParams),
     pool.query(countQuery, countParams),
+  ]);
+
+  return {
+    items: dataResult.rows.map(toPublic),
+    page: safePage,
+    pageSize: safeSize,
+    total: parseInt(countResult.rows[0].total, 10),
+  };
+}
+
+export async function listNearbyRestaurants({
+  northEastLatitude,
+  northEastLongitude,
+  southWestLatitude,
+  southWestLongitude,
+  page = 1,
+  pageSize = 100,
+} = {}) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeSize = Math.min(250, Math.max(1, parseInt(pageSize, 10) || 100));
+  const offset = (safePage - 1) * safeSize;
+
+  const params = [
+    southWestLongitude,
+    southWestLatitude,
+    northEastLongitude,
+    northEastLatitude,
+  ];
+  const envelopeExpression = `
+    ST_MakeEnvelope(
+      $1::double precision,
+      $2::double precision,
+      $3::double precision,
+      $4::double precision,
+      4326
+    )
+  `;
+  const conditions = [
+    PUBLIC_RESTAURANT_CONDITION,
+    'r.geo IS NOT NULL',
+    `ST_Covers(${envelopeExpression}, r.geo::geometry)`,
+  ];
+  const whereClause = `WHERE ${conditions.join(' AND ')}`;
+
+  const dataQuery = `
+    ${RESTAURANT_SELECT_PROJECTION}
+    ${whereClause}
+    GROUP BY r.id
+    ORDER BY r.name ASC, r.id ASC
+    LIMIT $5
+    OFFSET $6
+  `;
+
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM restaurants r
+    ${whereClause}
+  `;
+
+  const dataParams = [...params, safeSize, offset];
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(dataQuery, dataParams),
+    pool.query(countQuery, params),
   ]);
 
   return {
@@ -423,13 +544,13 @@ async function updateRestaurantAttempt(restaurantId, updates) {
       setClauses.push('latitude = NULL');
       setClauses.push('longitude = NULL');
       setClauses.push('geo = NULL');
-    } else if (latitude !== undefined && longitude !== undefined) {
-      const latParam = addParam(latitude);
-      const lngParam = addParam(longitude);
-      setClauses.push(`latitude = ${latParam}`);
-      setClauses.push(`longitude = ${lngParam}`);
-      setClauses.push(`geo = ST_SetSRID(ST_MakePoint(${lngParam}, ${latParam}), 4326)`);
-    }
+      } else if (latitude !== undefined && longitude !== undefined) {
+        const latParam = addParam(latitude);
+        const lngParam = addParam(longitude);
+        setClauses.push(`latitude = ${latParam}::numeric`);
+        setClauses.push(`longitude = ${lngParam}::numeric`);
+        setClauses.push(`geo = ST_SetSRID(ST_MakePoint(${lngParam}::numeric, ${latParam}::numeric), 4326)`);
+      }
 
     if (setClauses.length === 0 && categoryIds === undefined) {
       await client.query('ROLLBACK');
