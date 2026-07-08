@@ -112,7 +112,16 @@ async function createFraudFlag(client, { flagCode, riskScore, receiptId, reviewI
   return flagId;
 }
 
-async function writeDecision(client, { receipt, review, states, riskScore, reason, transactionHash, gpsDistance }) {
+async function writeDecision(client, {
+  receipt,
+  review,
+  states,
+  riskScore,
+  reason,
+  transactionHash,
+  gpsDistance,
+  merchantSimilarity = null,
+}) {
   await client.query(
     `UPDATE receipt_verifications
      SET status = $2,
@@ -120,7 +129,8 @@ async function writeDecision(client, { receipt, review, states, riskScore, reaso
          fraud_risk_score = $4,
          transaction_unique_hash = COALESCE($5, transaction_unique_hash),
          gps_distance_meters = $6,
-         decision_reason = $7,
+         ocr_similarity = $7,
+         decision_reason = $8,
          decided_at = NOW()
      WHERE id = $1`,
     [
@@ -130,6 +140,7 @@ async function writeDecision(client, { receipt, review, states, riskScore, reaso
       Math.min(riskScore, 100),
       transactionHash,
       gpsDistance,
+      merchantSimilarity,
       reason,
     ],
   );
@@ -302,15 +313,16 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
       ? `Fraud score ${score}: ${breakdown.map((b) => `${b.code}(+${b.points})`).join(', ')}`
       : 'Fraud score 0: all signals within thresholds.';
 
-    await writeDecision(client, {
-      receipt,
-      review,
-      states,
-      riskScore: score,
-      reason,
-      transactionHash,
-      gpsDistance: gps.gpsDistanceMeters,
-    });
+      await writeDecision(client, {
+        receipt,
+        review,
+        states,
+        riskScore: score,
+        reason,
+        transactionHash,
+        gpsDistance: gps.gpsDistanceMeters,
+        merchantSimilarity,
+      });
 
     // Serious-signal rejection gets a fraud flag tied to the dominant signal.
     if (states.decision === 'REJECTED' && breakdown.length) {

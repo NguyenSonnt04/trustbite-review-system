@@ -204,24 +204,49 @@ describe('processReceiptOcr — pipeline + downstream decision (mock provider)',
     expect(flag.rows.map((r) => r.flag_code)).toContain('DUPLICATE_RECEIPT_HASH');
   });
 
-  it('bad file format → OCR_FAILED before scoring, no downstream decision', async () => {
-    const { receipt, review } = await seedReceipt({ fileUrl: 's3://trustbite-invoices/receipts/bad.exe' });
-    registerMockReceipt(receipt.file_url, { struct: struct() });
+    it('bad file format → OCR_FAILED before scoring, no downstream decision', async () => {
+      const { receipt, review } = await seedReceipt({ fileUrl: 's3://trustbite-invoices/receipts/bad.exe' });
+      registerMockReceipt(receipt.file_url, { struct: struct() });
 
-    await processReceiptOcr(receipt.id, { provider: mockOcrProvider, now: NOW });
+      await processReceiptOcr(receipt.id, { provider: mockOcrProvider, now: NOW });
 
     const rec = await receiptRow(receipt.id);
     const rev = await reviewRow(review.id);
     expect(rec.status).toBe('OCR_FAILED');
     expect(rec.decision).toBeNull();
-    // review left in its pre-OCR processing state (not decided)
-    expect(rev.status).toBe('SUBMITTED');
-  });
+      // review left in its pre-OCR processing state (not decided)
+      expect(rev.status).toBe('SUBMITTED');
+    });
 
-  it('OCR_SUCCESS retry resumes at verification without reloading or re-running OCR', async () => {
-    const { receipt, review } = await seedReceipt();
-    await query(
-      `UPDATE receipt_verifications
+    it('oversized loaded file → OCR_FAILED before analyzeExpense or downstream decision', async () => {
+      const previousMax = process.env.OCR_MAX_FILE_BYTES;
+      process.env.OCR_MAX_FILE_BYTES = '10';
+      const { receipt, review } = await seedReceipt();
+      let analyzed = false;
+      const provider = {
+        async loadFile() { return Buffer.from('01234567890', 'utf8'); },
+        async analyzeExpense() { analyzed = true; return struct(); },
+      };
+
+      try {
+        await processReceiptOcr(receipt.id, { provider, now: NOW });
+      } finally {
+        if (previousMax == null) delete process.env.OCR_MAX_FILE_BYTES;
+        else process.env.OCR_MAX_FILE_BYTES = previousMax;
+      }
+
+      const rec = await receiptRow(receipt.id);
+      const rev = await reviewRow(review.id);
+      expect(analyzed).toBe(false);
+      expect(rec.status).toBe('OCR_FAILED');
+      expect(rec.decision).toBeNull();
+      expect(rev.status).toBe('SUBMITTED');
+    });
+
+    it('OCR_SUCCESS retry resumes at verification without reloading or re-running OCR', async () => {
+      const { receipt, review } = await seedReceipt();
+      await query(
+        `UPDATE receipt_verifications
        SET status='OCR_SUCCESS',
            ocr_text=$2,
            ocr_restaurant_name=$3,

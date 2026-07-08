@@ -1,10 +1,12 @@
 import { query } from '../db.js';
+import crypto from 'node:crypto';
 
 let restaurantSequence = 0;
+const restaurantPrefix = crypto.randomUUID();
 
 export async function createRestaurant(overrides = {}) {
   restaurantSequence += 1;
-  const slug = overrides.slug ?? `test-restaurant-${restaurantSequence}`;
+  const slug = overrides.slug ?? `test-restaurant-${restaurantPrefix}-${restaurantSequence}`;
 
   const result = await query(
     `

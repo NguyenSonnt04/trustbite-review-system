@@ -96,10 +96,10 @@ describe('receipt OCR worker degrade behavior', () => {
     expect(audit.rows).toHaveLength(0);
   });
 
-  it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW and zombie OCR cannot overwrite it', async () => {
-    const { receipt, review } = await seedReceipt();
-    // Mock provider sleeps far past the job timeout.
-    registerMockReceipt(receipt.file_url, { delayMs: 200, struct: { lineItems: [] } });
+    it('job timeout on the final attempt degrades to PENDING_ADMIN_REVIEW and zombie OCR cannot overwrite it', async () => {
+      const { receipt, review } = await seedReceipt();
+      // Mock provider sleeps far past the job timeout.
+      registerMockReceipt(receipt.file_url, { delayMs: 200, struct: { lineItems: [] } });
 
     const job = {
       data: { receiptVerificationId: receipt.id },
@@ -116,13 +116,49 @@ describe('receipt OCR worker degrade behavior', () => {
 
     const rec = await recRow(receipt.id);
     expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
-    expect(rec.decision).toBeNull();
-    expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
-  });
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
 
-  it('provider error on a non-final attempt rethrows for retry (no degrade yet)', async () => {
-    const { receipt } = await seedReceipt();
-    registerMockReceipt(receipt.file_url, { behavior: 'error', errorMessage: 'transient' });
+    it('oversized zombie load cannot overwrite a final timeout degrade', async () => {
+      const previousMax = process.env.OCR_MAX_FILE_BYTES;
+      process.env.OCR_MAX_FILE_BYTES = '10';
+      const { receipt, review } = await seedReceipt();
+      const provider = {
+        async loadFile() {
+          await delay(80);
+          return Buffer.from('01234567890', 'utf8');
+        },
+        async analyzeExpense() {
+          throw new Error('oversized file should not reach OCR');
+        },
+      };
+      const job = {
+        data: { receiptVerificationId: receipt.id },
+        attemptsMade: 2,
+        opts: { attempts: 3 },
+      };
+
+      try {
+        await runReceiptOcrJob(job, { provider, timeoutMs: 20 });
+        expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+        expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+        await delay(120);
+      } finally {
+        if (previousMax == null) delete process.env.OCR_MAX_FILE_BYTES;
+        else process.env.OCR_MAX_FILE_BYTES = previousMax;
+      }
+
+      const rec = await recRow(receipt.id);
+      expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
+
+    it('provider error on a non-final attempt rethrows for retry (no degrade yet)', async () => {
+      const { receipt } = await seedReceipt();
+      registerMockReceipt(receipt.file_url, { behavior: 'error', errorMessage: 'transient' });
 
     const job = { data: { receiptVerificationId: receipt.id }, attemptsMade: 0, opts: { attempts: 3 } };
 

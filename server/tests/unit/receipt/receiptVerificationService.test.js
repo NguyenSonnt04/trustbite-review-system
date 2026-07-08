@@ -145,23 +145,44 @@ describe('verifyReceipt orchestrator', () => {
 
   // --- Status_Mapping §3 rows ---
 
-  it('risk 0-30 → VERIFIED across receipt + review', async () => {
-    // clean signals: same coords, fresh receipt, exact name → score 0
-    const { calls } = setupScenario();
-    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+    it('risk 0-30 → VERIFIED across receipt + review', async () => {
+      // clean signals: same coords, fresh receipt, exact name → score 0
+      const { calls } = setupScenario();
+      const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
 
     expect(result.decision).toBe('VERIFIED');
     const rev = reviewUpdate(calls);
     expect(rev.sql).toMatch(/status\s*=/i);
     expect(rev.params).toEqual(expect.arrayContaining(['VERIFIED', 'PUBLIC', 'HIGH']));
-    const rec = receiptUpdate(calls);
-    expect(rec.params).toEqual(expect.arrayContaining(['VERIFIED']));
-  });
+      const rec = receiptUpdate(calls);
+      expect(rec.params).toEqual(expect.arrayContaining(['VERIFIED']));
+    });
 
-  it('risk 31-60 → PENDING_ADMIN_REVIEW with receipt.decision NULL', async () => {
-    // merchant 60-79 (+25) + receipt 49-168h (+40) = 65... need 31-60.
-    // Use unreadable merchant (+50) alone → 50 → pending.
-    const { calls } = setupScenario({
+    it('persists the merchant OCR similarity used for scoring', async () => {
+      const { calls } = setupScenario();
+      await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+      const rec = receiptUpdate(calls);
+      expect(String(rec.sql)).toMatch(/ocr_similarity\s*=/i);
+      expect(rec.params).toContain(100);
+    });
+
+    it('clears stale OCR similarity when the current merchant is unreadable', async () => {
+      const { calls } = setupScenario({
+        receipt: receiptRow({ ocr_restaurant_name: null, ocr_similarity: '88.00' }),
+      });
+
+      await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+      const rec = receiptUpdate(calls);
+      expect(String(rec.sql)).not.toMatch(/ocr_similarity\s*=\s*COALESCE/i);
+      expect(rec.params[6]).toBeNull();
+    });
+
+    it('risk 31-60 → PENDING_ADMIN_REVIEW with receipt.decision NULL', async () => {
+      // merchant 60-79 (+25) + receipt 49-168h (+40) = 65... need 31-60.
+      // Use unreadable merchant (+50) alone → 50 → pending.
+      const { calls } = setupScenario({
       receipt: receiptRow({ ocr_restaurant_name: null }),
     });
     const result = await verifyReceipt(RECEIPT_ID, { now: NOW });

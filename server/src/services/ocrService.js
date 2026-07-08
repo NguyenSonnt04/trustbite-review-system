@@ -49,6 +49,39 @@ async function writeAudit(client, { receiptId, previousStatus, newStatus, reason
   );
 }
 
+async function rejectFileValidationFailure(receipt, fileCheck) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const updated = await client.query(
+      `UPDATE receipt_verifications
+       SET status = 'OCR_FAILED'
+       WHERE id = $1
+         AND status NOT IN ('VERIFIED', 'REJECTED', 'REFERENCE_ONLY', 'PENDING_ADMIN_REVIEW')
+       RETURNING status`,
+      [receipt.id],
+    );
+    if (updated.rows.length === 0) {
+      const current = await client.query(`SELECT * FROM receipt_verifications WHERE id = $1`, [receipt.id]);
+      await client.query('COMMIT');
+      return terminalResult(current.rows[0] ?? receipt);
+    }
+    await writeAudit(client, {
+      receiptId: receipt.id,
+      previousStatus: receipt.status,
+      newStatus: 'OCR_FAILED',
+      reason: `File rejected: ${fileCheck.reason}`,
+    });
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+  return { status: 'OCR_FAILED', reason: fileCheck.reason };
+}
+
 async function rejectAsDuplicate(client, receipt) {
   const reason = 'Duplicate receipt file hash (layer-1 hard rule).';
 
@@ -152,29 +185,18 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
   // 1. File format/size guard — reject before any hashing/scoring.
   const fileCheck = validateReceiptFile({ fileUrl: receipt.file_url, sizeBytes: receipt.file_size_bytes }, ocrConfig);
   if (!fileCheck.ok) {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await setStatus(client, receipt.id, 'OCR_FAILED');
-      await writeAudit(client, {
-        receiptId: receipt.id,
-        previousStatus: receipt.status,
-        newStatus: 'OCR_FAILED',
-        reason: `File rejected: ${fileCheck.reason}`,
-      });
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK');
-      throw err;
-    } finally {
-      client.release();
-    }
-    return { status: 'OCR_FAILED', reason: fileCheck.reason };
+    return rejectFileValidationFailure(receipt, fileCheck);
   }
 
   // 2. Load the file bytes and compute the SHA-256 (Anti-Fraud §7.1) BEFORE the
   //    billable OCR call. Errors here propagate to the worker's retry policy.
   const bytes = await provider.loadFile({ fileUrl: receipt.file_url });
+  const loadedFileCheck = validateReceiptFile({ fileUrl: receipt.file_url, sizeBytes: bytes.byteLength ?? bytes.length }, ocrConfig);
+  if (!loadedFileCheck.ok) {
+    const current = await loadReceipt(receipt.id);
+    if (TERMINAL_RECEIPT_STATUSES.has(current.status)) return terminalResult(current);
+    return rejectFileValidationFailure(current, loadedFileCheck);
+  }
   const fileHash = computeFileHash(bytes);
 
   // 3. HASH_CHECKING + layer-1 duplicate hard rule against the computed hash.
