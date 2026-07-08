@@ -207,25 +207,43 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
   const dupClient = await pool.connect();
   try {
     await dupClient.query('BEGIN');
-    await setStatus(dupClient, receipt.id, 'HASH_CHECKING');
+    const currentResult = await dupClient.query(
+      `SELECT * FROM receipt_verifications WHERE id = $1 FOR UPDATE`,
+      [receipt.id],
+    );
+    if (currentResult.rows.length === 0) {
+      throw new NotFoundError('Receipt verification not found.');
+    }
+    const currentReceipt = currentResult.rows[0];
+    if (TERMINAL_RECEIPT_STATUSES.has(currentReceipt.status)) {
+      await dupClient.query('COMMIT');
+      return terminalResult(currentReceipt);
+    }
+    if (currentReceipt.status === 'OCR_SUCCESS') {
+      await dupClient.query('COMMIT');
+      const decision = await verifyReceipt(currentReceipt.id, { now });
+      return { status: 'OCR_SUCCESS', resumed: true, decision };
+    }
+
+    await setStatus(dupClient, currentReceipt.id, 'HASH_CHECKING');
 
     const dup = await dupClient.query(
       `SELECT id FROM receipt_verifications
        WHERE file_hash_sha256 = $1 AND id <> $2 AND status NOT IN ('OCR_FAILED')
        LIMIT 1`,
-      [fileHash, receipt.id],
+      [fileHash, currentReceipt.id],
     );
 
     if (dup.rows.length > 0) {
-      await setStatus(dupClient, receipt.id, 'DUPLICATE_DETECTED');
-      await rejectAsDuplicate(dupClient, receipt);
+      await setStatus(dupClient, currentReceipt.id, 'DUPLICATE_DETECTED');
+      await rejectAsDuplicate(dupClient, currentReceipt);
       await dupClient.query('COMMIT');
       return { status: 'REJECTED', duplicate: true };
     }
 
     await dupClient.query(
       `UPDATE receipt_verifications SET file_hash_sha256 = $2, status = 'OCR_PROCESSING' WHERE id = $1`,
-      [receipt.id, fileHash],
+      [currentReceipt.id, fileHash],
     );
     await dupClient.query('COMMIT');
   } catch (err) {

@@ -120,9 +120,49 @@ describe('receipt OCR worker degrade behavior', () => {
       expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
     });
 
-    it('oversized zombie load cannot overwrite a final timeout degrade', async () => {
-      const previousMax = process.env.OCR_MAX_FILE_BYTES;
-      process.env.OCR_MAX_FILE_BYTES = '10';
+    it('loadFile timeout continuation cannot enter hash-check after final degrade', async () => {
+      const { receipt, review } = await seedReceipt();
+      let analyzed = false;
+      const provider = {
+        async loadFile() {
+          await delay(80);
+          return Buffer.from(`valid-receipt-${receipt.id}`, 'utf8');
+        },
+        async analyzeExpense() {
+          analyzed = true;
+          return {
+            rawText: 'receipt text',
+            restaurantName: 'Pho 24',
+            receiptTime: new Date('2026-06-12T08:00:00.000Z'),
+            invoiceNo: 'INV-TIMEOUT-CONTINUATION',
+            totalAmount: 120000,
+            lineItems: [],
+          };
+        },
+      };
+      const job = {
+        data: { receiptVerificationId: receipt.id },
+        attemptsMade: 2,
+        opts: { attempts: 3 },
+      };
+
+      await runReceiptOcrJob(job, { provider, timeoutMs: 20 });
+
+      expect((await recRow(receipt.id)).status).toBe('PENDING_ADMIN_REVIEW');
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+
+      await delay(140);
+
+      const rec = await recRow(receipt.id);
+      expect(analyzed).toBe(false);
+      expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+      expect(rec.decision).toBeNull();
+      expect((await revRow(review.id)).status).toBe('PENDING_ADMIN_REVIEW');
+    });
+
+      it('oversized zombie load cannot overwrite a final timeout degrade', async () => {
+        const previousMax = process.env.OCR_MAX_FILE_BYTES;
+        process.env.OCR_MAX_FILE_BYTES = '10';
       const { receipt, review } = await seedReceipt();
       const provider = {
         async loadFile() {

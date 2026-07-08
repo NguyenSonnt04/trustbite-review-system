@@ -43,6 +43,11 @@ green after the fix.
   flag + entities, review DUPLICATE_REJECTED, no OCR call made.
 - OCR provider timeout (mock delays past `OCR_JOB_TIMEOUT_MS`) on final attempt →
   `PENDING_ADMIN_REVIEW`, no fraud flag.
+- OCR provider timeout while file loading is still in flight on final attempt →
+  `PENDING_ADMIN_REVIEW`, and the orphaned continuation must not enter
+  `HASH_CHECKING`, OCR, or downstream scoring.
+- An orphaned file-load continuation that observes `OCR_SUCCESS` from another
+  attempt resumes verification and must not re-enter hash-check or OCR.
 - provider error after retries → `PENDING_ADMIN_REVIEW`.
 - bad file format/size → `OCR_FAILED` before any scoring; no verifyReceipt call.
 - line items persisted to `receipt_line_items` with quantity/price.
