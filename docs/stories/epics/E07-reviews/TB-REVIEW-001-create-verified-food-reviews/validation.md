@@ -11,7 +11,7 @@ excluded from this backend closeout.
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Review creation validation and merchant self-review rule; receipt upload idempotency, duplicate hash, upload-to-OCR enqueue, durable admin-review degradation on post-commit enqueue failure, no enqueue on replay/failure; S3 upload uses private object input and fails closed without bucket config. |
+| Unit | Review creation validation and merchant self-review rule; receipt upload idempotency, duplicate hash, upload-to-OCR enqueue, durable admin-review degradation on post-commit enqueue failure with a fixed public reason, no enqueue on replay/failure; S3 upload uses private object input and fails closed without bucket config. |
 | Integration | `POST /reviews` auth, success persistence, validation no-write, inactive restaurant rollback; `GET /reviews/:reviewId/status` owner, non-owner, not-found, pending, verified, rejected, reference-only, pending-admin-review; existing PR #36 OCR/verification integration tests. |
 | E2E | Not in scope for backend closeout. |
 | Platform | `npm run db:migrate`; `npm run server:build`; Harness story verification. |
@@ -56,6 +56,15 @@ Backend coverage added in this closeout:
 - Receipt upload post-commit enqueue failure proof: no transaction cleanup after
   commit, durable `PENDING_ADMIN_REVIEW` degradation, and terminal-state replay
   preservation when the degrade update is skipped.
+- PR #38 review follow-up proof: enqueue failures persist a fixed public
+  manual-review reason instead of raw queue/provider error messages that the
+  owner-scoped status API would expose as receipt decision metadata.
+- 2026-07-08 PR #38 leak fix rerun: `npm run test --prefix server --
+  tests/unit/receiptService.test.js` passed 13 tests; `npm run db:migrate`
+  applied 0 migrations; `npm run test --prefix server` passed 31 files / 1
+  skipped and 308 tests / 2 skipped; `npm run server:build` passed 102 files;
+  `npm run harness -- story verify TB-REVIEW-001` passed the migrate/test/build
+  chain.
 - Review create HTTP integration proof.
 - Review status HTTP integration proof.
 - S3 private boundary unit proof.

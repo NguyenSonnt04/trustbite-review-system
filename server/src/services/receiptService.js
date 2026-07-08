@@ -19,6 +19,7 @@ const RECEIPT_CAPTURE_MAX_AGE_HOURS = 48;
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
 const IDEMPOTENCY_UNIQUE_CONSTRAINT = 'idempotency_keys_user_id_endpoint_idempotency_key_key';
 const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
+const OCR_ENQUEUE_FAILURE_PUBLIC_REASON = 'OCR enqueue failed; pending manual review.';
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
 
@@ -683,7 +684,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       userId,
       idempotencyKey,
       responseBody,
-      reason: `OCR enqueue failed: ${err?.message ?? 'unknown queue error'}`,
+      reason: OCR_ENQUEUE_FAILURE_PUBLIC_REASON,
     });
   }
 

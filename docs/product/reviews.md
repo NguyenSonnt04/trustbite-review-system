@@ -58,7 +58,9 @@ Rules:
   is not rolled back or deleted. The backend parks the receipt and review at
   `PENDING_ADMIN_REVIEW`, records system audit/idempotency evidence, and returns
   that durable state so clients can poll the status API instead of trusting a
-  non-existent queue job.
+  non-existent queue job. Queue/provider error messages are not persisted into
+  receipt decision metadata returned by the status API; users receive a fixed
+  public manual-review reason.
 
 ## Verification Lifecycle
 
