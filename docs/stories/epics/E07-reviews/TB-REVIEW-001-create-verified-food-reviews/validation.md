@@ -11,7 +11,7 @@ excluded from this backend closeout.
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Review creation validation and merchant self-review rule; receipt upload idempotency, duplicate hash, upload-to-OCR enqueue, no enqueue on replay/failure; S3 upload uses private object input and fails closed without bucket config. |
+| Unit | Review creation validation and merchant self-review rule; receipt upload idempotency, duplicate hash, upload-to-OCR enqueue, durable admin-review degradation on post-commit enqueue failure, no enqueue on replay/failure; S3 upload uses private object input and fails closed without bucket config. |
 | Integration | `POST /reviews` auth, success persistence, validation no-write, inactive restaurant rollback; `GET /reviews/:reviewId/status` owner, non-owner, not-found, pending, verified, rejected, reference-only, pending-admin-review; existing PR #36 OCR/verification integration tests. |
 | E2E | Not in scope for backend closeout. |
 | Platform | `npm run db:migrate`; `npm run server:build`; Harness story verification. |
@@ -43,7 +43,7 @@ npm run harness -- query matrix
 
 - `npm run db:migrate`: passed, applied 0 migrations.
 - `npm run test --prefix server`: passed, 31 files passed / 1 skipped and
-  306 tests passed / 2 skipped.
+  308 tests passed / 2 skipped.
 - `npm run server:build`: passed, syntax check covered 102 server files.
 - `npm run harness -- story verify TB-REVIEW-001`: passed the same
   migrate/test/build chain.
@@ -53,6 +53,9 @@ npm run harness -- query matrix
 Backend coverage added in this closeout:
 
 - Receipt upload enqueue unit proof.
+- Receipt upload post-commit enqueue failure proof: no transaction cleanup after
+  commit, durable `PENDING_ADMIN_REVIEW` degradation, and terminal-state replay
+  preservation when the degrade update is skipped.
 - Review create HTTP integration proof.
 - Review status HTTP integration proof.
 - S3 private boundary unit proof.

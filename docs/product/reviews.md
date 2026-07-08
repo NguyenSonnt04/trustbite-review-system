@@ -54,6 +54,11 @@ Rules:
 - On successful persistence, the review moves to
   `verification_status=PROCESSING`, `trust_label=PROCESSING`, and the receipt
   OCR job is enqueued after the database transaction commits.
+- If the post-commit OCR enqueue is unavailable, the already-persisted receipt
+  is not rolled back or deleted. The backend parks the receipt and review at
+  `PENDING_ADMIN_REVIEW`, records system audit/idempotency evidence, and returns
+  that durable state so clients can poll the status API instead of trusting a
+  non-existent queue job.
 
 ## Verification Lifecycle
 
