@@ -1,8 +1,8 @@
 # Overview
 
-## Current Behavior
+## Prior Behavior
 
-The restaurant soft-delete is implemented by setting `status = 'CLOSED'` on the `restaurants` row.
+The original restaurant soft-delete behavior was implemented by setting `status = 'CLOSED'` on the `restaurants` row.
 
 ```sql
 UPDATE restaurants SET status = 'CLOSED' WHERE id = $1 RETURNING id
@@ -10,14 +10,14 @@ UPDATE restaurants SET status = 'CLOSED' WHERE id = $1 RETURNING id
 
 This conflates the business-level status (`CLOSED` = restaurant stopped operations) with the data lifecycle status (soft-deleted). A restaurant that is genuinely closed for business cannot be represented correctly under this model because the application cannot distinguish between `CLOSED` (business) and `CLOSED` (soft-deleted).
 
-## Target Behavior
+## Implemented Behavior
 
-We introduce dedicated column flags to the `restaurants` table:
+Dedicated column flags now represent data lifecycle on the `restaurants` table:
 
 - `is_deleted BOOLEAN NOT NULL DEFAULT FALSE`
 - `deleted_at TIMESTAMPTZ`
 
-All read, list, and update queries filter out soft-deleted records via `WHERE is_deleted = FALSE`. The `DELETE /api/v1/restaurants/:restaurantId` endpoint sets `is_deleted = TRUE, deleted_at = NOW()` instead of modifying `status`.
+All read, list, and update queries filter out soft-deleted records via `WHERE is_deleted = FALSE`. The `DELETE /api/v1/restaurants/:restaurantId` endpoint sets `is_deleted = TRUE, deleted_at = NOW()` instead of modifying `status`. Repeating DELETE or PATCHing a soft-deleted restaurant returns `404 RESTAURANT_NOT_FOUND`. A non-deleted restaurant can still use `status = 'CLOSED'` as a business status without setting `is_deleted`.
 
 ## Affected Users
 

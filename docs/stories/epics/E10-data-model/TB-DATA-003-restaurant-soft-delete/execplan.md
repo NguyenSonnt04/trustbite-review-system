@@ -29,7 +29,7 @@ Separate restaurant business status (`CLOSED`) from logical deletion (`is_delete
 - Data model: migration adds columns to `restaurants`.
 - Public contracts: DELETE semantics remain externally stable but persistence semantics change.
 - Existing behavior: previous soft delete used `status = 'CLOSED'`.
-- Weak proof: no automated backend test script currently exists.
+- Weak proof: soft-delete semantics need DB-backed API regression proof.
 
 ### Hard gates
 
@@ -49,8 +49,9 @@ Separate restaurant business status (`CLOSED`) from logical deletion (`is_delete
    - Update model and service.
    - Keep controller response contract stable.
 5. **Verification**
-   - Run syntax/import smoke.
-   - Run database-backed smoke if Docker/Postgres are available.
+   - Run `npm run db:migrate`.
+   - Run targeted restaurant controller/CRUD Vitest proof.
+   - Run `npm run server:build`.
 6. **Harness update**
    - Attempt `npm run harness -- query matrix` and record result.
 
