@@ -14,8 +14,13 @@ vi.mock('../../src/services/s3ReceiptStorageService.js', () => ({
   deleteReceiptObject: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../src/services/queue/receiptOcrQueue.js', () => ({
+  enqueueReceiptOcr: vi.fn(() => Promise.resolve({ id: 'receipt-ocr-job-1' })),
+}));
+
 const { pool } = await import('../../src/config/db.js');
 const { uploadReceiptObject } = await import('../../src/services/s3ReceiptStorageService.js');
+const { enqueueReceiptOcr } = await import('../../src/services/queue/receiptOcrQueue.js');
 const { uploadReceiptForReview } = await import('../../src/services/receiptService.js');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -134,7 +139,7 @@ describe('uploadReceiptForReview', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
-  it('uploads a receipt, records capturedAt, and returns a 202 response body', async () => {
+  it('uploads a receipt, records capturedAt, enqueues OCR, and returns a 202 response body', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     mockReceiptHappyPath(client);
@@ -183,6 +188,8 @@ describe('uploadReceiptForReview', () => {
       },
     });
     expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    expect(enqueueReceiptOcr).toHaveBeenCalledWith('55555555-5555-4555-8555-555555555555');
+    expect(client.query.mock.invocationCallOrder.at(-1)).toBeLessThan(enqueueReceiptOcr.mock.invocationCallOrder[0]);
   });
 
   it('creates a fraud flag and rejects when the receipt hash already exists', async () => {
@@ -231,6 +238,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(failureClient.query).toHaveBeenCalledWith(
       expect.stringContaining("SET status = 'FAILED'"),
       [USER_ID, 'POST /api/v1/receipts', IDEMPOTENCY_KEY],
@@ -276,6 +284,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
@@ -311,6 +320,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
@@ -335,6 +345,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'REQUEST_IN_PROGRESS' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
     expect(pool.connect).toHaveBeenCalledTimes(1);
   });
@@ -471,5 +482,6 @@ describe('uploadReceiptForReview', () => {
 
     expect(result).toEqual({ statusCode: 202, body, replayed: true });
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
   });
 });
