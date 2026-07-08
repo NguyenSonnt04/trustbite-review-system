@@ -6,6 +6,7 @@ import {
   deleteReceiptObject,
   uploadReceiptObject,
 } from './s3ReceiptStorageService.js';
+import { enqueueReceiptOcr } from './queue/receiptOcrQueue.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -580,6 +581,8 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
 
     await markIdempotencyCompleted(persistClient, userId, idempotencyKey, body, receiptResult.rows[0].id);
     await persistClient.query('COMMIT');
+
+    await enqueueReceiptOcr(receiptResult.rows[0].id);
 
     return { statusCode: 202, body };
   } catch (err) {
