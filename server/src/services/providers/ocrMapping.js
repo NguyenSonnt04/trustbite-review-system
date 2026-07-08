@@ -27,20 +27,126 @@ export function validateReceiptFile({ fileUrl, sizeBytes }, ocrConfig) {
   return { ok: true };
 }
 
-const numOrNull = (v) => {
+const quantityOrNull = (v) => {
   if (v == null) return null;
-  // Strip currency symbols, thousands separators, spaces; keep digits/.,-
-  const cleaned = String(v).replace(/[^0-9.,-]/g, '').replace(/,/g, '');
-  if (cleaned === '' || cleaned === '-' || cleaned === '.') return null;
+  const cleaned = normalizeDecimalNumber(v);
+  if (cleaned == null) return null;
   const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 };
 
+const amountOrNull = (v) => {
+  if (v == null) return null;
+  const cleaned = normalizeCurrencyAmount(v);
+  if (cleaned == null) return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : null;
+};
+
+function normalizeDecimalNumber(value) {
+  const cleaned = String(value)
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^0-9.,-]/g, '');
+
+  if (cleaned === '' || cleaned === '-' || cleaned === '.' || cleaned === ',') return null;
+
+  if (cleaned.includes(',') && !cleaned.includes('.')) {
+    const parts = cleaned.split(',');
+    return parts.length === 2 ? parts.join('.') : parts.join('');
+  }
+
+  if (cleaned.includes(',') && cleaned.includes('.')) {
+    const lastComma = cleaned.lastIndexOf(',');
+    const lastDot = cleaned.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      return cleaned.replace(/\./g, '').replace(',', '.');
+    }
+    return cleaned.replace(/,/g, '');
+  }
+
+  return cleaned;
+}
+
+function normalizeCurrencyAmount(value) {
+  const cleaned = String(value)
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^0-9.,-]/g, '');
+
+  if (cleaned === '' || cleaned === '-' || cleaned === '.' || cleaned === ',') return null;
+
+  const sign = cleaned.startsWith('-') ? '-' : '';
+  const unsigned = cleaned.replace(/-/g, '');
+  if (!/\d/.test(unsigned)) return null;
+
+  const separators = [...unsigned].filter((char) => char === '.' || char === ',');
+  if (separators.length === 0) return `${sign}${unsigned}`;
+
+  const lastSeparatorIndex = Math.max(unsigned.lastIndexOf('.'), unsigned.lastIndexOf(','));
+  const lastSeparator = unsigned[lastSeparatorIndex];
+  const trailingDigits = unsigned.slice(lastSeparatorIndex + 1);
+  const separatorKinds = new Set(separators);
+
+  if (separatorKinds.size === 1) {
+    const parts = unsigned.split(lastSeparator);
+    const looksGrouped = parts.length > 2 || trailingDigits.length === 3;
+    return `${sign}${looksGrouped ? parts.join('') : parts.join('.')}`;
+  }
+
+  const withoutGroupSeparators = unsigned
+    .split(lastSeparator === '.' ? ',' : '.')
+    .join('');
+
+  if (trailingDigits.length === 3) {
+    return `${sign}${withoutGroupSeparators.replace(/[.,]/g, '')}`;
+  }
+
+  return `${sign}${withoutGroupSeparators.replace(lastSeparator, '.')}`;
+}
+
 const dateOrNull = (v) => {
   if (!v) return null;
-  const d = new Date(v);
+  const d = parseReceiptDate(v);
   return Number.isNaN(d.getTime()) ? null : d;
 };
+
+function parseReceiptDate(value) {
+  const text = String(value).trim();
+
+  const numericDate = text.match(
+    /^(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+
+  if (numericDate) {
+    const [, first, second, third, hour = '0', minute = '0', secondOfMinute = '0'] = numericDate;
+    const firstNumber = Number(first);
+    const secondNumber = Number(second);
+    const thirdNumber = Number(third);
+
+    const year = first.length === 4 ? firstNumber : normalizeYear(thirdNumber);
+    const month = first.length === 4 ? secondNumber : secondNumber;
+    const day = first.length === 4 ? thirdNumber : firstNumber;
+    const parsed = new Date(Date.UTC(year, month - 1, day, Number(hour), Number(minute), Number(secondOfMinute)));
+
+    if (
+      parsed.getUTCFullYear() === year
+      && parsed.getUTCMonth() === month - 1
+      && parsed.getUTCDate() === day
+      && parsed.getUTCHours() === Number(hour)
+      && parsed.getUTCMinutes() === Number(minute)
+      && parsed.getUTCSeconds() === Number(secondOfMinute)
+    ) {
+      return parsed;
+    }
+  }
+
+  return new Date(value);
+}
+
+function normalizeYear(year) {
+  return year < 100 ? 2000 + year : year;
+}
 
 const strOrNull = (v) => {
   if (v == null) return null;
@@ -83,9 +189,9 @@ export function mapAnalyzeExpense(response) {
       const fields = Array.isArray(row?.LineItemExpenseFields) ? row.LineItemExpenseFields : [];
       const name = strOrNull(lineItemValue(fields, 'ITEM'));
       if (!name) continue;
-      const quantity = numOrNull(lineItemValue(fields, 'QUANTITY'));
-      const unitPrice = numOrNull(lineItemValue(fields, 'UNIT_PRICE'));
-      const totalPrice = numOrNull(lineItemValue(fields, 'PRICE'));
+      const quantity = quantityOrNull(lineItemValue(fields, 'QUANTITY'));
+      const unitPrice = amountOrNull(lineItemValue(fields, 'UNIT_PRICE'));
+      const totalPrice = amountOrNull(lineItemValue(fields, 'PRICE'));
       lineItems.push({
         name,
         quantity: quantity != null && quantity > 0 ? quantity : 1,
@@ -106,7 +212,7 @@ export function mapAnalyzeExpense(response) {
     restaurantName: strOrNull(summaryValue(summaryFields, 'VENDOR_NAME')),
     receiptTime: dateOrNull(summaryValue(summaryFields, 'INVOICE_RECEIPT_DATE')),
     invoiceNo: strOrNull(summaryValue(summaryFields, 'INVOICE_RECEIPT_ID')),
-    totalAmount: numOrNull(summaryValue(summaryFields, 'TOTAL')),
+      totalAmount: amountOrNull(summaryValue(summaryFields, 'TOTAL')),
     lineItems,
   };
 }

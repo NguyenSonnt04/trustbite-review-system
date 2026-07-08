@@ -116,3 +116,36 @@ real AWS or capable LocalStack tier). Config keys required: `AWS_REGION`,
 `OCR_MAX_FILE_BYTES`, `OCR_ALLOWED_EXTENSIONS`. Deployment differs from local proof
 by using real Textract + real Redis; `AWS_ENDPOINT_URL` may point clients at
 LocalStack locally.
+
+## Vietnam-market parser follow-up
+
+PASS (2026-07-08).
+
+- Added unit regression coverage for Textract mapping of VND receipt amounts
+  such as `1.234.567đ`, `30.000`, and `60.000`.
+- Added fractional quantity coverage so `0.500` and `0,250` remain decimal
+  quantities while VND amounts still use thousands grouping.
+- Added day-month-year OCR date coverage with `10/06/2026`.
+- `npm run test --prefix server -- tests/unit/receipt/ocrMapping.test.js`
+  passed: 14 tests.
+- This changes OCR provider-value parsing only. Public API timestamps such as
+  `visitedAt` and `capturedAt` remain ISO-8601.
+
+## PR #36 terminal-race follow-up
+
+PASS (2026-07-08).
+
+- Added integration regression coverage for an orphaned OCR continuation that
+  observes an old `OCR_PROCESSING` snapshot while a final worker timeout commits
+  `PENDING_ADMIN_REVIEW` before OCR result persistence.
+- `persistOcrResult` now locks and reloads the receipt row inside the persistence
+  transaction, skips OCR field/line-item writes when the current row is terminal,
+  and resumes verification only when another attempt already reached
+  `OCR_SUCCESS`.
+- Red proof failed before the fix with `status: 'OCR_SUCCESS'` instead of
+  `PENDING_ADMIN_REVIEW`.
+- Green proof passed:
+  `npm run test:integration --prefix server -- tests/integration/receiptOcr.integration.test.js -t "orphaned OCR continuation must not overwrite"`.
+- Full receipt OCR integration proof passed:
+  `npm run test:integration --prefix server -- tests/integration/receiptOcr.integration.test.js`
+  reported 8 files passed, 1 skipped; 64 tests passed, 2 skipped.

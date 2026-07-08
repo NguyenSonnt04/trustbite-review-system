@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { query, deleteByIds, closeDbPool } from '../helpers/db.js';
 import { createUser, createRestaurant, createReview, createReceiptVerification } from '../helpers/factories/index.js';
+import { pool } from '../../src/config/db.js';
 import { mockOcrProvider, registerMockReceipt, clearMockReceipts } from '../../src/services/providers/__mocks__/mockOcrProvider.js';
 import { processReceiptOcr } from '../../src/services/ocrService.js';
 
@@ -319,10 +320,58 @@ describe('processReceiptOcr — pipeline + downstream decision (mock provider)',
       expect(rec.status).toBe('VERIFIED');
       expect(rec.ocr_invoice_no).toBe('INV-ORPHAN-RESUME');
       expect(rev.status).toBe('VERIFIED');
-    });
+      });
 
-    it('records an audit row for a successful OCR + decision', async () => {
-      const { receipt } = await seedReceipt();
+      it('orphaned OCR continuation must not overwrite a terminal status before persist', async () => {
+        const { receipt, review } = await seedReceipt();
+        let terminalRaceInjected = false;
+        let releaseTerminalRace = Promise.resolve();
+        const provider = {
+          async loadFile() {
+            return Buffer.from('terminal-race-after-ocr-bytes', 'utf8');
+          },
+          async analyzeExpense() {
+            const raceClient = await pool.connect();
+            await raceClient.query('BEGIN');
+            await raceClient.query(
+              `UPDATE receipt_verifications SET status='PENDING_ADMIN_REVIEW' WHERE id=$1`,
+              [receipt.id],
+            );
+            terminalRaceInjected = true;
+            releaseTerminalRace = new Promise((resolve, reject) => {
+              setTimeout(async () => {
+                try {
+                  await raceClient.query('COMMIT');
+                  resolve();
+                } catch (err) {
+                  reject(err);
+                } finally {
+                  raceClient.release();
+                }
+              }, 50);
+            });
+            return struct({ invoiceNo: 'SHOULD-NOT-PERSIST' });
+          },
+        };
+
+        try {
+          const result = await processReceiptOcr(receipt.id, { provider, now: NOW });
+          await releaseTerminalRace;
+          const rec = await receiptRow(receipt.id);
+          const rev = await reviewRow(review.id);
+
+          expect(terminalRaceInjected).toBe(true);
+          expect(result).toMatchObject({ status: 'PENDING_ADMIN_REVIEW', skipped: true });
+          expect(rec.status).toBe('PENDING_ADMIN_REVIEW');
+          expect(rec.ocr_invoice_no).toBeNull();
+          expect(rev.status).toBe('SUBMITTED');
+        } finally {
+          await releaseTerminalRace.catch(() => {});
+        }
+      });
+
+      it('records an audit row for a successful OCR + decision', async () => {
+        const { receipt } = await seedReceipt();
       registerMockReceipt(receipt.file_url, { struct: struct() });
 
     await processReceiptOcr(receipt.id, { provider: mockOcrProvider, now: NOW });

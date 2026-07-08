@@ -74,6 +74,34 @@ describe('mapAnalyzeExpense', () => {
     expect(struct.rawText).toContain('Cafe Sua');
   });
 
+  it('maps Vietnamese receipt amounts and day-month-year dates', () => {
+    const struct = mapAnalyzeExpense(analyzeExpenseResponse({
+      date: '10/06/2026',
+      total: '1.234.567đ',
+      items: [['Cà phê sữa', '2', '30.000', '60.000']],
+    }));
+
+    expect(struct.totalAmount).toBe(1234567);
+    expect(struct.receiptTime?.toISOString().slice(0, 10)).toBe('2026-06-10');
+    expect(struct.lineItems).toEqual([
+      { name: 'Cà phê sữa', quantity: 2, unitPrice: 30000, totalPrice: 60000 },
+    ]);
+  });
+
+  it('keeps fractional quantities separate from VND amount grouping', () => {
+    const struct = mapAnalyzeExpense(analyzeExpenseResponse({
+      items: [
+        ['Hạt rang theo kg', '0.500', '200.000', '100.000'],
+        ['Trà theo kg', '0,250', '120.000', '30.000'],
+      ],
+    }));
+
+    expect(struct.lineItems).toEqual([
+      { name: 'Hạt rang theo kg', quantity: 0.5, unitPrice: 200000, totalPrice: 100000 },
+      { name: 'Trà theo kg', quantity: 0.25, unitPrice: 120000, totalPrice: 30000 },
+    ]);
+  });
+
   it('returns nulls for missing summary fields (unreadable)', () => {
     const struct = mapAnalyzeExpense({ ExpenseDocuments: [{ SummaryFields: [], LineItemGroups: [] }] });
     expect(struct.restaurantName).toBeNull();

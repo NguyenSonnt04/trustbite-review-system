@@ -126,6 +126,18 @@ async function rejectAsDuplicate(client, receipt) {
 }
 
 async function persistOcrResult(client, receipt, struct) {
+  const currentResult = await client.query(
+    `SELECT * FROM receipt_verifications WHERE id = $1 FOR UPDATE`,
+    [receipt.id],
+  );
+  if (currentResult.rows.length === 0) {
+    throw new NotFoundError('Receipt verification not found.');
+  }
+  const currentReceipt = currentResult.rows[0];
+  if (TERMINAL_RECEIPT_STATUSES.has(currentReceipt.status) || currentReceipt.status === 'OCR_SUCCESS') {
+    return { persisted: false, receipt: currentReceipt };
+  }
+
   await client.query(
     `UPDATE receipt_verifications
      SET status = 'OCR_SUCCESS',
@@ -135,15 +147,15 @@ async function persistOcrResult(client, receipt, struct) {
          ocr_invoice_no = $5,
          ocr_total_amount = $6
      WHERE id = $1`,
-    [
-      receipt.id,
-      struct.rawText ?? null,
-      struct.restaurantName ?? null,
-      struct.receiptTime ?? null,
-      struct.invoiceNo ?? null,
-      struct.totalAmount ?? null,
-    ],
-  );
+      [
+        receipt.id,
+        struct.rawText ?? null,
+        struct.restaurantName ?? null,
+        struct.receiptTime ?? null,
+        struct.invoiceNo ?? null,
+        struct.totalAmount ?? null,
+      ],
+    );
 
   await client.query('DELETE FROM receipt_line_items WHERE receipt_verification_id = $1', [receipt.id]);
 
@@ -153,12 +165,14 @@ async function persistOcrResult(client, receipt, struct) {
     const quantity = item.quantity != null && item.quantity > 0 ? item.quantity : 1;
     const unitPrice = item.unitPrice != null && item.unitPrice >= 0 ? item.unitPrice : 0;
     const totalPrice = item.totalPrice != null && item.totalPrice >= 0 ? item.totalPrice : 0;
-    await client.query(
-      `INSERT INTO receipt_line_items (receipt_verification_id, raw_item_name, quantity, unit_price, total_price)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [receipt.id, item.name, quantity, unitPrice, totalPrice],
-    );
-  }
+      await client.query(
+        `INSERT INTO receipt_line_items (receipt_verification_id, raw_item_name, quantity, unit_price, total_price)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [receipt.id, item.name, quantity, unitPrice, totalPrice],
+      );
+    }
+
+  return { persisted: true, receipt: currentReceipt };
 }
 
 /**
@@ -264,15 +278,23 @@ export async function processReceiptOcr(receiptVerificationId, { provider, now =
 
   // 4. Persist extraction + line items atomically, then run the fraud decision.
   const client = await pool.connect();
+  let persistResult;
   try {
     await client.query('BEGIN');
-    await persistOcrResult(client, receipt, struct);
+    persistResult = await persistOcrResult(client, receipt, struct);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
+  }
+  if (!persistResult.persisted) {
+    if (TERMINAL_RECEIPT_STATUSES.has(persistResult.receipt.status)) return terminalResult(persistResult.receipt);
+    if (persistResult.receipt.status === 'OCR_SUCCESS') {
+      const decision = await verifyReceipt(persistResult.receipt.id, { now });
+      return { status: 'OCR_SUCCESS', resumed: true, decision };
+    }
   }
 
   // 5. Task 4.4 decision (own transaction).
