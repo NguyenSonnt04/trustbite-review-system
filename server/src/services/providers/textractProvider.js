@@ -5,10 +5,11 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { TextractClient, AnalyzeExpenseCommand } from '@aws-sdk/client-textract';
 import awsConfig from '../../config/aws.js';
-import { mapAnalyzeExpense } from './ocrMapping.js';
+import { extractExtension, mapAnalyzeExpense } from './ocrMapping.js';
 
 let s3Client = null;
 let textractClient = null;
+const S3_DOCUMENT_EXTENSIONS = new Set(['pdf', 'tif', 'tiff']);
 
 function clientConfig() {
   const cfg = { region: awsConfig.region };
@@ -88,9 +89,16 @@ export class TextractOcrProvider {
    * @returns {Promise<object>} normalized OCR struct
    */
   async analyzeExpense({ fileUrl, bytes }) {
-    const documentBytes = bytes ?? (await this.loadFile({ fileUrl }));
+    const ext = extractExtension(fileUrl);
+    let document;
+    if (S3_DOCUMENT_EXTENSIONS.has(ext)) {
+      const { bucket, key } = resolveS3Location(fileUrl);
+      document = { S3Object: { Bucket: bucket, Name: key } };
+    } else {
+      document = { Bytes: bytes ?? (await this.loadFile({ fileUrl })) };
+    }
     const response = await getTextract().send(
-      new AnalyzeExpenseCommand({ Document: { Bytes: documentBytes } }),
+      new AnalyzeExpenseCommand({ Document: document }),
     );
     return mapAnalyzeExpense(response);
   }

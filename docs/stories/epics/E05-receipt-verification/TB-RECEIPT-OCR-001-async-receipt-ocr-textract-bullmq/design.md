@@ -6,8 +6,10 @@ OCR extraction lives behind a provider adapter selected at runtime, mirroring th
 identity-provider pattern (`getIdentityProvider()` in `services/auth.js`).
 
 - `services/providers/textractProvider.js` — real adapter. Loads the S3 object
-  (`@aws-sdk/client-s3` GetObject) and calls Textract `AnalyzeExpense`
-  (`@aws-sdk/client-textract`, added pinned). Returns the normalized struct.
+    (`@aws-sdk/client-s3` GetObject) and calls Textract `AnalyzeExpense`
+    (`@aws-sdk/client-textract`, added pinned). PNG/JPEG receipts are sent with
+    `Document.Bytes`; PDF/TIFF receipts are sent with `Document.S3Object` from the
+    stored S3 URL. Returns the normalized struct.
 - `services/providers/__mocks__/mockOcrProvider.js` — deterministic test/local
   double. Reads a fixture map keyed by the receipt's S3 key (or a per-job
   override the test injects), returns the normalized struct, and **fails closed**

@@ -133,6 +133,16 @@ PASS (2026-07-08).
 - This changes OCR provider-value parsing only. Public API timestamps such as
   `visitedAt` and `capturedAt` remain ISO-8601.
 
+## PR #36 Textract document-source follow-up
+
+PASS (2026-07-08).
+
+- Added unit regression coverage for the real Textract adapter command input:
+  PNG/JPEG receipts use `Document.Bytes`, while PDF/TIFF receipts use
+  `Document.S3Object` from the stored S3 URL.
+- `npm run test --prefix server -- tests/unit/receipt/textractProvider.test.js tests/unit/receipt/ocrMapping.test.js`
+  passed: 2 files / 19 tests.
+
 ## PR #36 terminal-race follow-up
 
 PASS (2026-07-08).
