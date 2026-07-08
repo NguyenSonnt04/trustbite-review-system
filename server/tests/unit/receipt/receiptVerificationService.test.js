@@ -54,9 +54,25 @@ function restaurantRow(overrides = {}) {
   };
 }
 
+function branchRow(overrides = {}) {
+  return {
+    id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+    parent_restaurant_id: RESTAURANT_ID,
+    name: 'Highlands Coffee',
+    latitude: '10.7769',
+    longitude: '106.7009',
+    ...overrides,
+  };
+}
+
 // Configurable SQL-dispatching mock. Each test sets the scenario; the mock
 // returns rows based on which table/clause the SQL targets, and records writes.
-function setupScenario({ receipt = receiptRow(), restaurant = restaurantRow(), duplicateRows = [] } = {}) {
+function setupScenario({
+  receipt = receiptRow(),
+  restaurant = restaurantRow(),
+  branch = null,
+  duplicateRows = [],
+} = {}) {
   const calls = [];
   client.query.mockReset();
   client.release.mockReset();
@@ -73,12 +89,19 @@ function setupScenario({ receipt = receiptRow(), restaurant = restaurantRow(), d
     if (/FROM\s+receipt_verifications/i.test(text) && /FOR\s+UPDATE/i.test(text)) {
       return { rows: receipt ? [receipt] : [] };
     }
-    if (/FROM\s+reviews/i.test(text)) {
-      return { rows: [{ id: REVIEW_ID, user_id: USER_ID, restaurant_id: RESTAURANT_ID }] };
-    }
-    if (/FROM\s+restaurants/i.test(text)) {
-      return { rows: restaurant ? [restaurant] : [] };
-    }
+      if (/FROM\s+reviews/i.test(text)) {
+        return { rows: [{ id: REVIEW_ID, user_id: USER_ID, restaurant_id: RESTAURANT_ID }] };
+      }
+      if (/FROM\s+restaurant_branches/i.test(text)) {
+        if (!branch) return { rows: [] };
+        if (params.length >= 2) {
+          return { rows: branch.parent_restaurant_id === params[1] ? [branch] : [] };
+        }
+        return { rows: [branch] };
+      }
+      if (/FROM\s+restaurants/i.test(text)) {
+        return { rows: restaurant ? [restaurant] : [] };
+      }
     // Duplicate transaction-hash lookup.
     if (/FROM\s+receipt_verifications/i.test(text) && /transaction_unique_hash\s*=/i.test(text)) {
       return { rows: duplicateRows };
@@ -223,6 +246,29 @@ describe('verifyReceipt orchestrator', () => {
     expect(findWrite(calls, /INSERT\s+INTO\s+fraud_flags/i).length).toBe(1);
     expect(findWrite(calls, /INSERT\s+INTO\s+fraud_flag_entities/i).length).toBeGreaterThanOrEqual(1);
   });
+
+    it('falls back to the receipt restaurant when branch_id belongs to another restaurant', async () => {
+      const { calls } = setupScenario({
+        receipt: receiptRow({ branch_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }),
+        branch: branchRow({
+          parent_restaurant_id: '99999999-9999-4999-8999-999999999999',
+        }),
+        restaurant: restaurantRow({
+          name: 'Faraway Noodles',
+          latitude: '10.9000',
+          longitude: '106.9000',
+        }),
+      });
+
+      const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+      expect(result.reviewStatus).toBe('REJECTED');
+      const branchLookup = calls.find((c) => /FROM\s+restaurant_branches/i.test(String(c.sql)));
+      expect(branchLookup.params).toEqual([
+        'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        RESTAURANT_ID,
+      ]);
+    });
 
   it('duplicate transaction hash → REJECTED + DUPLICATE_REJECTED + DUPLICATE_TRANSACTION_HASH flag (no scoring)', async () => {
     const { calls } = setupScenario({

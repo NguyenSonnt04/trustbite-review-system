@@ -78,8 +78,8 @@ provided we add only the +30 absent penalty (no distance/accuracy rows).
 `verifyReceipt(receiptVerificationId, { now } = {})`:
 
 1. `BEGIN`. `SELECT ... FOR UPDATE` the receipt row; throw `NotFoundError` if
-   missing. Load its review and restaurant (+ branch coords when `branch_id` set,
-   else restaurant coords).
+   missing. Load its review and restaurant (+ branch coords only when `branch_id`
+   belongs to the receipt's `restaurant_id`, else restaurant coords).
 2. Compute `transaction_unique_hash` from OCR fields when present.
 3. Hard rule — composite duplicate: if a **different** receipt with the same
    `transaction_unique_hash` exists at `status='VERIFIED'`, reject:

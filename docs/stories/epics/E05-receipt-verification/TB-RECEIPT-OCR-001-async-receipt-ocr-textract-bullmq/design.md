@@ -43,7 +43,8 @@ Task 4.4 already scores as "unreadable".
 `processReceiptOcr(receiptVerificationId, { provider, now })`:
 
 1. Load receipt `FOR UPDATE`. Validate file format/size from stored metadata
-   (`file_url` extension allowlist + a size guard if available); invalid →
+   (`file_url` extension allowlist for Textract-supported receipt formats:
+   `jpg`, `jpeg`, `png`, `pdf`, `tif`, `tiff`, plus a size guard if available); invalid →
    `OCR_FAILED` + terminal, no scoring. (File bytes are validated again here from
    the S3 object content-length when the provider loads them.)
 2. Set `status = HASH_CHECKING`. Compute SHA-256 over the S3 object bytes.

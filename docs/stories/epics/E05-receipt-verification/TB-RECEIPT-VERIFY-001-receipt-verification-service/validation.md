@@ -72,6 +72,18 @@ Result (2026-06-12), all PASS:
 
 The proof script was removed after running (not committed).
 
+## PR #36 venue-binding follow-up
+
+PASS (2026-07-08).
+
+- Added unit regression coverage for a receipt whose `branch_id` points to a
+  branch owned by another restaurant.
+- `verifyReceipt` now requires `restaurant_branches.parent_restaurant_id` to
+  match the receipt's `restaurant_id`; otherwise scoring falls back to the
+  receipt restaurant instead of using the wrong branch venue.
+- `npm run test --prefix server -- tests/unit/receipt/receiptVerificationService.test.js`
+  passed: 15 tests.
+
 ## Result
 
 PASS. `npm run test:unit` 73/73 green (60 receipt-specific). `npm run build`

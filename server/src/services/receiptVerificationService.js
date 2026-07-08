@@ -217,8 +217,9 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
         `SELECT rb.id, r.name AS name, rb.latitude, rb.longitude
          FROM restaurant_branches rb
          JOIN restaurants r ON r.id = rb.parent_restaurant_id
-         WHERE rb.id = $1`,
-        [receipt.branch_id],
+         WHERE rb.id = $1
+           AND rb.parent_restaurant_id = $2`,
+        [receipt.branch_id, receipt.restaurant_id],
       );
       venue = branchResult.rows[0];
     }

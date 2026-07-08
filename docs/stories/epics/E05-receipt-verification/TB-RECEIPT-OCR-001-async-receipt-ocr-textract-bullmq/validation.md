@@ -126,8 +126,10 @@ PASS (2026-07-08).
 - Added fractional quantity coverage so `0.500` and `0,250` remain decimal
   quantities while VND amounts still use thousands grouping.
 - Added day-month-year OCR date coverage with `10/06/2026`.
+- Added file-format regression coverage that rejects default `.heic` receipts
+  before Textract and accepts `.tiff` receipts supported by AnalyzeExpense.
 - `npm run test --prefix server -- tests/unit/receipt/ocrMapping.test.js`
-  passed: 14 tests.
+  passed: 16 tests.
 - This changes OCR provider-value parsing only. Public API timestamps such as
   `visitedAt` and `capturedAt` remain ISO-8601.
 

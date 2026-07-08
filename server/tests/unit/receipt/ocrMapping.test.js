@@ -36,6 +36,14 @@ describe('validateReceiptFile', () => {
     expect(res.ok).toBe(false);
     expect(res.reason).toMatch(/exceeds/);
   });
+  it('rejects HEIC by default because Textract AnalyzeExpense does not support it', () => {
+    const res = validateReceiptFile({ fileUrl: 'r.heic', sizeBytes: 10 }, ocrConfig);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/Unsupported file type/);
+  });
+  it('accepts TIFF by default for Textract AnalyzeExpense receipts', () => {
+    expect(validateReceiptFile({ fileUrl: 'r.tiff', sizeBytes: 10 }, ocrConfig)).toEqual({ ok: true });
+  });
 });
 
 // A representative AnalyzeExpense response.

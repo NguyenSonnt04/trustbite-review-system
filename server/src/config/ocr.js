@@ -32,6 +32,6 @@ export function getOcrConfig() {
     jobBackoffMs: int('OCR_JOB_BACKOFF_MS', 5000),
     jobTimeoutMs: int('OCR_JOB_TIMEOUT_MS', 30000),
     maxFileBytes: int('OCR_MAX_FILE_BYTES', 10 * 1024 * 1024),
-    allowedExtensions: csv(process.env.OCR_ALLOWED_EXTENSIONS || 'jpg,jpeg,png,pdf,heic'),
+    allowedExtensions: csv(process.env.OCR_ALLOWED_EXTENSIONS || 'jpg,jpeg,png,pdf,tif,tiff'),
   };
 }
