@@ -6,6 +6,7 @@ import {
   deleteReceiptObject,
   uploadReceiptObject,
 } from './s3ReceiptStorageService.js';
+import { enqueueReceiptOcr } from './queue/receiptOcrQueue.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -18,6 +19,7 @@ const RECEIPT_CAPTURE_MAX_AGE_HOURS = 48;
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
 const IDEMPOTENCY_UNIQUE_CONSTRAINT = 'idempotency_keys_user_id_endpoint_idempotency_key_key';
 const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
+const OCR_ENQUEUE_FAILURE_PUBLIC_REASON = 'OCR enqueue failed; pending manual review.';
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
 
@@ -238,6 +240,82 @@ async function markIdempotencyFailed(client, userId, idempotencyKey) {
        AND status = 'IN_PROGRESS'`,
     [userId, RECEIPT_ENDPOINT, idempotencyKey],
   );
+}
+
+async function markReceiptPendingAdminReviewForQueueFailure({
+  receiptVerificationId,
+  userId,
+  idempotencyKey,
+  responseBody,
+  reason,
+}) {
+  const degradedBody = {
+    ...responseBody,
+    status: 'PENDING_ADMIN_REVIEW',
+    processingStatus: 'PENDING_ADMIN_REVIEW',
+  };
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+    const loaded = await client.query(
+      `SELECT id, review_id, status
+       FROM receipt_verifications
+       WHERE id = $1
+       FOR UPDATE`,
+      [receiptVerificationId],
+    );
+
+    if (loaded.rowCount === 0) {
+      await client.query('COMMIT');
+      return responseBody;
+    }
+
+    const receipt = loaded.rows[0];
+    const updated = await client.query(
+      `UPDATE receipt_verifications
+       SET status = 'PENDING_ADMIN_REVIEW',
+           decision_reason = $2
+       WHERE id = $1
+         AND status NOT IN ('VERIFIED', 'REJECTED', 'REFERENCE_ONLY', 'PENDING_ADMIN_REVIEW')
+       RETURNING id`,
+      [receiptVerificationId, reason],
+    );
+
+    let finalBody = degradedBody;
+    if (updated.rowCount > 0) {
+      await client.query(
+        `UPDATE reviews
+         SET status = 'PENDING_ADMIN_REVIEW',
+             verification_status = 'PENDING_ADMIN_REVIEW',
+             trust_label = 'PENDING_ADMIN_REVIEW',
+             public_visibility = 'PRIVATE_UNTIL_DECISION',
+             trust_weight_bucket = 'NONE'
+         WHERE id = $1`,
+        [receipt.review_id],
+      );
+      await client.query(
+        `INSERT INTO audit_logs (actor_id, actor_role, action, entity_type, entity_id, previous_status, new_status, reason)
+         VALUES (NULL, 'SYSTEM', 'RECEIPT_OCR_ENQUEUE_FAILED', 'RECEIPT_VERIFICATION', $1, $2, 'PENDING_ADMIN_REVIEW', $3)`,
+        [receipt.id, receipt.status, reason],
+      );
+    } else {
+      finalBody = {
+        ...responseBody,
+        status: receipt.status,
+        processingStatus: receipt.status,
+      };
+    }
+
+    await markIdempotencyCompleted(client, userId, idempotencyKey, finalBody, receiptVerificationId);
+    await client.query('COMMIT');
+    return finalBody;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function refreshIdempotencyAttempt(client, userId, idempotencyKey, requestHash) {
@@ -528,6 +606,8 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
   }
 
   const persistClient = await pool.connect();
+  let receiptVerificationId;
+  let responseBody;
   try {
     await persistClient.query('BEGIN');
     const review = await getReviewForUpload(persistClient, userId, data.reviewId, data.restaurantId);
@@ -580,8 +660,8 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
 
     await markIdempotencyCompleted(persistClient, userId, idempotencyKey, body, receiptResult.rows[0].id);
     await persistClient.query('COMMIT');
-
-    return { statusCode: 202, body };
+    receiptVerificationId = receiptResult.rows[0].id;
+    responseBody = body;
   } catch (err) {
     await persistClient.query('ROLLBACK');
 
@@ -595,4 +675,18 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
   } finally {
     persistClient.release();
   }
+
+  try {
+    await enqueueReceiptOcr(receiptVerificationId);
+  } catch (err) {
+    responseBody = await markReceiptPendingAdminReviewForQueueFailure({
+      receiptVerificationId,
+      userId,
+      idempotencyKey,
+      responseBody,
+      reason: OCR_ENQUEUE_FAILURE_PUBLIC_REASON,
+    });
+  }
+
+  return { statusCode: 202, body: responseBody };
 }

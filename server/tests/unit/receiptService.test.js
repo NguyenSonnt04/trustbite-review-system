@@ -14,8 +14,13 @@ vi.mock('../../src/services/s3ReceiptStorageService.js', () => ({
   deleteReceiptObject: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../src/services/queue/receiptOcrQueue.js', () => ({
+  enqueueReceiptOcr: vi.fn(() => Promise.resolve({ id: 'receipt-ocr-job-1' })),
+}));
+
 const { pool } = await import('../../src/config/db.js');
-const { uploadReceiptObject } = await import('../../src/services/s3ReceiptStorageService.js');
+const { deleteReceiptObject, uploadReceiptObject } = await import('../../src/services/s3ReceiptStorageService.js');
+const { enqueueReceiptOcr } = await import('../../src/services/queue/receiptOcrQueue.js');
 const { uploadReceiptForReview } = await import('../../src/services/receiptService.js');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
@@ -134,7 +139,7 @@ describe('uploadReceiptForReview', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
-  it('uploads a receipt, records capturedAt, and returns a 202 response body', async () => {
+  it('uploads a receipt, records capturedAt, enqueues OCR, and returns a 202 response body', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     mockReceiptHappyPath(client);
@@ -183,6 +188,97 @@ describe('uploadReceiptForReview', () => {
       },
     });
     expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    expect(enqueueReceiptOcr).toHaveBeenCalledWith('55555555-5555-4555-8555-555555555555');
+    expect(client.query.mock.invocationCallOrder.at(-1)).toBeLessThan(enqueueReceiptOcr.mock.invocationCallOrder[0]);
+  });
+
+  it('degrades the committed receipt to admin review when OCR enqueue fails after commit', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    mockReceiptHappyPath(client);
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          id: '55555555-5555-4555-8555-555555555555',
+          review_id: REVIEW_ID,
+          status: 'UPLOADED',
+        }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [{ id: '55555555-5555-4555-8555-555555555555' }], rowCount: 1 })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+    enqueueReceiptOcr.mockRejectedValueOnce(new Error('queue unavailable'));
+
+    const result = await uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    });
+
+    expect(result).toEqual({
+      statusCode: 202,
+      body: {
+        receiptVerificationId: '55555555-5555-4555-8555-555555555555',
+        status: 'PENDING_ADMIN_REVIEW',
+        processingStatus: 'PENDING_ADMIN_REVIEW',
+      },
+    });
+    expect(enqueueReceiptOcr).toHaveBeenCalledWith('55555555-5555-4555-8555-555555555555');
+    expect(client.query.mock.calls.map(([sql]) => sql)).not.toContain('ROLLBACK');
+    expect(client.query.mock.calls.some(([sql]) => String(sql).includes("SET status = 'FAILED'"))).toBe(false);
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("SET status = 'PENDING_ADMIN_REVIEW'"),
+      ['55555555-5555-4555-8555-555555555555', 'OCR enqueue failed; pending manual review.'],
+    );
+    expect(JSON.stringify(client.query.mock.calls)).not.toContain('queue unavailable');
+    expect(deleteReceiptObject).not.toHaveBeenCalled();
+  });
+
+  it('preserves the current terminal receipt status when OCR enqueue failure degrade is skipped', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    mockReceiptHappyPath(client);
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({
+        rows: [{
+          id: '55555555-5555-4555-8555-555555555555',
+          review_id: REVIEW_ID,
+          status: 'VERIFIED',
+        }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+    enqueueReceiptOcr.mockRejectedValueOnce(new Error('ambiguous queue timeout'));
+
+    const result = await uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    });
+
+    expect(result).toEqual({
+      statusCode: 202,
+      body: {
+        receiptVerificationId: '55555555-5555-4555-8555-555555555555',
+        status: 'VERIFIED',
+        processingStatus: 'VERIFIED',
+      },
+    });
+    expect(client.query).toHaveBeenCalledWith(
+      expect.stringContaining("SET status = 'PENDING_ADMIN_REVIEW'"),
+      ['55555555-5555-4555-8555-555555555555', 'OCR enqueue failed; pending manual review.'],
+    );
+    expect(JSON.stringify(client.query.mock.calls)).not.toContain('ambiguous queue timeout');
+    expect(deleteReceiptObject).not.toHaveBeenCalled();
   });
 
   it('creates a fraud flag and rejects when the receipt hash already exists', async () => {
@@ -231,6 +327,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(failureClient.query).toHaveBeenCalledWith(
       expect.stringContaining("SET status = 'FAILED'"),
       [USER_ID, 'POST /api/v1/receipts', IDEMPOTENCY_KEY],
@@ -276,6 +373,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
@@ -311,6 +409,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'DUPLICATE_RECEIPT_HASH' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(fraudClient.release).toHaveBeenCalled();
   });
 
@@ -335,6 +434,7 @@ describe('uploadReceiptForReview', () => {
     })).rejects.toMatchObject({ statusCode: 409, code: 'REQUEST_IN_PROGRESS' });
 
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
     expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
     expect(pool.connect).toHaveBeenCalledTimes(1);
   });
@@ -471,5 +571,6 @@ describe('uploadReceiptForReview', () => {
 
     expect(result).toEqual({ statusCode: 202, body, replayed: true });
     expect(uploadReceiptObject).not.toHaveBeenCalled();
+    expect(enqueueReceiptOcr).not.toHaveBeenCalled();
   });
 });

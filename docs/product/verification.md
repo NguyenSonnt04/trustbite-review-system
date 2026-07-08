@@ -40,6 +40,18 @@ values must tolerate common Vietnam receipt formats:
 - Client-supplied API timestamps such as `visitedAt` and `capturedAt` remain
   ISO-8601 strings at the HTTP boundary.
 
-## Current Scope
+## OCR And Verification Scope
 
-`TB-FRAUD-002` only establishes the backend GPS proximity rule and unit proof. `TB-FRAUD-003` adds timestamp integrity and duplicate-hash proof for receipt/review creation. OCR extraction, receipt age scoring, GPS evidence persistence, public verification APIs, review status finalization, and trust score updates remain part of later review/verification stories.
+`TB-FRAUD-001` provides the backend OCR/receipt verification dependency for
+Phase 4. The service loads private receipt objects through the provider
+boundary, maps Textract expense fields where supported, persists OCR text and
+line items, rejects duplicate receipt/transaction evidence, and synchronizes
+receipt plus review states through backend rules.
+
+`TB-REVIEW-001` owns the review-facing lifecycle around that dependency:
+creating the initial review, uploading the receipt, enqueueing OCR after upload,
+and exposing owner-scoped review/receipt status.
+
+Known proof boundary: current automated proof uses mock-provider/local adapter
+coverage for Textract behavior. A live AWS Textract end-to-end provider run is
+not claimed by this backend closeout.
