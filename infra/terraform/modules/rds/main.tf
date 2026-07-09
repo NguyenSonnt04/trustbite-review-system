@@ -18,6 +18,7 @@ locals {
     parameter_group_family    = var.parameter_group_family
     postgis_required          = true
     public_access             = false
+    ssl_required              = true
   }
 }
 
@@ -55,6 +56,12 @@ resource "aws_db_parameter_group" "this" {
   parameter {
     name  = "log_disconnections"
     value = "1"
+  }
+
+  parameter {
+    apply_method = "pending-reboot"
+    name         = "rds.force_ssl"
+    value        = "1"
   }
 
   tags = merge(var.tags, {

@@ -24,10 +24,21 @@ const start = async () => {
 
 const shutdown = async (signal) => {
   console.log(`\n[Worker] ${signal} received - shutting down`);
-  if (ocrWorker) await ocrWorker.close().catch(() => {});
-  await closeReceiptOcrQueue().catch(() => {});
-  await disconnectDB().catch(() => {});
-  process.exit(0);
+  let shutdownFailed = false;
+
+  const closeStep = async (label, close) => {
+    try {
+      await close();
+    } catch (err) {
+      shutdownFailed = true;
+      console.error(`[Worker] ${label} failed during shutdown:`, err?.message ?? err);
+    }
+  };
+
+  if (ocrWorker) await closeStep('OCR worker close', () => ocrWorker.close());
+  await closeStep('OCR queue close', closeReceiptOcrQueue);
+  await closeStep('database disconnect', disconnectDB);
+  process.exit(shutdownFailed ? 1 : 0);
 };
 
 process.on('SIGINT', () => shutdown('SIGINT'));

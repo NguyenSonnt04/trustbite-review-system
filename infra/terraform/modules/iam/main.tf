@@ -71,12 +71,6 @@ data "aws_iam_policy_document" "api_task" {
     }
   }
 
-  statement {
-    actions   = ["secretsmanager:GetSecretValue"]
-    effect    = "Allow"
-    resources = local.task_secret_arns
-    sid       = "RuntimeSecretRead"
-  }
 }
 
 data "aws_iam_policy_document" "worker_task" {
@@ -113,12 +107,6 @@ data "aws_iam_policy_document" "worker_task" {
     sid       = "TextractAnalyzeExpense"
   }
 
-  statement {
-    actions   = ["secretsmanager:GetSecretValue"]
-    effect    = "Allow"
-    resources = local.task_secret_arns
-    sid       = "RuntimeSecretRead"
-  }
 }
 
 data "aws_iam_policy_document" "execution_secrets" {

@@ -1037,5 +1037,34 @@ Planning evidence only:
   check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
   inspection was run. Spreadsheet task 1.2 remains not done.
 
+2026-07-10 PR #41 Codex closeout static validation:
+
+- Added `rds.force_ssl = 1` to the RDS PostgreSQL parameter group and set
+  `apply_method = "pending-reboot"` so live RDS enforces TLS without Terraform
+  attempting an invalid immediate static-parameter apply.
+- Removed `secretsmanager:GetSecretValue` from the API and worker task roles.
+  ECS secret injection remains scoped to the execution role through the existing
+  `execution_secrets` policy.
+- Replaced the worker shutdown `.catch(() => {})` cleanup calls with logged
+  shutdown steps and a non-zero exit code when OCR worker, queue, or database
+  cleanup fails.
+- Kept the API avatar S3 grant upload-only (`s3:PutObject` on `avatars/*`).
+  Codex review rejected adding `s3:GetObject` because the current avatar service
+  only presigns `PutObjectCommand`; no bounded avatar-read call path exists in
+  this slice.
+- Validation passed:
+  `.agents/skills/github-actions-validator/scripts/.tools/actionlint.exe
+  .github/workflows/aws-infra.yml`; `node --check
+  scripts/verify-tb-infra-static.mjs`; `npm run test --prefix server --
+  tests/unit/config/dbSsl.test.js tests/unit/config/ocrConfig.test.js` (2 files
+  / 9 tests); `npm run server:build` (106 files); `srcwalk review --scope .`;
+  `npm run verify:tb-infra-static` with Terraform fmt/init/validate/no-live
+  plan, `server:build`, server Docker image build, and git whitespace checks;
+  and final `codex review --uncommitted`, which reported no blocking
+  correctness issues.
+- No live AWS plan/apply, AWS resource creation, image push, deployed API health
+  check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
+  inspection was run. Spreadsheet task 1.2 remains not done.
+
 Future implementation evidence must be appended here after each slice. Use
 concrete commands, dates, counts, environment, and proof classification.
