@@ -61,3 +61,25 @@ harness.db-wal
 harness.db-shm
 scripts/bin/harness-cli
 scripts/bin/harness-cli.exe
+
+# Terraform local artifacts
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+*.plan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+backend*.hcl
+!backend*.example.hcl
+crash.log
+crash.*.log
+terraform.log
+*.tf.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

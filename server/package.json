@@ -5,9 +5,11 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "worker": "node src/worker.js",
     "dev": "nodemon src/server.js",
     "build": "node scripts/check-syntax.mjs",
     "db:migrate": "node scripts/migrate.js",
+    "smoke:aws-mvp": "node scripts/smoke-aws-mvp.mjs",
     "deletions:process": "node scripts/process-deletions.mjs",
     "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",

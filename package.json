@@ -17,6 +17,8 @@
     "verify:tb-app-smoke": "node scripts/verify-tb-app-smoke.mjs",
     "verify:tb-user-avatar-upload": "node scripts/verify-tb-user-avatar-upload.mjs",
     "verify:tb-aws-localstack": "node scripts/verify-tb-aws-localstack.mjs",
+    "verify:tb-infra-static": "node scripts/verify-tb-infra-static.mjs",
+    "smoke:aws-mvp": "node scripts/smoke-aws-mvp.mjs",
     "db:migrate": "npm run db:migrate --prefix server",
     "install:all": "npm install --prefix client && npm install --prefix server",
     "docker:up": "docker compose up -d",

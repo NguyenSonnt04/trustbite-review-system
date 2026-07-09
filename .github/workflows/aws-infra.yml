@@ -1,0 +1,397 @@
+name: AWS Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/aws-infra.yml"
+      - "infra/terraform/**"
+      - "scripts/smoke-aws-mvp.mjs"
+      - "scripts/export-terraform-ecr-env.mjs"
+      - "scripts/verify-tb-infra-static.mjs"
+      - "server/Dockerfile"
+      - "server/migrations/**"
+      - "server/scripts/**"
+      - "server/src/config/ocr.js"
+      - "server/src/worker.js"
+      - "server/package.json"
+      - "server/package-lock.json"
+      - "package.json"
+      - "package-lock.json"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/aws-infra.yml"
+      - "infra/terraform/**"
+      - "scripts/smoke-aws-mvp.mjs"
+      - "scripts/export-terraform-ecr-env.mjs"
+      - "scripts/verify-tb-infra-static.mjs"
+      - "server/Dockerfile"
+      - "server/migrations/**"
+      - "server/scripts/**"
+      - "server/src/config/ocr.js"
+      - "server/src/worker.js"
+      - "server/package.json"
+      - "server/package-lock.json"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Non-production GitHub environment and Terraform environment."
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - staging
+      aws_region:
+        description: "AWS region for the live plan/apply."
+        required: true
+        default: ap-southeast-1
+        type: string
+      apply:
+        description: "Apply the reviewed plans. False runs live plan only."
+        required: true
+        default: false
+        type: boolean
+      create_ecs:
+        description: "After foundation apply, push images and apply ECS resources."
+        required: true
+        default: false
+        type: boolean
+      ecs_private_egress_enabled:
+        description: "Confirm private ECS task egress through NAT or VPC endpoints is approved."
+        required: true
+        default: false
+        type: boolean
+      confirm_live:
+        description: "Type TB-INFRA-001 to unlock apply=true."
+        required: true
+        default: "no"
+        type: string
+      cost_ack:
+        description: "Type TB-COST-ACK to acknowledge live AWS resources can consume credits."
+        required: true
+        default: "no"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "24"
+  TERRAFORM_IMAGE: "hashicorp/terraform:1.14.5"
+  TF_WORKDIR: "infra/terraform/envs/dev"
+
+jobs:
+  static-validation:
+    name: Static infrastructure validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install server dependencies
+        run: npm ci --prefix server
+
+      - name: Verify static AWS infrastructure contract
+        run: npm run verify:tb-infra-static
+
+      - name: Verify Redis TLS runtime config
+        run: npm run test --prefix server -- tests/unit/config/ocrConfig.test.js
+
+      - name: Check live smoke script syntax
+        run: |
+          node --check scripts/smoke-aws-mvp.mjs
+          node --check scripts/export-terraform-ecr-env.mjs
+          node --check server/scripts/smoke-aws-mvp.mjs
+
+      - name: Write static summary
+        if: always()
+        run: |
+          {
+            echo "## TrustBite AWS Infrastructure"
+            echo ""
+            echo "| Check | Scope |"
+            echo "| --- | --- |"
+            echo "| Static Terraform verify | no live AWS resources |"
+            echo "| Redis TLS unit proof | runtime config only |"
+            echo "| Smoke script syntax | live smoke not executed |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  live-plan-apply:
+    name: Live AWS plan/apply
+    if: github.event_name == 'workflow_dispatch'
+    needs: static-validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment:
+      name: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      AWS_REGION: ${{ inputs.aws_region }}
+      AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+      API_CERTIFICATE_ARN: ${{ vars.API_CERTIFICATE_ARN }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      TF_VAR_redis_auth_token: ${{ secrets.REDIS_AUTH_TOKEN }}
+      REDIS_AUTH_TOKEN_SECRET_ARN: ${{ vars.REDIS_AUTH_TOKEN_SECRET_ARN }}
+      AWS_COGNITO_USER_POOL_ID: ${{ vars.AWS_COGNITO_USER_POOL_ID }}
+      AWS_COGNITO_CLIENT_ID: ${{ vars.AWS_COGNITO_CLIENT_ID }}
+      ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 1
+
+      - name: Validate live deployment inputs
+        env:
+          TRUSTBITE_ENV: ${{ inputs.environment }}
+          APPLY_REQUESTED: ${{ inputs.apply }}
+          CREATE_ECS: ${{ inputs.create_ecs }}
+          ECS_EGRESS_APPROVED: ${{ inputs.ecs_private_egress_enabled }}
+          CONFIRM_LIVE: ${{ inputs.confirm_live }}
+          COST_ACK: ${{ inputs.cost_ack }}
+        run: |
+          set -euo pipefail
+          if [[ "$TRUSTBITE_ENV" != "dev" && "$TRUSTBITE_ENV" != "staging" ]]; then
+            echo "::error::environment must be dev or staging"
+            exit 1
+          fi
+          if [[ ! "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            echo "::error::aws_region is not a valid AWS region shape"
+            exit 1
+          fi
+            if [[ -z "$AWS_DEPLOY_ROLE_ARN" || -z "$TF_STATE_BUCKET" ]]; then
+              echo "::error::AWS_DEPLOY_ROLE_ARN and TF_STATE_BUCKET GitHub environment variables are required"
+              exit 1
+            fi
+            if [[ -z "$ALLOWED_ORIGINS" ]]; then
+              echo "::error::ALLOWED_ORIGINS GitHub environment variable is required for live S3 CORS"
+              exit 1
+            fi
+            if [[ -z "$TF_VAR_redis_auth_token" || -z "$REDIS_AUTH_TOKEN_SECRET_ARN" ]]; then
+              echo "::error::REDIS_AUTH_TOKEN secret and REDIS_AUTH_TOKEN_SECRET_ARN variable are required for live Redis"
+            exit 1
+          fi
+          if [[ "$APPLY_REQUESTED" == "true" && "$CONFIRM_LIVE" != "TB-INFRA-001" ]]; then
+            echo "::error::apply=true requires confirm_live=TB-INFRA-001"
+            exit 1
+          fi
+          if [[ "$APPLY_REQUESTED" == "true" && "$COST_ACK" != "TB-COST-ACK" ]]; then
+            echo "::error::apply=true requires cost_ack=TB-COST-ACK because live AWS resources can consume credits"
+            exit 1
+          fi
+            if [[ "$CREATE_ECS" == "true" && "$ECS_EGRESS_APPROVED" != "true" ]]; then
+              echo "::error::create_ecs=true requires ecs_private_egress_enabled=true"
+              exit 1
+            fi
+            if [[ "$CREATE_ECS" == "true" && ( -z "$AWS_COGNITO_USER_POOL_ID" || -z "$AWS_COGNITO_CLIENT_ID" || -z "$API_CERTIFICATE_ARN" ) ]]; then
+              echo "::error::create_ecs=true requires AWS_COGNITO_USER_POOL_ID, AWS_COGNITO_CLIENT_ID, and API_CERTIFICATE_ARN GitHub environment variables"
+              exit 1
+            fi
+            if [[ "$APPLY_REQUESTED" != "true" ]]; then
+              echo "::notice::Plan-only run requested; Terraform will not apply or create paid AWS resources."
+            fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: trustbite-infra-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Prepare Terraform backend
+        env:
+          TRUSTBITE_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          STATE_KEY="${TF_STATE_KEY:-trustbite/${TRUSTBITE_ENV}/terraform.tfstate}"
+          cat > "$RUNNER_TEMP/backend.hcl" <<EOF
+          bucket       = "$TF_STATE_BUCKET"
+          key          = "$STATE_KEY"
+          region       = "$AWS_REGION"
+          encrypt      = true
+          use_lockfile = true
+          EOF
+
+      - name: Plan foundation resources
+        env:
+          TRUSTBITE_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          terraform() {
+            docker run --rm \
+              -e AWS_ACCESS_KEY_ID \
+              -e AWS_SECRET_ACCESS_KEY \
+              -e AWS_SESSION_TOKEN \
+              -e "AWS_REGION=${AWS_REGION}" \
+              -e TF_VAR_redis_auth_token \
+              -v "$PWD:/workspace" \
+              -v "$RUNNER_TEMP:/runner-temp" \
+              -w /workspace \
+              "$TERRAFORM_IMAGE" \
+              -chdir="$TF_WORKDIR" "$@"
+          }
+          terraform init -input=false -backend-config=/runner-temp/backend.hcl
+          terraform plan -input=false -no-color -out=/runner-temp/foundation.tfplan \
+            -var "environment=$TRUSTBITE_ENV" \
+              -var "aws_region=$AWS_REGION" \
+              -var "allowed_origins=$ALLOWED_ORIGINS" \
+              -var "create_live_resources=true" \
+            -var "create_ecs_resources=false" \
+            -var "redis_auth_token_secret_arn=$REDIS_AUTH_TOKEN_SECRET_ARN"
+
+      - name: Apply foundation resources
+        if: "inputs.apply == true"
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN \
+            -e "AWS_REGION=${AWS_REGION}" \
+            -e TF_VAR_redis_auth_token \
+            -v "$PWD:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            "$TERRAFORM_IMAGE" \
+            -chdir="$TF_WORKDIR" apply -input=false /runner-temp/foundation.tfplan
+
+      - name: Export ECR repository URLs
+        if: 'inputs.apply == true && inputs.create_ecs == true'
+        run: node scripts/export-terraform-ecr-env.mjs
+
+      - name: Build and push API and worker images
+        if: 'inputs.apply == true && inputs.create_ecs == true'
+        run: |
+          set -euo pipefail
+          REGISTRY="${API_ECR_REPOSITORY_URL%%/*}"
+          API_REPOSITORY_NAME="${API_ECR_REPOSITORY_URL#*/}"
+          WORKER_REPOSITORY_NAME="${WORKER_ECR_REPOSITORY_URL#*/}"
+          aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
+
+          image_exists() {
+            aws ecr describe-images \
+              --region "$AWS_REGION" \
+              --repository-name "$1" \
+              --image-ids "imageTag=${GITHUB_SHA}" >/dev/null 2>&1
+          }
+
+          API_IMAGE_EXISTS=false
+          WORKER_IMAGE_EXISTS=false
+          if image_exists "$API_REPOSITORY_NAME"; then
+            API_IMAGE_EXISTS=true
+            echo "::notice::API image tag ${GITHUB_SHA} already exists in ${API_REPOSITORY_NAME}; skipping push."
+          fi
+          if image_exists "$WORKER_REPOSITORY_NAME"; then
+            WORKER_IMAGE_EXISTS=true
+            echo "::notice::Worker image tag ${GITHUB_SHA} already exists in ${WORKER_REPOSITORY_NAME}; skipping push."
+          fi
+
+          if [[ "$API_IMAGE_EXISTS" != "true" || "$WORKER_IMAGE_EXISTS" != "true" ]]; then
+            docker build -t "trustbite-server:${GITHUB_SHA}" server
+          fi
+          if [[ "$API_IMAGE_EXISTS" != "true" ]]; then
+            docker tag "trustbite-server:${GITHUB_SHA}" "${API_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+            docker push "${API_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+          fi
+          if [[ "$WORKER_IMAGE_EXISTS" != "true" ]]; then
+            docker tag "trustbite-server:${GITHUB_SHA}" "${WORKER_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+            docker push "${WORKER_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+          fi
+
+      - name: Plan ECS resources
+        if: "inputs.create_ecs == true"
+        env:
+          TRUSTBITE_ENV: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN \
+            -e "AWS_REGION=${AWS_REGION}" \
+            -e TF_VAR_redis_auth_token \
+            -v "$PWD:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            "$TERRAFORM_IMAGE" \
+            -chdir="$TF_WORKDIR" plan -input=false -no-color -out=/runner-temp/ecs.tfplan \
+            -var "environment=$TRUSTBITE_ENV" \
+            -var "aws_region=$AWS_REGION" \
+            -var "aws_cognito_user_pool_id=$AWS_COGNITO_USER_POOL_ID" \
+            -var "aws_cognito_client_id=$AWS_COGNITO_CLIENT_ID" \
+              -var "allowed_origins=$ALLOWED_ORIGINS" \
+              -var "api_certificate_arn=$API_CERTIFICATE_ARN" \
+              -var "create_live_resources=true" \
+            -var "create_ecs_resources=true" \
+            -var "enable_nat_gateway=true" \
+            -var "ecs_image_tag=$GITHUB_SHA" \
+            -var "ecs_private_egress_enabled=true" \
+            -var "redis_auth_token_secret_arn=$REDIS_AUTH_TOKEN_SECRET_ARN"
+
+      - name: Apply ECS resources
+        if: 'inputs.apply == true && inputs.create_ecs == true'
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN \
+            -e "AWS_REGION=${AWS_REGION}" \
+            -e TF_VAR_redis_auth_token \
+            -v "$PWD:/workspace" \
+            -v "$RUNNER_TEMP:/runner-temp" \
+            -w /workspace \
+            "$TERRAFORM_IMAGE" \
+            -chdir="$TF_WORKDIR" apply -input=false /runner-temp/ecs.tfplan
+
+      - name: Write live summary
+        if: always()
+        env:
+          TRUSTBITE_ENV: ${{ inputs.environment }}
+          APPLY_REQUESTED: ${{ inputs.apply }}
+          CREATE_ECS: ${{ inputs.create_ecs }}
+          COST_ACK: ${{ inputs.cost_ack }}
+        run: |
+          {
+            echo "## TrustBite AWS Live Infrastructure"
+            echo ""
+            echo "| Field | Value |"
+            echo "| --- | --- |"
+            echo "| Environment | $TRUSTBITE_ENV |"
+            echo "| Region | $AWS_REGION |"
+            echo "| Apply requested | $APPLY_REQUESTED |"
+            echo "| ECS phase requested | $CREATE_ECS |"
+            echo "| Cost acknowledgement | $COST_ACK |"
+            echo "| Image tag | $GITHUB_SHA |"
+            echo ""
+              echo "Run migration and smoke from a VPC-reachable boundary after ECS deploy. Preferred path: ECS one-off tasks using the API task definition; ordinary host-side RDS/Redis smoke is not expected to work."
+            } >> "$GITHUB_STEP_SUMMARY"

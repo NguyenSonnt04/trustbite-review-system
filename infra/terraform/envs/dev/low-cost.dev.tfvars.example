@@ -1,0 +1,44 @@
+# Low-cost non-production defaults for TB-INFRA-001.
+# Copy to an ignored .tfvars file only after AWS account, backend, and budget are approved.
+
+project_name = "trustbite"
+environment  = "dev"
+aws_region   = "ap-southeast-1"
+owner        = "trustbite"
+
+# Keep live creation off by default. Plan-only validation should work with this file
+# without creating paid AWS resources.
+create_live_resources = false
+create_ecs_resources  = false
+
+# NAT Gateway is usually one of the easiest ways to burn credit in a small stack.
+# Keep this false until private ECS egress through NAT or VPC endpoints is approved.
+enable_nat_gateway        = false
+ecs_private_egress_enabled = false
+
+availability_zone_count = 2
+vpc_cidr                = "10.42.0.0/16"
+public_ingress_cidrs    = ["0.0.0.0/0"]
+
+rds_instance_class           = "db.t4g.micro"
+rds_allocated_storage_gib    = 20
+rds_max_allocated_storage_gib = 100
+rds_backup_retention_days    = 7
+rds_deletion_protection      = true
+rds_multi_az                 = false
+
+redis_node_type  = "cache.t4g.micro"
+redis_node_count = 1
+
+cloudwatch_log_retention_days = 7
+
+ecs_api_cpu           = 512
+ecs_api_memory        = 1024
+ecs_api_desired_count = 1
+
+ecs_worker_cpu           = 512
+ecs_worker_memory        = 1024
+ecs_worker_desired_count = 1
+
+ecr_scan_on_push = true
+ecr_force_delete = false

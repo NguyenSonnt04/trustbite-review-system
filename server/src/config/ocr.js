@@ -7,6 +7,14 @@ const int = (name, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const bool = (name, fallback = false) => {
+  const raw = process.env[name];
+  if (raw === undefined || raw === '') {
+    return fallback;
+  }
+  return raw.trim().toLowerCase() === 'true';
+};
+
 const csv = (value = '') =>
   value
     .split(',')
@@ -14,7 +22,7 @@ const csv = (value = '') =>
     .filter(Boolean);
 
 export function getRedisConnection() {
-  return {
+  const connection = {
     host: process.env.REDIS_HOST || 'localhost',
     port: int('REDIS_PORT', 6379),
     password: process.env.REDIS_PASSWORD || undefined,
@@ -22,6 +30,12 @@ export function getRedisConnection() {
     // BullMQ requires this for blocking commands.
     maxRetriesPerRequest: null,
   };
+
+  if (bool('REDIS_TLS')) {
+    connection.tls = {};
+  }
+
+  return connection;
 }
 
 export function getOcrConfig() {

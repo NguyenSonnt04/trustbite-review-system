@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 import pg from 'pg';
+import { getDatabaseSslConfig } from '../src/config/dbSsl.js';
 
 const { Pool } = pg;
 
@@ -34,6 +35,7 @@ const pool = new Pool({
   user: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
+  ssl: getDatabaseSslConfig(),
   max: 1,
   connectionTimeoutMillis: 5000
 });
