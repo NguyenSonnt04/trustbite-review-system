@@ -997,11 +997,16 @@ Planning evidence only:
   `.agents/skills/github-actions-validator/scripts/.tools/actionlint.exe
   .github/workflows/aws-infra.yml`; `node --check
   scripts/verify-tb-infra-static.mjs`; `npm run test --prefix server --
-  tests/unit/config/ocrConfig.test.js` (1 file / 3 tests); and
+  tests/unit/config/dbSsl.test.js tests/unit/config/ocrConfig.test.js` (2 files
+  / 8 tests); and
   `npm run verify:tb-infra-static` with Terraform `fmt -check`,
   `init -backend=false`, `validate`, temp-workspace no-live plan,
   `server:build` syntax check for 106 files, server Docker image build, and
   git whitespace checks.
+- Follow-up Greptile 4/5 items were also addressed: the AWS static workflow now
+  runs `dbSsl.test.js` alongside `ocrConfig.test.js`, and worker shutdown catches
+  `disconnectDB()` errors after SIGINT/SIGTERM so shutdown cannot hang on a DB
+  disconnect failure.
 - No live AWS plan/apply, AWS resource creation, image push, deployed API health
   check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
   inspection was run. Spreadsheet task 1.2 remains not done.

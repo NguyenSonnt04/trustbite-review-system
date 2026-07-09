@@ -26,7 +26,7 @@ const shutdown = async (signal) => {
   console.log(`\n[Worker] ${signal} received - shutting down`);
   if (ocrWorker) await ocrWorker.close().catch(() => {});
   await closeReceiptOcrQueue().catch(() => {});
-  await disconnectDB();
+  await disconnectDB().catch(() => {});
   process.exit(0);
 };
 

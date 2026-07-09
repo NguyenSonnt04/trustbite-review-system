@@ -123,8 +123,8 @@ jobs:
       - name: Verify static AWS infrastructure contract
         run: npm run verify:tb-infra-static
 
-      - name: Verify Redis TLS runtime config
-        run: npm run test --prefix server -- tests/unit/config/ocrConfig.test.js
+      - name: Verify DB and Redis TLS runtime config
+        run: npm run test --prefix server -- tests/unit/config/dbSsl.test.js tests/unit/config/ocrConfig.test.js
 
       - name: Check live smoke script syntax
         run: |
