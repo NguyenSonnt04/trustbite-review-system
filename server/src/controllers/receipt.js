@@ -7,6 +7,7 @@ export async function uploadReceiptHandler(req, res, next) {
       idempotencyKey: req.header('Idempotency-Key'),
       fields: req.body,
       file: req.file,
+      requestIp: req.ip ?? null,
     });
 
     res.status(result.statusCode).json(result.body);

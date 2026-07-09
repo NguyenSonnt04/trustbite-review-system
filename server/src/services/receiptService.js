@@ -500,7 +500,7 @@ async function findReceiptByHashOutsideTransaction(fileHash) {
   }
 }
 
-export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file }) {
+export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file, requestIp = null }) {
   validateIdempotencyKey(idempotencyKey);
   const data = validateReceiptFields(fields);
   validateFile(file);
@@ -626,9 +626,10 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
          gps_latitude,
          gps_longitude,
          gps_accuracy_meters,
-         captured_at
+         captured_at,
+         request_ip
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10, $11)
        RETURNING id, status`,
       [
         data.reviewId,
@@ -641,6 +642,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
         data.longitude,
         data.gpsAccuracyMeters,
         data.capturedAt,
+        requestIp,
       ],
     );
 

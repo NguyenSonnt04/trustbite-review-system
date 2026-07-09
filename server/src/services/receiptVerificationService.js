@@ -86,6 +86,71 @@ function deriveMerchantSimilarity(receipt, venue) {
   );
 }
 
+/**
+ * Derive the behavioral / velocity / device anti-fraud signals from persisted
+ * data (Anti-Fraud §4.1, §9). All lookups run inside the caller's transaction.
+ *
+ * - newAccountFirstReview: account created < 24h ago AND this review is the
+ *   user's first review (no earlier review exists).
+ * - manyRejectedReceipts: the user already has >= 3 REJECTED receipts in the
+ *   trailing 7-day window (the receipt under decision is excluded).
+ * - multiAccountSameDevice: another account uploaded a receipt from the same
+ *   request IP for the same restaurant within the 24h window. This is the MVP
+ *   IP-based signal; full client device fingerprinting is out of scope until a
+ *   legal/consent/retention decision exists (spec §9, V1.1).
+ */
+async function deriveBehavioralSignals(client, { review, receipt, now, rules }) {
+  const userId = review.user_id;
+
+  // --- New account + first review ---
+  // Anchor account age on review submission time, not the decision time: OCR is
+  // async, so measuring against `now` would drop the signal if the queue latency
+  // pushed the account past 24h after a genuinely new-account submission.
+  const submittedAt = review.created_at ? new Date(review.created_at) : now;
+  const userResult = await client.query(
+    `SELECT created_at FROM users WHERE id = $1`,
+    [userId],
+  );
+  const userCreatedAt = userResult.rows[0]?.created_at ? new Date(userResult.rows[0].created_at) : null;
+  const isNewAccount = userCreatedAt != null
+    && (submittedAt.getTime() - userCreatedAt.getTime()) < rules.newAccountWindowMs;
+
+  let newAccountFirstReview = false;
+  if (isNewAccount) {
+    const earlierReview = await client.query(
+      `SELECT 1 FROM reviews
+       WHERE user_id = $1 AND id <> $2 AND created_at < $3
+       LIMIT 1`,
+      [userId, review.id, review.created_at ?? now],
+    );
+    newAccountFirstReview = earlierReview.rows.length === 0;
+  }
+
+  // --- >= 3 rejected receipts in the trailing window ---
+  const rejectedWindowStart = new Date(now.getTime() - rules.rejectedReceiptWindowMs);
+  const rejectedResult = await client.query(
+    `SELECT COUNT(*)::int AS count FROM receipt_verifications
+     WHERE user_id = $1 AND id <> $2 AND status = 'REJECTED' AND created_at >= $3`,
+    [userId, receipt.id, rejectedWindowStart],
+  );
+  const manyRejectedReceipts = (rejectedResult.rows[0]?.count ?? 0) >= rules.rejectedReceiptThreshold;
+
+  // --- Multi-account same IP for the same restaurant within 24h ---
+  let multiAccountSameDevice = false;
+  if (receipt.request_ip) {
+    const sameIpWindowStart = new Date(now.getTime() - rules.sameIpWindowMs);
+    const sameIpResult = await client.query(
+      `SELECT 1 FROM receipt_verifications
+       WHERE request_ip = $1 AND restaurant_id = $2 AND user_id <> $3 AND created_at >= $4
+       LIMIT 1`,
+      [receipt.request_ip, receipt.restaurant_id, userId, sameIpWindowStart],
+    );
+    multiAccountSameDevice = sameIpResult.rows.length > 0;
+  }
+
+  return { newAccountFirstReview, manyRejectedReceipts, multiAccountSameDevice };
+}
+
 async function createFraudFlag(client, { flagCode, riskScore, receiptId, reviewId, userId }) {
   const flagResult = await client.query(
     `INSERT INTO fraud_flags (flag_code, risk_score, status)
@@ -202,7 +267,7 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
     const receipt = receiptResult.rows[0];
 
     const reviewResult = await client.query(
-      `SELECT id, user_id, restaurant_id FROM reviews WHERE id = $1`,
+      `SELECT id, user_id, restaurant_id, created_at FROM reviews WHERE id = $1`,
       [receipt.review_id],
     );
     if (reviewResult.rows.length === 0) {
@@ -295,6 +360,7 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
     const gps = deriveGpsSignals(receipt, venue, now, rules);
     const merchantSimilarity = deriveMerchantSimilarity(receipt, venue);
     const receiptAgeHours = deriveReceiptAgeHours(receipt, now);
+    const behavioral = await deriveBehavioralSignals(client, { review, receipt, now, rules });
 
     const signals = {
       ...gps,
@@ -302,10 +368,8 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
       receiptAgeHours,
       duplicateFileHash: false, // file-hash dedup is enforced upstream at upload
       duplicateTransactionHash: false,
-      editedMetadata: false,
-      newAccountFirstReview: false,
-      manyRejectedReceipts: false,
-      multiAccountSameDevice: false,
+      editedMetadata: false, // EXIF/edited-metadata detection is a future slice
+      ...behavioral,
     };
 
     const { score, breakdown } = scoreReceipt(signals, rules);

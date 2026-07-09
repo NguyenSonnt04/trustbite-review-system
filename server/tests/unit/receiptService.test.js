@@ -167,6 +167,7 @@ describe('uploadReceiptForReview', () => {
       24,
     ]);
     expect(client.query.mock.calls[11][0]).toContain('captured_at');
+    expect(client.query.mock.calls[11][0]).toContain('request_ip');
     expect(client.query.mock.calls[11][1]).toEqual([
       REVIEW_ID,
       USER_ID,
@@ -178,6 +179,7 @@ describe('uploadReceiptForReview', () => {
       null,
       null,
       capturedAt,
+      null,
     ]);
     expect(result).toEqual({
       statusCode: 202,

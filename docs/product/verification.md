@@ -26,6 +26,16 @@ Receipt `capturedAt` is optional client-supplied capture metadata. When supplied
 
 Receipt image SHA-256 hashes are unique for receipt verification records whose status is not `OCR_FAILED`. A matching non-failed hash is rejected as `DUPLICATE_RECEIPT_HASH` and creates a fraud flag for review.
 
+## Behavioral, Velocity, and Device Signals
+
+Accepted rules for `TB-FRAUD-005` (Anti-Fraud §4.1, §9). The backend derives these signals from persisted data during the receipt verification decision and adds them to the fraud risk score:
+
+- **New account + first review**: when the reviewer account was created less than 24 hours ago and this is their first review, add `+15`.
+- **Rejected-receipt velocity**: when the reviewer already has 3 or more `REJECTED` receipts in the trailing 7 days, add `+40`.
+- **Multi-account same IP**: when another account uploaded a receipt from the same request IP for the same restaurant within the last 24 hours, add `+50`. This is the MVP IP-based device signal. The caller IP is captured server-side into `receipt_verifications.request_ip` (an optional, nullable `INET` column) and is treated as PII (never returned in API responses). A full client/mobile device-fingerprint SDK remains out of scope until a legal-basis/consent/retention decision exists.
+
+These signals feed the same §4.2 decision buckets as the GPS/merchant/timestamp signals; a total score of `100+` still rejects and raises a fraud flag on the dominant signal. Daily hard rate limits (BR-RATE-003/004) are tracked separately and are not part of this rule set.
+
 ## Vietnam Receipt Parsing
 
 Textract `AnalyzeExpense` field names remain provider-defined, but mapped receipt
