@@ -36,9 +36,9 @@ const normalizePhoneNumber = (value) => {
   return phoneNumber;
 };
 
-const normalizeDisplayName = (value, phoneNumber) => {
+const normalizeDisplayName = (value) => {
   if (value === undefined || value === null || String(value).trim() === '') {
-    return `Local ${phoneNumber.slice(-4)}`;
+    return null;
   }
 
   const displayName = String(value).trim();
@@ -48,6 +48,8 @@ const normalizeDisplayName = (value, phoneNumber) => {
 
   return displayName;
 };
+
+const defaultLocalDisplayName = (phoneNumber) => `Local ${phoneNumber.slice(-4)}`;
 
 const assertLocalDevelopmentSignupEnabled = () => {
   if (appConfig.env === 'production' || !appConfig.trustedAuthHeaders) {
@@ -64,15 +66,15 @@ export const createLocalDevelopmentUser = async (req, res, next) => {
     assertLocalDevelopmentSignupEnabled();
 
     const phoneNumber = normalizePhoneNumber(req.body?.phoneNumber);
-    const displayName = normalizeDisplayName(req.body?.displayName, phoneNumber);
+    const displayName = normalizeDisplayName(req.body?.displayName);
 
     const result = await pool.query(
       `INSERT INTO users (phone_number, display_name)
-       VALUES ($1, $2)
+       VALUES ($1, COALESCE($2, $3))
        ON CONFLICT (phone_number) DO UPDATE
-       SET display_name = COALESCE(EXCLUDED.display_name, users.display_name)
+       SET display_name = COALESCE($2, users.display_name)
        RETURNING id, phone_number, display_name, status, created_at, updated_at`,
-      [phoneNumber, displayName]
+      [phoneNumber, displayName, defaultLocalDisplayName(phoneNumber)]
     );
 
     const user = result.rows[0];

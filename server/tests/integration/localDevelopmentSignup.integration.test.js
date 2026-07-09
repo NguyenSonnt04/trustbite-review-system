@@ -1,8 +1,9 @@
+import { afterAll, describe, expect, it } from 'vitest';
+
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
 
-import { afterAll, describe, expect, it } from 'vitest';
-import { requestApp } from '../helpers/http.js';
-import { closeDbPool, deleteByIds } from '../helpers/db.js';
+const { requestApp } = await import('../helpers/http.js');
+const { closeDbPool, deleteByIds } = await import('../helpers/db.js');
 
 const createdUsers = [];
 
@@ -55,5 +56,39 @@ describe('local development auth signup', () => {
       .expect(422);
 
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('preserves an existing display name when reused without displayName', async () => {
+    const firstResponse = await requestApp()
+      .post('/api/v1/auth/dev/local-signup')
+      .send({
+        phoneNumber: '+84901234568',
+        displayName: 'Existing Local Name',
+      })
+      .expect(201);
+
+    createdUsers.push(firstResponse.body.user.id);
+
+    const reusedResponse = await requestApp()
+      .post('/api/v1/auth/dev/local-signup')
+      .send({ phoneNumber: '+84901234568' })
+      .expect(201);
+
+    expect(reusedResponse.body.user).toMatchObject({
+      id: firstResponse.body.user.id,
+      phoneNumber: '+84901234568',
+      displayName: 'Existing Local Name',
+      status: 'ACTIVE',
+    });
+
+    const blankNameResponse = await requestApp()
+      .post('/api/v1/auth/dev/local-signup')
+      .send({ phoneNumber: '+84901234568', displayName: '   ' })
+      .expect(201);
+
+    expect(blankNameResponse.body.user).toMatchObject({
+      id: firstResponse.body.user.id,
+      displayName: 'Existing Local Name',
+    });
   });
 });
