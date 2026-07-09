@@ -13,7 +13,7 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | E05 Review Submission | Create, store, display, and moderate food reviews | unsliced |
 | E06 Anti-Fraud Verification | Receipt hash/OCR/timestamp/merchant/GPS verification pipeline | unsliced |
 | E07 Trust Score & Badges | Compute trust scores and badges from verified behavior and fraud signals | unsliced |
-| E08 AWS/LocalStack Integrations | Provider service boundaries, LocalStack support, and deployment-safe config | unsliced |
+| E08 AWS/LocalStack Integrations | Provider service boundaries, LocalStack support, real AWS infrastructure, and deployment-safe config | active |
 | E09 Observability & Audit | Request logs, audit records, verification evidence, and operational diagnostics | unsliced |
 
 ## Ready Story Packets
@@ -21,11 +21,12 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | Story | Title | Lane | Status | File |
 | --- | --- | --- | --- | --- |
 | TB-HARNESS-001 | Install and adopt repository harness | normal | implemented | `docs/stories/TB-HARNESS-001-install-repository-harness.md` |
-| TB-REST-001 | Restaurant CRUD API closeout | high-risk | in_progress | `docs/stories/epics/E03-restaurant-search/TB-REST-001-crud-restaurant/overview.md` |
-| TB-REST-002 | Restaurant search, filters, and nearby lookup | high-risk | planned | `docs/stories/epics/E03-restaurant-search/TB-REST-002-search-filter-nearby/overview.md` |
-| REST-US-003 | Restaurant detail and verified reviews | high-risk | in_progress | `docs/stories/epics/E03-restaurant-search/REST-US-003-restaurant-detail-verified-reviews/overview.md` |
+| TB-REST-001 | Restaurant CRUD API closeout | high-risk | implemented | `docs/stories/epics/E03-restaurant-search/TB-REST-001-crud-restaurant/overview.md` |
+| TB-REST-002 | Restaurant search, filters, and nearby lookup | high-risk | implemented | `docs/stories/epics/E03-restaurant-search/TB-REST-002-search-filter-nearby/overview.md` |
+| REST-US-003 | Restaurant detail and verified reviews | high-risk | implemented | `docs/stories/epics/E03-restaurant-search/REST-US-003-restaurant-detail-verified-reviews/overview.md` |
 | TB-AUTH-CLIENT-001 | Cognito signup/login/forgot-password integration | high-risk | in_progress | `docs/stories/epics/E04-auth-identity/TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery/overview.md` |
 | TB-USER-PROFILE-001 | Register and update user profile | high-risk | implemented | `docs/stories/epics/E04-auth-identity/TB-USER-PROFILE-001-register-update-profile/overview.md` |
+| TB-INFRA-001 | Real AWS MVP infrastructure baseline | high-risk | in_progress | `docs/stories/epics/E08-aws-infrastructure/TB-INFRA-001-real-aws-mvp-infra/overview.md` |
 
 ## Suggested Next Slices
 
@@ -37,3 +38,4 @@ This backlog tracks candidate TrustBite work. Do not create every possible story
 | TB-AUTH-001 | Complete Cognito authentication proof | high-risk | Finish the remaining Cognito JWT negative-path proof required before client auth integration can close |
 | TB-AUTH-OTP-001 | OTP SMS send and verify | retired | Superseded by Cognito-first auth boundary decision |
 | TB-AUTH-SESSION-001 | Access and refresh token lifecycle | retired | Superseded by Cognito-first auth boundary decision |
+| TB-INFRA-001 | Real AWS MVP infrastructure baseline | high-risk | Closes spreadsheet task 1.2 only after live non-production RDS/S3/Redis/ECS proof exists |
