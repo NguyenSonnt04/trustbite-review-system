@@ -36,4 +36,16 @@ npm run test:integration --prefix server
 
 ## Acceptance Evidence
 
-TBD after implementation.
+2026-07-08 mobile slice:
+
+- Added `MobileAuthService.completeCognitoSignIn` for the Cognito-token handoff to TrustBite Express.
+- Added `TrustBiteApiClient` tests proving `Authorization: Bearer <Cognito access token>` on `GET /api/v1/users/me`, backend `401` session clearing, and token-safe error strings.
+- Updated the Flutter login entry screen copy away from backend OTP issuance and toward Cognito-owned login/signup.
+- `npm run mobile:test` passed locally with 10 tests. The command updated local Flutter transitive lock entries during dependency resolution; those environment-only lock/generated-file changes were not kept in the patch.
+
+2026-07-08 local mobile signup smoke:
+
+- Added a dev-only `POST /api/v1/auth/dev/local-signup` endpoint guarded by non-production `TRUSTBITE_TRUSTED_AUTH_HEADERS=true`.
+- Mobile now falls back to that local trusted-auth path when no Cognito client callback is wired, stores trusted-local metadata, and calls `GET /api/v1/users/me` with `x-trustbite-*` headers.
+- Android emulator defaults to `http://10.0.2.2:5000` when `TRUSTBITE_API_BASE_URL` is not passed, so local mobile can reach the host Express server.
+- Validation passed: `flutter test --no-pub` with 15 tests, server syntax build, server integration suite including `localDevelopmentSignup.integration.test.js`, and `flutter build apk --debug --no-pub`.

@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
+import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
+import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 
 /// Login/register entry screen styled after the TrustBite discover screen.
 ///
-/// This is a visual UI only: the buttons and inputs are ready to wire into
-/// Cognito-backed auth later, but they do not perform authentication yet.
+/// Cognito owns credential verification and token issuance. The optional
+/// callbacks let the app attach a Cognito client without routing credentials
+/// through TrustBite Express.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.authService,
+    this.onContinueWithCognito,
+    this.onContinueWithGoogle,
+  });
+
+  final MobileAuthService? authService;
+  final VoidCallback? onContinueWithCognito;
+  final VoidCallback? onContinueWithGoogle;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -16,13 +29,63 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _muted = Color(0xFF8E8E9A);
 
   int _activeTab = 0;
+  bool _isSubmitting = false;
 
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  MobileAuthService get _authService =>
+      widget.authService ?? appMobileAuthService;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _identifierController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _handlePrimaryAuth() async {
+    final callback = widget.onContinueWithCognito;
+    if (callback != null) {
+      callback();
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      final user = await _authService.completeLocalDevelopmentSignUp(
+        phoneNumber: _identifierController.text,
+        displayName: _identifierController.text,
+      );
+
+      if (!mounted) return;
+      final displayName =
+          user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản local';
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(user);
+      } else {
+        _showMessage('Đã đăng nhập với $displayName.');
+      }
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } on ArgumentError catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
   @override
@@ -172,7 +235,14 @@ class _LoginScreenState extends State<LoginScreen> {
             child: _buildPhoneFields(),
           ),
           const SizedBox(height: 16),
-          _primaryButton('Gửi mã OTP'),
+          _primaryButton(
+            _activeTab == 0
+                ? 'Tiếp tục với Cognito'
+                : _isSubmitting
+                    ? 'Đang tạo...'
+                    : 'Tạo tài khoản Cognito',
+            _isSubmitting ? null : _handlePrimaryAuth,
+          ),
           const SizedBox(height: 16),
           _divider(),
           const SizedBox(height: 16),
@@ -235,11 +305,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildPhoneFields() {
     final helperText = _activeTab == 0
-        ? 'Nhập số điện thoại để nhận mã đăng nhập.'
-        : 'Tạo tài khoản mới bằng số điện thoại của bạn.';
+        ? 'Đăng nhập bằng Cognito rồi gửi access token tới backend TrustBite.'
+        : 'Tạo tài khoản qua Cognito; TrustBite chỉ nhận token đã xác thực.';
 
     return Column(
-      key: ValueKey('phone-fields-$_activeTab'),
+      key: ValueKey('cognito-fields-$_activeTab'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -253,12 +323,21 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 12),
         _inputField(
-          controller: _phoneController,
-          icon: Icons.phone_iphone_rounded,
-          hint: 'Số điện thoại',
-          keyboardType: TextInputType.phone,
+          controller: _identifierController,
+          icon: Icons.person_outline_rounded,
+          hint: 'Email hoặc số điện thoại',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.username],
+        ),
+        const SizedBox(height: 12),
+        _inputField(
+          controller: _passwordController,
+          icon: Icons.lock_outline_rounded,
+          hint: 'Mật khẩu Cognito',
           textInputAction: TextInputAction.done,
-          autofillHints: const [AutofillHints.telephoneNumber],
+          autofillHints: const [AutofillHints.password],
+          obscureText: true,
         ),
       ],
     );
@@ -310,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _primaryButton(String label) {
+  Widget _primaryButton(String label, VoidCallback? onPressed) {
     return Container(
       height: 52,
       width: double.infinity,
@@ -326,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: TextButton(
-        onPressed: () {},
+        onPressed: onPressed,
         child: Text(
           label,
           style: const TextStyle(
@@ -364,7 +443,8 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 52,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: () {},
+        onPressed: widget.onContinueWithGoogle ??
+            () => _showMessage('Google sign-in chưa được cấu hình cho mobile.'),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFF0F0F0)),
           shape:

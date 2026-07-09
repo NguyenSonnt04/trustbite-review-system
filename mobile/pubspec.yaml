@@ -24,3 +24,6 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/bg/

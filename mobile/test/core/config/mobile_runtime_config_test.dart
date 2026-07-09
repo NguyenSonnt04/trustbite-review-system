@@ -3,6 +3,15 @@ import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 
 void main() {
   group('MobileRuntimeConfig', () {
+    test('loads local defaults from compile-time environment', () {
+      final config = MobileRuntimeConfig.fromEnvironment();
+
+      expect(config.apiBaseUrl, 'http://10.0.2.2:5000');
+      expect(config.awsRegion, 'ap-southeast-1');
+      expect(config.cognitoUserPoolId, '');
+      expect(config.cognitoClientId, '');
+    });
+
     test('builds API v1 URI without duplicating namespace', () {
       const config = MobileRuntimeConfig(
         apiBaseUrl: 'http://localhost:5000/api/v1/',

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/core/theme/app_scroll_behavior.dart';
 import 'package:trustbite_mobile/src/core/theme/app_theme.dart';
 import 'package:trustbite_mobile/src/features/home/home_screen.dart';
 
@@ -12,6 +13,7 @@ class TrustBiteApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
+      scrollBehavior: const AppScrollBehavior(),
       home: const HomeScreen(),
     );
   }

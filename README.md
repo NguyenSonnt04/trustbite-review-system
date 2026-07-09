@@ -184,11 +184,14 @@ AWS_SES_SENDER_EMAIL=noreply@trustbite.com
 AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
 AWS_COGNITO_CLIENT_ID=local-cognito-client
 AUTH_PHONE_FALLBACK_ENABLED=true
+TRUSTBITE_TRUSTED_AUTH_HEADERS=true
 TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test
 GPS_PROXIMITY_THRESHOLD_METERS=200
 ```
 
 `AUTH_PHONE_FALLBACK_ENABLED=true` is a local transition setting. Production-like environments default this fallback off and should opt in only after verified-phone backfill proof.
+
+`TRUSTBITE_TRUSTED_AUTH_HEADERS=true` is for local development and mobile emulator smoke tests only. It enables the dev-only trusted-local auth path used when Cognito signup/login is not available locally. Keep it disabled in production.
 
 If a temporary JWT fallback is ever needed for isolated test doubles, keep it out of the default runtime path and document the exception in a decision record.
 
