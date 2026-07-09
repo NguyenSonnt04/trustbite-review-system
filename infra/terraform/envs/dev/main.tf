@@ -49,6 +49,7 @@ module "redis" {
   source = "../../modules/redis"
 
   auth_token                 = var.redis_auth_token
+  auth_token_state_approved  = var.redis_auth_token_state_approved
   auth_token_update_strategy = var.redis_auth_token_update_strategy
   create_live_resources      = var.create_live_resources
   engine_version             = var.redis_engine_version

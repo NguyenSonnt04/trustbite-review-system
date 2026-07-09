@@ -5,6 +5,12 @@ variable "auth_token" {
   sensitive   = true
 }
 
+variable "auth_token_state_approved" {
+  description = "Explicit approval that the Redis AUTH token may enter encrypted Terraform state for this non-production apply."
+  type        = bool
+  default     = false
+}
+
 variable "auth_token_update_strategy" {
   description = "Redis AUTH token update strategy. SET revokes the previous token; ROTATE must be followed by SET after clients move."
   type        = string

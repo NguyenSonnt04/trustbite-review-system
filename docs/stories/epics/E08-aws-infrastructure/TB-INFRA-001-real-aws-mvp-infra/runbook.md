@@ -13,7 +13,8 @@ Before `create_live_resources=true`, confirm:
 - Private ECS task egress is approved through NAT. The current Terraform stack
   does not model the required ECR, CloudWatch Logs, Secrets Manager, and AWS API
   VPC endpoints yet.
-- Redis AUTH token and state/secret handling are explicitly approved.
+  - Redis AUTH token plaintext-in-state exception, state access, and rotation
+    handling are explicitly approved.
 - Production API config is available from the selected GitHub environment:
   `AWS_COGNITO_USER_POOL_ID`, `AWS_COGNITO_CLIENT_ID`, and `ALLOWED_ORIGINS`.
 - Budget and cleanup owner are recorded.
@@ -74,6 +75,9 @@ Required workflow dispatch inputs for a live apply:
 - `apply=true`
 - `confirm_live=TB-INFRA-001`
 - `cost_ack=TB-COST-ACK`
+- `redis_secret_state_approved=true` after the non-production Redis AUTH token
+  plaintext-in-state exception, remote-state access boundary, and rotation plan
+  are approved.
 - `create_ecs=true` only after the foundation phase has created ECR and
   private ECS egress has been approved.
 - `ecs_private_egress_enabled=true` only when NAT egress is approved. The

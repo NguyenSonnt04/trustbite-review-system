@@ -29,6 +29,9 @@ rds_multi_az                 = false
 
 redis_node_type  = "cache.t4g.micro"
 redis_node_count = 1
+# Keep false unless a live non-production plan has an approved Redis AUTH
+# plaintext-in-state exception and rotation/access boundary.
+redis_auth_token_state_approved = false
 
 cloudwatch_log_retention_days = 7
 

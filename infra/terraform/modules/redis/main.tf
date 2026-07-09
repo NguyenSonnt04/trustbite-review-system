@@ -13,6 +13,7 @@ locals {
     parameter_group_family   = var.parameter_group_family
     port                     = var.port
     public_access            = false
+    state_secret_approval    = var.auth_token_state_approved
     runtime_env_vars         = ["REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD", "REDIS_DB", "REDIS_TLS"]
     runtime_use              = "BullMQ queues and cache workflows"
     transit_encryption       = true
@@ -89,6 +90,11 @@ resource "aws_elasticache_replication_group" "this" {
       condition     = var.auth_token != null
       error_message = "Redis AUTH token must be supplied only after remote state secret handling is approved."
     }
+
+    precondition {
+      condition     = var.auth_token_state_approved
+      error_message = "Redis AUTH token can enter Terraform state; set auth_token_state_approved only after remote state access, rotation, and exception approval are recorded."
+    }
   }
 }
 
@@ -101,6 +107,7 @@ output "ids" {
   description = "Redis ids for runtime config. Empty until live resources are enabled."
   value = {
     auth_token_state_warning   = "REDIS_PASSWORD must not be set until secret-in-state handling is explicitly approved."
+    auth_token_state_approved  = var.auth_token_state_approved
     auth_token_update_strategy = var.auth_token_update_strategy
     primary_endpoint_address   = try(aws_elasticache_replication_group.this[0].primary_endpoint_address, null)
     reader_endpoint_address    = try(aws_elasticache_replication_group.this[0].reader_endpoint_address, null)

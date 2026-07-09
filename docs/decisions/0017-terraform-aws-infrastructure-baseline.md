@@ -24,6 +24,11 @@ for live work must use an approved encrypted remote backend with locking before
 any live `plan` or `apply`. Local state, real `tfvars`, plan files, provider
 debug logs, and credentials must stay out of git.
 
+ElastiCache Redis AUTH token handling is a known Terraform state exception for
+this non-production baseline. A live plan may set it only after explicit
+approval of encrypted state access, rotation, and access boundaries; the
+Terraform module and GitHub workflow must fail closed without that approval.
+
 The first implementation slice may add an IaC skeleton and static validation
 only. Live `terraform plan` and `terraform apply` remain gated on explicit
 confirmation of AWS account, region, state backend, budget, and blast radius.
@@ -57,5 +62,6 @@ Tradeoffs:
 
 - Add the first `infra/terraform` skeleton and static validation evidence.
 - Confirm remote state backend values outside git before any live plan.
+- Confirm the Redis AUTH plaintext-in-state exception before any live Redis plan.
 - Add concrete AWS resources only after account, region, budget, and apply gates
   are approved.

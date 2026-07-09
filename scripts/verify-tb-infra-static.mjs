@@ -36,6 +36,11 @@ const runNpm = (label, args) => {
 };
 
 const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
+const dockerUserArgs =
+  process.platform !== 'win32' && typeof process.getuid === 'function' && typeof process.getgid === 'function'
+    ? ['--user', `${process.getuid()}:${process.getgid()}`]
+    : [];
+const dockerHomeArgs = dockerUserArgs.length > 0 ? ['-e', 'HOME=/tmp'] : [];
 
 const runGitWhitespaceCheck = () => {
   if (!isGitHubActions) {
@@ -93,6 +98,8 @@ const runTerraform = (label, args, options = {}) => {
   run(label, 'docker', [
     'run',
     '--rm',
+    ...dockerUserArgs,
+    ...dockerHomeArgs,
     ...dockerEnvArgs,
     '-v',
     `${workspaceDir}:/workspace`,

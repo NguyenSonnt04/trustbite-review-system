@@ -75,6 +75,11 @@ on:
         required: true
         default: "no"
         type: string
+      redis_secret_state_approved:
+        description: "Confirm Redis AUTH token plaintext-in-state exception is approved for non-production."
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -178,6 +183,7 @@ jobs:
           ECS_EGRESS_APPROVED: ${{ inputs.ecs_private_egress_enabled }}
           CONFIRM_LIVE: ${{ inputs.confirm_live }}
           COST_ACK: ${{ inputs.cost_ack }}
+          REDIS_SECRET_STATE_APPROVED: ${{ inputs.redis_secret_state_approved }}
         run: |
           set -euo pipefail
           if [[ "$TRUSTBITE_ENV" != "dev" && "$TRUSTBITE_ENV" != "staging" ]]; then
@@ -198,8 +204,12 @@ jobs:
             fi
             if [[ -z "$TF_VAR_redis_auth_token" || -z "$REDIS_AUTH_TOKEN_SECRET_ARN" ]]; then
               echo "::error::REDIS_AUTH_TOKEN secret and REDIS_AUTH_TOKEN_SECRET_ARN variable are required for live Redis"
-            exit 1
-          fi
+              exit 1
+            fi
+            if [[ "$REDIS_SECRET_STATE_APPROVED" != "true" ]]; then
+              echo "::error::live Redis requires redis_secret_state_approved=true because ElastiCache AUTH token can enter Terraform state"
+              exit 1
+            fi
           if [[ "$APPLY_REQUESTED" == "true" && "$CONFIRM_LIVE" != "TB-INFRA-001" ]]; then
             echo "::error::apply=true requires confirm_live=TB-INFRA-001"
             exit 1
@@ -260,13 +270,14 @@ jobs:
               -chdir="$TF_WORKDIR" "$@"
           }
           terraform init -input=false -backend-config=/runner-temp/backend.hcl
-          terraform plan -input=false -no-color -out=/runner-temp/foundation.tfplan \
-            -var "environment=$TRUSTBITE_ENV" \
+            terraform plan -input=false -no-color -out=/runner-temp/foundation.tfplan \
+              -var "environment=$TRUSTBITE_ENV" \
               -var "aws_region=$AWS_REGION" \
               -var "allowed_origins=$ALLOWED_ORIGINS" \
               -var "create_live_resources=true" \
-            -var "create_ecs_resources=false" \
-            -var "redis_auth_token_secret_arn=$REDIS_AUTH_TOKEN_SECRET_ARN"
+              -var "create_ecs_resources=false" \
+              -var "redis_auth_token_state_approved=true" \
+              -var "redis_auth_token_secret_arn=$REDIS_AUTH_TOKEN_SECRET_ARN"
 
       - name: Apply foundation resources
         if: "inputs.apply == true"
@@ -348,13 +359,14 @@ jobs:
             -var "aws_region=$AWS_REGION" \
             -var "aws_cognito_user_pool_id=$AWS_COGNITO_USER_POOL_ID" \
             -var "aws_cognito_client_id=$AWS_COGNITO_CLIENT_ID" \
-              -var "allowed_origins=$ALLOWED_ORIGINS" \
-              -var "api_certificate_arn=$API_CERTIFICATE_ARN" \
-              -var "create_live_resources=true" \
+            -var "allowed_origins=$ALLOWED_ORIGINS" \
+            -var "api_certificate_arn=$API_CERTIFICATE_ARN" \
+            -var "create_live_resources=true" \
             -var "create_ecs_resources=true" \
             -var "enable_nat_gateway=true" \
             -var "ecs_image_tag=$GITHUB_SHA" \
             -var "ecs_private_egress_enabled=true" \
+            -var "redis_auth_token_state_approved=true" \
             -var "redis_auth_token_secret_arn=$REDIS_AUTH_TOKEN_SECRET_ARN"
 
       - name: Apply ECS resources

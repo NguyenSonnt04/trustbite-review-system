@@ -7,12 +7,14 @@ const int = (name, fallback) => {
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
+const BOOL_TRUE = new Set(['1', 'true', 'yes', 'on']);
+
 const bool = (name, fallback = false) => {
   const raw = process.env[name];
   if (raw === undefined || raw === '') {
     return fallback;
   }
-  return raw.trim().toLowerCase() === 'true';
+  return BOOL_TRUE.has(raw.trim().toLowerCase());
 };
 
 const csv = (value = '') =>

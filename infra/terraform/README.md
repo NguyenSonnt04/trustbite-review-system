@@ -115,7 +115,10 @@ Before any live `terraform plan`:
    approved ACM certificate for the public HTTPS listener.
 5. Add the approved `backend "s3"` block and run `terraform init` with an
    approved backend config outside git.
-6. Treat the generated plan as sensitive and keep it out of the repository.
+6. Confirm the non-production Redis AUTH token plaintext-in-state exception,
+   state access boundary, and rotation plan before setting
+   `redis_auth_token_state_approved=true`.
+7. Treat the generated plan as sensitive and keep it out of the repository.
 
 Do not run `terraform apply` without explicit human approval for the selected
 non-production account and region. The GitHub workflow requires

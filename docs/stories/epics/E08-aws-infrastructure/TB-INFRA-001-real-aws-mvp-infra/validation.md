@@ -973,5 +973,38 @@ Planning evidence only:
   smoke, ECS deploy, or CloudWatch runtime log inspection was run. Spreadsheet
   task 1.2 remains not done.
 
+2026-07-09 PR #41 Greptile/CI review fix static validation:
+
+- Removed `s3:DeleteObject` from the API task role receipt object policy so API
+  runtime can read/write receipt evidence but cannot delete anti-fraud receipt
+  objects. Avatar upload still has its separate `s3:PutObject` prefix grant.
+- Added explicit Redis AUTH plaintext-in-state approval gates:
+  `redis_auth_token_state_approved` in Terraform and
+  `redis_secret_state_approved=true` in the live workflow. The no-live static
+  plan showed `redis.state_secret_approval = false` and
+  `redis_ids.auth_token_state_approved = false`.
+- Updated the decision, Terraform README, story runbook, and low-cost tfvars
+  example to record the Redis AUTH state exception, state-access boundary, and
+  rotation approval requirement before live Redis plan/apply.
+- Fixed `scripts/verify-tb-infra-static.mjs` so Linux CI runs Terraform Docker
+  containers as the runner UID/GID with `HOME=/tmp`, preventing root-owned temp
+  workspace files from causing `EACCES` cleanup failures.
+- Added `DATABASE_SSL_REJECT_UNAUTHORIZED=true` to `server/.env.example`.
+- Added red/green unit proof for `REDIS_TLS=1`; the red run failed because TLS
+  was not enabled, then the config helper was changed to accept `1`, `true`,
+  `yes`, and `on`.
+- Validation passed:
+  `.agents/skills/github-actions-validator/scripts/.tools/actionlint.exe
+  .github/workflows/aws-infra.yml`; `node --check
+  scripts/verify-tb-infra-static.mjs`; `npm run test --prefix server --
+  tests/unit/config/ocrConfig.test.js` (1 file / 3 tests); and
+  `npm run verify:tb-infra-static` with Terraform `fmt -check`,
+  `init -backend=false`, `validate`, temp-workspace no-live plan,
+  `server:build` syntax check for 106 files, server Docker image build, and
+  git whitespace checks.
+- No live AWS plan/apply, AWS resource creation, image push, deployed API health
+  check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
+  inspection was run. Spreadsheet task 1.2 remains not done.
+
 Future implementation evidence must be appended here after each slice. Use
 concrete commands, dates, counts, environment, and proof classification.

@@ -43,7 +43,6 @@ data "aws_iam_policy_document" "api_task" {
     actions = [
       "s3:GetObject",
       "s3:PutObject",
-      "s3:DeleteObject",
     ]
     effect = "Allow"
     resources = [

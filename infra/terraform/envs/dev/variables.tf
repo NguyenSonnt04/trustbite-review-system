@@ -266,6 +266,12 @@ variable "redis_auth_token" {
   }
 }
 
+variable "redis_auth_token_state_approved" {
+  description = "Explicit approval that the Redis AUTH token may enter encrypted Terraform state for this non-production apply."
+  type        = bool
+  default     = false
+}
+
 variable "redis_auth_token_update_strategy" {
   description = "ElastiCache AUTH token update strategy. Defaults to SET so rotated Redis tokens are revoked instead of left valid."
   type        = string
