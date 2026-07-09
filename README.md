@@ -47,7 +47,7 @@ This repository contains the structured skeleton folders for development.
 ### 1. Requirements
 - Node.js (v20.9+; CI and Docker images currently use Node.js 24)
 - Docker & Docker Compose
-- Flutter SDK 3.4+ for mobile development
+- Flutter SDK 3.35+ with Dart 3.9+ for mobile development
 
 ### 2. Install Workspace Dependencies
 Run this in the root directory:
@@ -98,6 +98,13 @@ Run the Flutter mobile app:
 npm run mobile:pubget
 npm run mobile:run
 ```
+
+`npm run mobile:run` maps only `AWS_REGION`,
+`AWS_COGNITO_USER_POOL_ID`, and `AWS_COGNITO_CLIENT_ID` from the ignored
+`server/.env` file into Flutter `--dart-define` values. AWS access keys,
+secrets, database credentials, and other server-only settings are never passed
+to the mobile process. Explicit `TRUSTBITE_*` environment variables override
+the mapped values.
 
 If `mobile/android`, `mobile/ios`, `mobile/web`, or another Flutter platform runner folder is missing, generate runners first:
 ```bash

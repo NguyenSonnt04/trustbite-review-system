@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:trustbite_mobile/src/core/auth/auth_session_store.dart';
+import 'package:trustbite_mobile/src/core/auth/cognito_session_provider.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 
 class ApiTransportRequest {
@@ -19,10 +20,7 @@ class ApiTransportRequest {
 }
 
 class ApiTransportResponse {
-  const ApiTransportResponse({
-    required this.statusCode,
-    required this.body,
-  });
+  const ApiTransportResponse({required this.statusCode, required this.body});
 
   final int statusCode;
   final String body;
@@ -34,7 +32,7 @@ abstract class ApiTransport {
 
 class HttpApiTransport implements ApiTransport {
   HttpApiTransport({HttpClient? httpClient})
-      : _httpClient = httpClient ?? HttpClient();
+    : _httpClient = httpClient ?? HttpClient();
 
   final HttpClient _httpClient;
 
@@ -76,13 +74,16 @@ class TrustBiteApiClient {
   TrustBiteApiClient({
     required MobileRuntimeConfig config,
     required AuthSessionStore sessionStore,
+    CognitoSessionProvider? cognitoSessionProvider,
     ApiTransport? transport,
-  })  : _config = config,
-        _sessionStore = sessionStore,
-        _transport = transport ?? HttpApiTransport();
+  }) : _config = config,
+       _sessionStore = sessionStore,
+       _cognitoSessionProvider = cognitoSessionProvider,
+       _transport = transport ?? HttpApiTransport();
 
   final MobileRuntimeConfig _config;
   final AuthSessionStore _sessionStore;
+  final CognitoSessionProvider? _cognitoSessionProvider;
   final ApiTransport _transport;
 
   Future<Map<String, dynamic>> getJson(
@@ -100,11 +101,7 @@ class TrustBiteApiClient {
     String path,
     Map<String, dynamic> body,
   ) {
-    return _requestJson(
-      method: 'POST',
-      path: path,
-      body: jsonEncode(body),
-    );
+    return _requestJson(method: 'POST', path: path, body: jsonEncode(body));
   }
 
   Future<Map<String, dynamic>> _requestJson({
@@ -124,6 +121,12 @@ class TrustBiteApiClient {
 
     if (response.statusCode == HttpStatus.unauthorized) {
       await _sessionStore.clear();
+      try {
+        await _cognitoSessionProvider?.signOut();
+      } on Exception {
+        // The backend rejection remains authoritative even if provider
+        // cleanup is temporarily unavailable.
+      }
       throw AuthRequiredException(
         response.statusCode,
         _readErrorMessage(response),
@@ -157,11 +160,6 @@ class TrustBiteApiClient {
     };
 
     final session = await _sessionStore.read();
-    final token = session?.accessToken?.trim();
-    if (token != null && token.isNotEmpty) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-
     final trustedLocalUserId = session?.trustedLocalUserId?.trim();
     if (trustedLocalUserId != null && trustedLocalUserId.isNotEmpty) {
       headers['x-trustbite-user-id'] = trustedLocalUserId;
@@ -176,6 +174,11 @@ class TrustBiteApiClient {
           trustedLocalPhoneNumber.isNotEmpty) {
         headers['x-trustbite-phone-number'] = trustedLocalPhoneNumber;
       }
+    } else {
+      final token = (await _cognitoSessionProvider?.getAccessToken())?.trim();
+      if (token != null && token.isNotEmpty) {
+        headers['Authorization'] = 'Bearer $token';
+      }
     }
 
     return headers;
@@ -188,8 +191,9 @@ class TrustBiteApiClient {
       final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic>) {
         final error = decoded['error'];
-        final nestedMessage =
-            error is Map<String, dynamic> ? error['message'] : null;
+        final nestedMessage = error is Map<String, dynamic>
+            ? error['message']
+            : null;
         final message = nestedMessage ?? decoded['message'];
         if (message is String && message.trim().isNotEmpty) {
           return message;

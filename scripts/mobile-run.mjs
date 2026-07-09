@@ -1,8 +1,9 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const mobileDir = join(process.cwd(), 'mobile');
+const serverEnvPath = join(process.cwd(), 'server', '.env');
 const platformDirs = ['android', 'ios', 'web', 'windows', 'macos', 'linux'];
 const hasPlatformRunner = platformDirs.some((dir) => existsSync(join(mobileDir, dir)));
 
@@ -30,10 +31,61 @@ if (flutterCheck.status !== 0) {
   process.exit(flutterCheck.status ?? 1);
 }
 
-const result = spawnSync('flutter', ['run'], {
+const serverEnv = existsSync(serverEnvPath)
+  ? readEnvFile(serverEnvPath)
+  : {};
+const mobileConfig = {
+  TRUSTBITE_AWS_REGION:
+    process.env.TRUSTBITE_AWS_REGION ?? serverEnv.AWS_REGION,
+  TRUSTBITE_COGNITO_USER_POOL_ID:
+    process.env.TRUSTBITE_COGNITO_USER_POOL_ID ??
+    serverEnv.AWS_COGNITO_USER_POOL_ID,
+  TRUSTBITE_COGNITO_CLIENT_ID:
+    process.env.TRUSTBITE_COGNITO_CLIENT_ID ??
+    serverEnv.AWS_COGNITO_CLIENT_ID,
+  TRUSTBITE_API_BASE_URL: process.env.TRUSTBITE_API_BASE_URL,
+};
+
+const dartDefines = Object.entries(mobileConfig)
+  .filter(([, value]) => typeof value === 'string' && value.trim() !== '')
+  .map(([name, value]) => `--dart-define=${name}=${value.trim()}`);
+
+const missingCognitoConfig = [
+  'TRUSTBITE_AWS_REGION',
+  'TRUSTBITE_COGNITO_USER_POOL_ID',
+  'TRUSTBITE_COGNITO_CLIENT_ID',
+].filter((name) => !mobileConfig[name]?.trim());
+
+if (missingCognitoConfig.length > 0) {
+  console.warn(
+    `Cognito mobile configuration is incomplete: ${missingCognitoConfig.join(', ')}`,
+  );
+}
+
+const result = spawnSync('flutter', ['run', ...dartDefines], {
   cwd: mobileDir,
   shell: true,
   stdio: 'inherit',
 });
 
 process.exit(result.status ?? 1);
+
+function readEnvFile(path) {
+  const values = {};
+  for (const line of readFileSync(path, 'utf8').split(/\r?\n/)) {
+    const match = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/);
+    if (!match) continue;
+
+    const [, name, rawValue] = match;
+    let value = rawValue.trim();
+    if (
+      value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'")))
+    ) {
+      value = value.slice(1, -1);
+    }
+    values[name] = value;
+  }
+  return values;
+}

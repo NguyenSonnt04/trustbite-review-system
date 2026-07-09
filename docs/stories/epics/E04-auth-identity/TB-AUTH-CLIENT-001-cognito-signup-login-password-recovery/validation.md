@@ -49,3 +49,44 @@ npm run test:integration --prefix server
 - Mobile now falls back to that local trusted-auth path when no Cognito client callback is wired, stores trusted-local metadata, and calls `GET /api/v1/users/me` with `x-trustbite-*` headers.
 - Android emulator defaults to `http://10.0.2.2:5000` when `TRUSTBITE_API_BASE_URL` is not passed, so local mobile can reach the host Express server.
 - Validation passed: `flutter test --no-pub` with 15 tests, server syntax build, server integration suite including `localDevelopmentSignup.integration.test.js`, and `flutter build apk --debug --no-pub`.
+
+2026-07-09 Cognito default-flow correction:
+
+- Added an Amplify Cognito gateway configured from the existing mobile
+  `TRUSTBITE_AWS_REGION`, `TRUSTBITE_COGNITO_USER_POOL_ID`, and
+  `TRUSTBITE_COGNITO_CLIENT_ID` compile-time settings.
+- Removed trusted-local signup as the default `LoginScreen` Cognito fallback.
+  Identifier/password now go to Cognito and only the returned access token is
+  handed to TrustBite Express.
+- Widget proof asserts that the password reaches the Cognito boundary, the
+  Cognito access token reaches `MobileAuthService`, and
+  `completeLocalDevelopmentSignUp` is not called.
+- Negative tests prove blank credentials are rejected before provider calls and
+  missing Cognito configuration fails closed.
+- `npm run mobile:run` now maps only the non-secret Cognito region, user-pool
+  ID, and app-client ID from `server/.env` into Flutter `--dart-define`
+  arguments; AWS credentials and other server-only values are excluded.
+- `flutter analyze`, all 18 Flutter tests, and
+  `flutter build apk --debug --no-pub` passed. Android build emitted only
+  forward-looking Gradle, Android Gradle Plugin, and Kotlin compatibility
+  warnings.
+
+2026-07-09 Cognito session and challenge hardening:
+
+- Amplify initializes before `runApp`; missing configuration still starts the
+  app but authentication fails closed.
+- Removed the duplicated Cognito access-token snapshot from
+  `AuthSessionStore`. `TrustBiteApiClient` fetches the current Amplify access
+  token for every request, allowing the SDK to retain refresh/session
+  ownership.
+- Kept trusted-local metadata separate and prevented it from being combined
+  with Cognito bearer authentication.
+- Added UI state for signup confirmation, SMS/TOTP/email MFA codes, and
+  Cognito's required-new-password challenge. Provider errors are mapped to
+  stable user-safe messages.
+- Added contract proof for per-request token reads, backend `401` Cognito
+  sign-out, transient backend errors preserving provider sessions, SMS MFA,
+  and signup confirmation.
+- `flutter analyze`, all 21 Flutter tests, and
+  `flutter build apk --debug --no-pub` passed. The APK build retained the
+  existing forward-looking Gradle, Android Gradle Plugin, and Kotlin warnings.

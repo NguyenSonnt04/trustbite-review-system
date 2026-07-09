@@ -1,35 +1,24 @@
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session_store.dart';
+import 'package:trustbite_mobile/src/core/auth/cognito_session_provider.dart';
 
 class MobileAuthService {
   const MobileAuthService({
     required TrustBiteApiClient apiClient,
     required AuthSessionStore sessionStore,
-  })  : _apiClient = apiClient,
-        _sessionStore = sessionStore;
+    required CognitoSessionProvider cognitoSessionProvider,
+  }) : _apiClient = apiClient,
+       _sessionStore = sessionStore,
+       _cognitoSessionProvider = cognitoSessionProvider;
 
   final TrustBiteApiClient _apiClient;
   final AuthSessionStore _sessionStore;
+  final CognitoSessionProvider _cognitoSessionProvider;
 
-  Future<Map<String, dynamic>> completeCognitoSignIn({
-    required String accessToken,
-  }) async {
-    final normalizedToken = accessToken.trim();
-    if (normalizedToken.isEmpty) {
-      throw ArgumentError.value(
-          accessToken, 'accessToken', 'must not be blank');
-    }
-
-    await _sessionStore
-        .write(AuthSession.cognito(accessToken: normalizedToken));
-
-    try {
-      return await _apiClient.getJson('/users/me');
-    } catch (_) {
-      await _sessionStore.clear();
-      rethrow;
-    }
+  Future<Map<String, dynamic>> completeCognitoSignIn() async {
+    await _sessionStore.clear();
+    return _apiClient.getJson('/users/me');
   }
 
   Future<Map<String, dynamic>> completeLocalDevelopmentSignUp({
@@ -39,7 +28,10 @@ class MobileAuthService {
     final normalizedPhone = phoneNumber.trim();
     if (normalizedPhone.isEmpty) {
       throw ArgumentError.value(
-          phoneNumber, 'phoneNumber', 'must not be blank');
+        phoneNumber,
+        'phoneNumber',
+        'must not be blank',
+      );
     }
 
     final response = await _apiClient.postJson('/auth/dev/local-signup', {
@@ -51,7 +43,9 @@ class MobileAuthService {
     final trustedLocal = response['trustedLocal'];
     if (trustedLocal is! Map<String, dynamic>) {
       throw const ApiException(
-          500, 'Backend did not return trusted local auth metadata.');
+        500,
+        'Backend did not return trusted local auth metadata.',
+      );
     }
 
     final userId = trustedLocal['userId'];
@@ -61,7 +55,9 @@ class MobileAuthService {
         subject is! String ||
         subject.trim().isEmpty) {
       throw const ApiException(
-          500, 'Backend returned invalid trusted local auth metadata.');
+        500,
+        'Backend returned invalid trusted local auth metadata.',
+      );
     }
 
     final phone = trustedLocal['phoneNumber'];
@@ -81,5 +77,8 @@ class MobileAuthService {
     }
   }
 
-  Future<void> signOut() => _sessionStore.clear();
+  Future<void> signOut() async {
+    await _sessionStore.clear();
+    await _cognitoSessionProvider.signOut();
+  }
 }

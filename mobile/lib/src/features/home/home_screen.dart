@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
+import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 import 'package:trustbite_mobile/src/features/home/pages/discover_page.dart';
@@ -9,9 +10,10 @@ import 'package:trustbite_mobile/src/features/home/widgets/trustbite_bottom_nav.
 import 'package:trustbite_mobile/src/features/map/map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.authService});
+  const HomeScreen({super.key, this.authService, this.cognitoAuthGateway});
 
   final MobileAuthService? authService;
+  final CognitoAuthGateway? cognitoAuthGateway;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -31,14 +33,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadAuthState() async {
     final session = await appAuthSessionStore.read();
+    final cognitoSignedIn =
+        await (widget.cognitoAuthGateway ?? appCognitoAuthGateway).isSignedIn();
     if (!mounted) return;
-    setState(() => _isSignedIn = session != null);
+    setState(() => _isSignedIn = session != null || cognitoSignedIn);
   }
 
   Future<void> _openLogin() async {
     final user = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute<Map<String, dynamic>>(
-        builder: (_) => LoginScreen(authService: widget.authService),
+        builder: (_) => LoginScreen(
+          authService: widget.authService,
+          cognitoAuthGateway: widget.cognitoAuthGateway,
+        ),
       ),
     );
 
@@ -137,21 +144,21 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildActivePage() {
     return switch (_activeNav) {
       0 => DiscoverPage(
-          activeServiceIndex: _activeServiceIndex,
-          onServiceSelected: (index) => setState(() {
-            _activeServiceIndex = index;
-          }),
-          isSignedIn: _isSignedIn,
-          currentUser: _currentUser,
-          onLogin: _openLogin,
-        ),
+        activeServiceIndex: _activeServiceIndex,
+        onServiceSelected: (index) => setState(() {
+          _activeServiceIndex = index;
+        }),
+        isSignedIn: _isSignedIn,
+        currentUser: _currentUser,
+        onLogin: _openLogin,
+      ),
       1 => const MapScreen(),
       2 => const FavoritesPage(),
       _ => ProfilePage(
-          isSignedIn: _isSignedIn,
-          currentUser: _currentUser,
-          onLogin: _openLogin,
-        ),
+        isSignedIn: _isSignedIn,
+        currentUser: _currentUser,
+        onLogin: _openLogin,
+      ),
     };
   }
 }

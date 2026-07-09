@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
+import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 
 /// Login/register entry screen styled after the TrustBite discover screen.
 ///
-/// Cognito owns credential verification and token issuance. The optional
-/// callbacks let the app attach a Cognito client without routing credentials
-/// through TrustBite Express.
+/// Cognito owns credential verification and token issuance. Credentials never
+/// pass through TrustBite Express.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({
     super.key,
     this.authService,
-    this.onContinueWithCognito,
+    this.cognitoAuthGateway,
     this.onContinueWithGoogle,
   });
 
   final MobileAuthService? authService;
-  final VoidCallback? onContinueWithCognito;
+  final CognitoAuthGateway? cognitoAuthGateway;
   final VoidCallback? onContinueWithGoogle;
 
   @override
@@ -30,55 +30,70 @@ class _LoginScreenState extends State<LoginScreen> {
 
   int _activeTab = 0;
   bool _isSubmitting = false;
+  CognitoAuthStep? _pendingStep;
 
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmationController = TextEditingController();
 
   MobileAuthService get _authService =>
       widget.authService ?? appMobileAuthService;
+
+  CognitoAuthGateway get _cognitoAuthGateway =>
+      widget.cognitoAuthGateway ?? appCognitoAuthGateway;
 
   @override
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _confirmationController.dispose();
     super.dispose();
   }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
   Future<void> _handlePrimaryAuth() async {
-    final callback = widget.onContinueWithCognito;
-    if (callback != null) {
-      callback();
-      return;
-    }
-
     setState(() => _isSubmitting = true);
     try {
-      final user = await _authService.completeLocalDevelopmentSignUp(
-        phoneNumber: _identifierController.text,
-        displayName: _identifierController.text,
-      );
-
-      if (!mounted) return;
-      final displayName =
-          user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản local';
-      if (Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(user);
+      late final CognitoAuthResult result;
+      final pendingStep = _pendingStep;
+      if (pendingStep == CognitoAuthStep.confirmSignUp) {
+        await _cognitoAuthGateway.confirmSignUp(
+          identifier: _identifierController.text,
+          confirmationCode: _confirmationController.text,
+        );
+        result = await _cognitoAuthGateway.signIn(
+          identifier: _identifierController.text,
+          password: _passwordController.text,
+        );
+      } else if (pendingStep != null) {
+        result = await _cognitoAuthGateway.confirmSignIn(
+          _confirmationController.text,
+        );
       } else {
-        _showMessage('Đã đăng nhập với $displayName.');
+        result = _activeTab == 0
+            ? await _cognitoAuthGateway.signIn(
+                identifier: _identifierController.text,
+                password: _passwordController.text,
+              )
+            : await _cognitoAuthGateway.signUp(
+                identifier: _identifierController.text,
+                password: _passwordController.text,
+              );
       }
+
+      await _handleCognitoResult(result);
     } on ApiException catch (err) {
       if (!mounted) return;
       _showMessage(err.message);
     } on ArgumentError catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } on CognitoAuthGatewayException catch (err) {
       if (!mounted) return;
       _showMessage(err.message);
     } finally {
@@ -86,6 +101,36 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isSubmitting = false);
       }
     }
+  }
+
+  Future<void> _handleCognitoResult(CognitoAuthResult result) async {
+    if (!result.isSignedIn) {
+      if (!mounted) return;
+      setState(() {
+        _pendingStep = result.step;
+        _confirmationController.clear();
+      });
+      return;
+    }
+
+    final user = await _authService.completeCognitoSignIn();
+    if (!mounted) return;
+    final displayName =
+        user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản';
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(user);
+    } else {
+      _showMessage('Đã đăng nhập với $displayName.');
+    }
+  }
+
+  Future<void> _cancelChallenge() async {
+    await _cognitoAuthGateway.signOut();
+    if (!mounted) return;
+    setState(() {
+      _pendingStep = null;
+      _confirmationController.clear();
+    });
   }
 
   @override
@@ -199,9 +244,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               children: [
                 TextSpan(
-                    text: 'Đăng nhập ',
-                    style: TextStyle(color: Color.fromARGB(255, 0, 0, 0))),
-                TextSpan(text: 'TrustBite', style: TextStyle(color: _brand)),
+                  text: 'Đăng nhập ',
+                  style: TextStyle(color: Color.fromARGB(255, 0, 0, 0)),
+                ),
+                TextSpan(
+                  text: 'TrustBite',
+                  style: TextStyle(color: _brand),
+                ),
               ],
             ),
           ),
@@ -232,17 +281,20 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 18),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: _buildPhoneFields(),
+            child: _pendingStep == null
+                ? _buildPhoneFields()
+                : _buildConfirmationField(),
           ),
           const SizedBox(height: 16),
           _primaryButton(
-            _activeTab == 0
-                ? 'Tiếp tục với Cognito'
-                : _isSubmitting
-                    ? 'Đang tạo...'
-                    : 'Tạo tài khoản Cognito',
+            _primaryButtonLabel(),
             _isSubmitting ? null : _handlePrimaryAuth,
           ),
+          if (_pendingStep != null)
+            TextButton(
+              onPressed: _isSubmitting ? null : _cancelChallenge,
+              child: const Text('Quay lại'),
+            ),
           const SizedBox(height: 16),
           _divider(),
           const SizedBox(height: 16),
@@ -260,10 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
-        children: [
-          _tabButton(0, 'Đăng nhập'),
-          _tabButton(1, 'Đăng ký'),
-        ],
+        children: [_tabButton(0, 'Đăng nhập'), _tabButton(1, 'Đăng ký')],
       ),
     );
   }
@@ -274,7 +323,9 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => setState(() => _activeTab = index),
+          onTap: _pendingStep == null
+              ? () => setState(() => _activeTab = index)
+              : null,
           borderRadius: BorderRadius.circular(15),
           child: Semantics(
             button: true,
@@ -343,7 +394,62 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildConfirmationField() {
+    final step = _pendingStep!;
+    final isNewPassword = step == CognitoAuthStep.confirmNewPassword;
+    final description = switch (step) {
+      CognitoAuthStep.confirmSignUp =>
+        'Nhập mã Cognito đã gửi để xác nhận tài khoản.',
+      CognitoAuthStep.confirmSmsMfa => 'Nhập mã MFA được gửi qua SMS.',
+      CognitoAuthStep.confirmTotpMfa => 'Nhập mã từ ứng dụng xác thực.',
+      CognitoAuthStep.confirmEmailMfa => 'Nhập mã MFA được gửi qua email.',
+      CognitoAuthStep.confirmNewPassword =>
+        'Cognito yêu cầu bạn đặt mật khẩu mới.',
+      CognitoAuthStep.signedIn => '',
+    };
+
+    return Column(
+      key: ValueKey('cognito-confirm-${step.name}'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          description,
+          style: const TextStyle(
+            color: _muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _inputField(
+          fieldKey: const ValueKey('cognito-confirmation-field'),
+          controller: _confirmationController,
+          icon: isNewPassword
+              ? Icons.lock_reset_rounded
+              : Icons.verified_user_outlined,
+          hint: isNewPassword ? 'Mật khẩu mới' : 'Mã xác nhận',
+          keyboardType: isNewPassword
+              ? TextInputType.visiblePassword
+              : TextInputType.number,
+          textInputAction: TextInputAction.done,
+          autofillHints: isNewPassword
+              ? const [AutofillHints.newPassword]
+              : const [AutofillHints.oneTimeCode],
+          obscureText: isNewPassword,
+        ),
+      ],
+    );
+  }
+
+  String _primaryButtonLabel() {
+    if (_isSubmitting) return 'Đang xử lý...';
+    if (_pendingStep != null) return 'Xác nhận';
+    return _activeTab == 0 ? 'Tiếp tục với Cognito' : 'Tạo tài khoản Cognito';
+  }
+
   Widget _inputField({
+    Key? fieldKey,
     required TextEditingController controller,
     required IconData icon,
     required String hint,
@@ -369,6 +475,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: TextField(
+        key: fieldKey,
         controller: controller,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
@@ -443,19 +550,26 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 52,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: widget.onContinueWithGoogle ??
+        onPressed:
+            widget.onContinueWithGoogle ??
             () => _showMessage('Google sign-in chưa được cấu hình cho mobile.'),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFF0F0F0)),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('G',
-                style: TextStyle(
-                    color: _brand, fontSize: 18, fontWeight: FontWeight.w900)),
+            Text(
+              'G',
+              style: TextStyle(
+                color: _brand,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             SizedBox(width: 10),
             Text(
               'Tiếp tục với Google',
