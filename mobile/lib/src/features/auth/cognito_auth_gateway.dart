@@ -75,17 +75,26 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
     if (Amplify.isConfigured) return;
 
     await Amplify.addPlugin(AmplifyAuthCognito());
-    await Amplify.configure(
-      jsonEncode({
-        'version': '1',
-        'auth': {
-          'aws_region': _config.awsRegion,
-          'user_pool_id': _config.cognitoUserPoolId,
-          'user_pool_client_id': _config.cognitoClientId,
-        },
-      }),
-    );
+    await Amplify.configure(buildAmplifyConfigurationJson());
   }
+
+  String buildAmplifyConfigurationJson() => jsonEncode({
+    'Version': '1.0',
+    'auth': {
+      'plugins': {
+        'awsCognitoAuthPlugin': {
+          'Version': '1.0',
+          'CognitoUserPool': {
+            'Default': {
+              'PoolId': _config.cognitoUserPoolId.trim(),
+              'AppClientId': _config.cognitoClientId.trim(),
+              'Region': _config.awsRegion.trim(),
+            },
+          },
+        },
+      },
+    },
+  });
 
   @override
   Future<CognitoAuthResult> signIn({

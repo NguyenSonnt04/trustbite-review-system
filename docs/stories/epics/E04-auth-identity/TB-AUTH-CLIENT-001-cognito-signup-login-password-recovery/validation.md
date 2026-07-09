@@ -90,3 +90,15 @@ npm run test:integration --prefix server
 - `flutter analyze`, all 21 Flutter tests, and
   `flutter build apk --debug --no-pub` passed. The APK build retained the
   existing forward-looking Gradle, Android Gradle Plugin, and Kotlin warnings.
+
+2026-07-09 Amplify Cognito config schema correction:
+
+- Mobile now passes Amplify's Cognito plugin schema at
+  `auth.plugins.awsCognitoAuthPlugin.CognitoUserPool.Default` with
+  `PoolId`, `AppClientId`, and `Region`, rather than the flat
+  `auth.aws_region/user_pool_id/user_pool_client_id` shape.
+- Added unit proof for the generated configuration JSON.
+- Validation passed: targeted Cognito gateway test, `flutter analyze`, full
+  mobile test suite, and `flutter build apk --debug --no-pub`. The APK build
+  retained the existing forward-looking Gradle, Android Gradle Plugin, and
+  Kotlin warnings.
