@@ -1016,5 +1016,26 @@ Planning evidence only:
   check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
   inspection was run. Spreadsheet task 1.2 remains not done.
 
+2026-07-10 PR #41 Redis secret precondition follow-up static validation:
+
+- Added `redis_auth_secret_arn` lifecycle preconditions to both API and worker
+  ECS task definitions, so live ECS planning fails before either container can
+  start without `REDIS_PASSWORD` injection for the Redis AUTH/TLS runtime.
+- Confirmed the two remaining Greptile review threads on PR #41 were the API
+  and worker Redis secret precondition comments. Earlier review threads were
+  already resolved before this follow-up patch.
+- Validation passed:
+  `.agents/skills/github-actions-validator/scripts/.tools/actionlint.exe
+  .github/workflows/aws-infra.yml`; `srcwalk review --scope .`;
+  `npm run test --prefix server --
+  tests/unit/config/dbSsl.test.js tests/unit/config/ocrConfig.test.js` (2 files
+  / 9 tests); `npm run verify:tb-infra-static` with Terraform
+  fmt/init/validate/no-live plan, `server:build` syntax check for 106 files,
+  server Docker image build, and git whitespace checks; and
+  `npm run harness -- story verify TB-INFRA-001`.
+- No live AWS plan/apply, AWS resource creation, image push, deployed API health
+  check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
+  inspection was run. Spreadsheet task 1.2 remains not done.
+
 Future implementation evidence must be appended here after each slice. Use
 concrete commands, dates, counts, environment, and proof classification.
