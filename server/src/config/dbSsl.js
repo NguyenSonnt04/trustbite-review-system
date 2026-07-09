@@ -1,5 +1,6 @@
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on', 'require']);
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off', 'disable']);
+const DATABASE_SSL_VALUES = [...TRUE_VALUES, ...FALSE_VALUES].sort().join(', ');
 
 function normalize(value) {
   return value?.trim().toLowerCase();
@@ -21,6 +22,7 @@ export function getDatabaseSslConfig(env = process.env) {
         rejectUnauthorized: !isFalse(env.DATABASE_SSL_REJECT_UNAUTHORIZED),
       };
     }
+    throw new Error(`DATABASE_SSL must be one of: ${DATABASE_SSL_VALUES}`);
   }
 
   const sslMode = normalize(env.PGSSLMODE);

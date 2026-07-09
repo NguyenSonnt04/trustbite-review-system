@@ -257,6 +257,11 @@ resource "aws_ecs_task_definition" "api" {
       condition     = try(trimspace(var.receipt_bucket_domain_name) != "", false)
       error_message = "API ECS tasks require the S3 bucket domain for TRUSTBITE_AVATAR_ALLOWED_HOSTS before live resources can be created."
     }
+
+    precondition {
+      condition     = try(trimspace(var.database_secret_arn) != "", false)
+      error_message = "API ECS tasks require database_secret_arn so DATABASE_USER and DATABASE_PASSWORD are injected before live resources can be created."
+    }
   }
 }
 
@@ -309,6 +314,11 @@ resource "aws_ecs_task_definition" "worker" {
     precondition {
       condition     = var.private_egress_enabled && var.nat_gateway_enabled
       error_message = "Private ECS tasks require actual outbound egress. This stack does not model VPC endpoints yet, so enable_nat_gateway must be true before live ECS resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.database_secret_arn) != "", false)
+      error_message = "Worker ECS tasks require database_secret_arn so DATABASE_USER and DATABASE_PASSWORD are injected before live resources can be created."
     }
   }
 }

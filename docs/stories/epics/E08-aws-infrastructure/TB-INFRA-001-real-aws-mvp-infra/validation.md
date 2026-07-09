@@ -998,7 +998,7 @@ Planning evidence only:
   .github/workflows/aws-infra.yml`; `node --check
   scripts/verify-tb-infra-static.mjs`; `npm run test --prefix server --
   tests/unit/config/dbSsl.test.js tests/unit/config/ocrConfig.test.js` (2 files
-  / 8 tests); and
+  / 9 tests); and
   `npm run verify:tb-infra-static` with Terraform `fmt -check`,
   `init -backend=false`, `validate`, temp-workspace no-live plan,
   `server:build` syntax check for 106 files, server Docker image build, and
@@ -1007,6 +1007,11 @@ Planning evidence only:
   runs `dbSsl.test.js` alongside `ocrConfig.test.js`, and worker shutdown catches
   `disconnectDB()` errors after SIGINT/SIGTERM so shutdown cannot hang on a DB
   disconnect failure.
+- Follow-up Greptile 3/5 items were also addressed: `DATABASE_SSL` now throws on
+  unrecognized values instead of silently disabling TLS, with red/green unit
+  proof; API and worker ECS task definitions now fail live planning when
+  `database_secret_arn` is missing, so containers cannot start without
+  `DATABASE_USER` / `DATABASE_PASSWORD` injection.
 - No live AWS plan/apply, AWS resource creation, image push, deployed API health
   check, RDS migration, Redis/S3 smoke, ECS deploy, or CloudWatch runtime log
   inspection was run. Spreadsheet task 1.2 remains not done.

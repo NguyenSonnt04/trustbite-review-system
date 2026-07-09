@@ -33,4 +33,10 @@ describe('database SSL config', () => {
       PGSSLMODE: 'require',
     })).toBe(false);
   });
+
+  it('rejects unrecognized DATABASE_SSL values instead of disabling SSL silently', () => {
+    expect(() => getDatabaseSslConfig({ DATABASE_SSL: 'maybe' })).toThrow(
+      'DATABASE_SSL must be one of',
+    );
+  });
 });
