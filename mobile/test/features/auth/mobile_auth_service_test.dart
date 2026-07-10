@@ -122,6 +122,45 @@ void main() {
         );
       },
     );
+
+    test('submits required onboarding fields to the current profile', () async {
+      final sessionStore = InMemoryAuthSessionStore();
+      final cognitoSession = _FakeCognitoSessionProvider();
+      final transport = _FakeApiTransport(
+        response: const ApiTransportResponse(
+          statusCode: 200,
+          body:
+              '{"displayName":"Nguyen Son","dateOfBirth":"2004-11-20","phoneNumber":"+84395665937","profileComplete":true}',
+        ),
+      );
+      final authService = MobileAuthService(
+        apiClient: TrustBiteApiClient(
+          config: config,
+          transport: transport,
+          sessionStore: sessionStore,
+          cognitoSessionProvider: cognitoSession,
+        ),
+        sessionStore: sessionStore,
+        cognitoSessionProvider: cognitoSession,
+      );
+
+      final user = await authService.completeProfile(
+        displayName: ' Nguyen Son ',
+        dateOfBirth: '2004-11-20',
+        phoneNumber: ' 0395665937 ',
+      );
+
+      expect(user['profileComplete'], isTrue);
+      expect(transport.lastRequest?.method, 'PATCH');
+      expect(
+        transport.lastRequest?.body,
+        contains('"displayName":"Nguyen Son"'),
+      );
+      expect(
+        transport.lastRequest?.body,
+        contains('"phoneNumber":"0395665937"'),
+      );
+    });
   });
 }
 
@@ -148,10 +187,12 @@ class _FakeApiTransport implements ApiTransport {
 
   final ApiTransportResponse response;
   Map<String, String> lastHeaders = const {};
+  ApiTransportRequest? lastRequest;
 
   @override
   Future<ApiTransportResponse> send(ApiTransportRequest request) async {
     lastHeaders = request.headers;
+    lastRequest = request;
     return response;
   }
 }

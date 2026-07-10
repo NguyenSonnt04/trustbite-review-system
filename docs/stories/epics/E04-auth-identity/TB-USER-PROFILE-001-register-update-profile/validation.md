@@ -8,9 +8,9 @@ Prove Cognito identity mapping finds or safely binds the correct local user, pro
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Body validation, field mapping, avatar allowlist validation, active deletion-request mutation guard. |
-| Integration | Cognito-sub user mapping; verified-phone transition fallback; unmapped identity rejection; GET me returns profile; PATCH updates display/avatar; SUSPENDED/DELETED update rejected. |
-| E2E | Authenticated profile smoke through Cognito bearer token or accepted Cognito-compatible test double. |
+| Unit | Body validation, date-only mapping, phone normalization/conflict, avatar allowlist, deletion guard. |
+| Integration | GET incomplete profile; PATCH completes required fields; persistence; invalid/conflicting values. |
+| E2E | Flutter gates immediate and restored Cognito sessions before Home. |
 | Platform | LocalStack Cognito where available, otherwise explicit Cognito-compatible test double preserving claim semantics. |
 | Performance | Not required. |
 | Logs/Audit | No full phone/token logging. |
@@ -24,6 +24,8 @@ Prove Cognito identity mapping finds or safely binds the correct local user, pro
 - Suspended user.
 - Deleted user.
 - User with active account deletion request.
+- New Cognito user with required fields null.
+- Existing phone conflict and malformed/future birth date.
 
 ## Commands
 
@@ -107,3 +109,20 @@ npm run server:build
 - The verify command runs `db:migrate`, targeted profile/auth/config/user unit proof, targeted `userProfile.integration.test.js`, and `server:build` from the repository root.
 - `npm run harness -- story verify TB-USER-PROFILE-001` passed: `db:migrate` applied 0 migrations; unit proof reported 13 files / 115 tests passed; integration proof reported 5 files passed, 1 skipped, 43 tests passed, 2 skipped; `server:build` passed for 91 files.
 - Spreadsheet Phase 2.1 and 2.2 remain satisfied through the accepted Cognito-first boundary, not through backend-owned OTP, access-token, refresh-token, or password-reset APIs. Cognito owns those auth flows; this story covers the TrustBite-local `/users/me` profile boundary after Cognito JWT verification.
+
+2026-07-11 required mobile profile onboarding:
+
+- Migration `007_add_user_date_of_birth.sql` added the schema-backed birth
+  date. Express now returns derived `profileComplete`, normalizes Vietnamese
+  phone input to E.164, rejects invalid/future dates, and maps duplicate phone
+  values to `409 PHONE_NUMBER_IN_USE`.
+- Flutter now opens one required onboarding screen after Cognito authentication
+  and after restoring an incomplete signed-in session. Users cannot enter Home
+  until `PATCH /users/me` returns a complete profile.
+- A first integration run exposed a DATE timezone regression that moved birth
+  dates back one day; the mapper now preserves PostgreSQL calendar dates.
+- A full-suite run exposed a fixture collision with a real local phone number;
+  integration fixtures now generate isolated Vietnamese test numbers.
+- Proof passed: `flutter analyze`; 35 Flutter tests; debug APK build; 216 server
+  unit tests; 103 server integration tests with 2 skipped; server syntax check;
+  idempotent migration rerun; and `git diff --check`.

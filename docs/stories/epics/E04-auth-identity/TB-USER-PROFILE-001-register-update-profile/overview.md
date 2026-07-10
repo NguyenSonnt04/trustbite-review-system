@@ -6,7 +6,12 @@
 
 ## Target Behavior
 
-After a Cognito-authenticated request is accepted, Express maps the verified external identity to a TrustBite-local `users` row by `users.cognito_sub`, with verified-phone fallback only for transition rows that do not yet have a Cognito subject. Authenticated users can read profile and update display name/avatar URL using only schema-backed fields. Suspended/deleted users and users with active deletion requests cannot mutate profile.
+After a Cognito-authenticated request is accepted, Express maps the verified
+external identity to a local `users` row. Authenticated users can read and
+update display name, date of birth, phone number, and avatar URL. Mobile
+requires display name, date of birth, and phone before entering Home, including
+when restoring a Cognito session. Suspended/deleted users and users with active
+deletion requests cannot mutate profile.
 
 ## Affected Users
 
@@ -23,7 +28,6 @@ After a Cognito-authenticated request is accepted, Express maps the verified ext
 
 ## Non-Goals
 
-- No UI work.
 - No avatar upload URL implementation in this story.
-- No new fields beyond `users` schema.
+- No address, gender, government ID, or additional demographic fields.
 - No Cognito signup, login, forgot-password, OTP, or token issuance implementation; those are covered by `TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery`.

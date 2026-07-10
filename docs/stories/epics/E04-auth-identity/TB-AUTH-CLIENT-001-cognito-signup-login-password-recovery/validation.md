@@ -121,3 +121,42 @@ npm run test:integration --prefix server
   `npm run server:build`; `npm run test:integration --prefix server` with 13
   files passed, 1 skipped, 102 tests passed, and 2 skipped; Harness story
   verification passed for `TB-AUTH-CLIENT-001`.
+
+2026-07-11 email-first Cognito onboarding correction:
+
+- Mobile now creates a Cognito user for a new email before showing Cognito's
+  signup confirmation step, and calls `confirmSignUp` instead of incorrectly
+  submitting a signup code as a custom sign-in answer.
+- Existing confirmed users continue through Cognito custom auth. Expired codes
+  and missing active challenge sessions reset the mobile UI to email entry.
+  Existing but unconfirmed users receive a fresh signup confirmation code
+  instead of being sent into an invalid custom-auth session.
+- Added migration
+  `003_make_users_phone_optional_for_cognito_email_signup.sql`. Express now
+  provisions a local active `users` row transactionally from a verified Cognito
+  `sub`, so the first authenticated `/users/me` request succeeds without a
+  phone number.
+- Local proof passed: `npm run db:migrate`; `flutter analyze`; `npm run
+  mobile:test`; `npm run server:build`; `npm run test:unit --prefix server --
+  authService.test.js`; and `npm run test:integration --prefix server --
+  userProfile.integration.test.js`. Final proof included 29 Flutter tests, 211
+  server unit tests, transactional rollback coverage, and Harness story
+  verification.
+- Real AWS manual smoke passed in `ap-southeast-1`: the user replaced the
+  forced-answer diagnostic with a cryptographically random six-digit custom
+  challenge, verified the SES sender identity, granted the Lambda execution
+  role scoped `ses:SendEmail`, received the code, and completed login. SES is
+  still sandboxed, so non-verified recipients require production access. The
+  console-managed Lambda source still needs repository/IaC ownership later.
+
+2026-07-11 backend connection recovery:
+
+- Confirmed the reported post-confirmation failure was a refused connection to
+  `10.0.2.2:5000`, after Cognito had already completed authentication.
+- Mobile now maps socket/HTTP transport failures to a user-safe `503` message
+  instead of allowing an unhandled exception to escape.
+- The login screen preserves the completed Cognito session and exposes a
+  backend-only retry action, so retrying does not submit the confirmation code
+  or invoke Cognito again.
+- Added transport and widget regression tests. Local Express `/health` returned
+  `{"status":"ok"}` on port `5000` after the server was started.

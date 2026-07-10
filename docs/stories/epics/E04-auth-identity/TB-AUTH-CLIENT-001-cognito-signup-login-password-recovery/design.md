@@ -16,12 +16,16 @@
 6. Express maps the external identity to a local `users` row and enforces local `ACTIVE`/`SUSPENDED`/`DELETED` account state.
 
 The Flutter mobile implementation uses `amplify_auth_cognito`. The default
-`LoginScreen` sends the identifier and password only to the Cognito gateway,
-then handles Cognito signup confirmation, SMS/TOTP/email MFA, and required-new-
-password challenge states before loading `/users/me`. Amplify remains the sole
-owner of the Cognito session and token lifecycle. `TrustBiteApiClient` asks the
-Cognito session provider for the current access token on every protected
-request instead of copying a token into TrustBite's local session store.
+`LoginScreen` accepts one email. It calls Cognito `SignUp` for a new email with
+a memory-only generated password, handles Cognito signup confirmation, then
+uses that same temporary credential once to bootstrap a Cognito session. An
+existing confirmed email starts the configured custom-auth challenge. The
+screen dispatches Cognito signup confirmation and custom challenge confirmation
+through separate gateway operations, and resets a stale provider challenge to
+the email entry state. Amplify remains the sole owner of the Cognito session
+and token lifecycle. `TrustBiteApiClient` asks the Cognito session provider for
+the current access token on every protected request instead of copying a token
+into TrustBite's local session store.
 Trusted-local metadata remains isolated in that local store and the development
 signup endpoint is not a fallback for the Cognito button. Missing Cognito
 runtime configuration fails closed with a user-visible configuration error.
@@ -36,7 +40,12 @@ Expected error categories at the TrustBite API boundary include missing credenti
 
 ## Data Model
 
-Uses existing `users.cognito_sub` for local identity mapping. Schema changes require a separate high-risk story and migration proof.
+Uses `users.cognito_sub` for local identity mapping. Migration
+`003_make_users_phone_optional_for_cognito_email_signup.sql` makes
+`users.phone_number` nullable so email-first Cognito users can be provisioned
+after their verified access token reaches the Express auth boundary. The
+provisioning insert is transactional and only runs for the verified Cognito
+provider identity, never for arbitrary client input.
 
 ## UI / Platform Impact
 

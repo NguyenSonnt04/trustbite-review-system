@@ -9,19 +9,38 @@ const ADMIN_ROLES = ['ADMIN', 'SUPER_ADMIN'];
 const normalizeRole = (role) => (role == null ? '' : String(role).trim().toUpperCase());
 const normalizeRoleList = (roles = []) => [...new Set(roles.map(normalizeRole).filter(Boolean))];
 
-const mapUserRow = (row) => ({
-  id: row.id,
-  phoneNumber: row.phone_number,
-  displayName: row.display_name,
-  avatarUrl: row.avatar_url,
-  status: row.status,
-  expPoints: row.exp_points,
-  rankCode: row.rank_code,
-  deletionRequestedAt: row.deletion_requested_at,
-  deletedAt: row.deleted_at,
-  createdAt: row.created_at,
-  updatedAt: row.updated_at
-});
+const mapDateOnly = (value) => {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    const year = value.getFullYear().toString().padStart(4, '0');
+    const month = (value.getMonth() + 1).toString().padStart(2, '0');
+    const day = value.getDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return String(value).slice(0, 10);
+};
+
+const mapUserRow = (row) => {
+  const displayName = row.display_name?.trim() || null;
+  const phoneNumber = row.phone_number?.trim() || null;
+  const dateOfBirth = mapDateOnly(row.date_of_birth);
+
+  return {
+    id: row.id,
+    phoneNumber,
+    displayName,
+    dateOfBirth,
+    profileComplete: Boolean(displayName && phoneNumber && dateOfBirth),
+    avatarUrl: row.avatar_url,
+    status: row.status,
+    expPoints: row.exp_points,
+    rankCode: row.rank_code,
+    deletionRequestedAt: row.deletion_requested_at,
+    deletedAt: row.deleted_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+};
 
 const mapDeletionRequestRow = (row) => ({
   deletionRequestId: row.id,
@@ -80,6 +99,54 @@ const normalizeDisplayName = (value) => {
     throw createHttpError(422, 'VALIDATION_ERROR', 'displayName must be at most 120 characters');
   }
   return trimmed;
+};
+
+const normalizePhoneNumber = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'string') {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'phoneNumber must be a string');
+  }
+
+  let normalized = value.trim().replace(/[\s().-]/g, '');
+  if (normalized === '') return null;
+  if (/^0\d{9}$/.test(normalized)) {
+    normalized = `+84${normalized.slice(1)}`;
+  } else if (/^84\d{9}$/.test(normalized)) {
+    normalized = `+${normalized}`;
+  }
+
+  if (!/^\+[1-9]\d{7,14}$/.test(normalized)) {
+    throw createHttpError(
+      422,
+      'VALIDATION_ERROR',
+      'phoneNumber must be a valid international number',
+    );
+  }
+  return normalized;
+};
+
+const normalizeDateOfBirth = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null || value === '') return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'dateOfBirth must use YYYY-MM-DD');
+  }
+
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'dateOfBirth must be a real calendar date');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (value > today || value < '1900-01-01') {
+    throw createHttpError(
+      422,
+      'VALIDATION_ERROR',
+      'dateOfBirth must be between 1900-01-01 and today',
+    );
+  }
+  return value;
 };
 
 const normalizeAvatarUrl = (value) => {
@@ -176,8 +243,15 @@ export class UserService {
   async updateCurrentUser(userId, body) {
     const displayName = normalizeDisplayName(body.displayName);
     const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
+    const phoneNumber = normalizePhoneNumber(body.phoneNumber);
+    const dateOfBirth = normalizeDateOfBirth(body.dateOfBirth);
 
-    if (displayName === undefined && avatarUrl === undefined) {
+    if (
+      displayName === undefined
+      && avatarUrl === undefined
+      && phoneNumber === undefined
+      && dateOfBirth === undefined
+    ) {
       throw createHttpError(422, 'VALIDATION_ERROR', 'At least one profile field is required');
     }
 
@@ -192,6 +266,16 @@ export class UserService {
     if (avatarUrl !== undefined) {
       values.push(avatarUrl);
       updates.push(`avatar_url = $${values.length}`);
+    }
+
+    if (phoneNumber !== undefined) {
+      values.push(phoneNumber);
+      updates.push(`phone_number = $${values.length}`);
+    }
+
+    if (dateOfBirth !== undefined) {
+      values.push(dateOfBirth);
+      updates.push(`date_of_birth = $${values.length}`);
     }
 
     values.push(userId);
@@ -211,6 +295,9 @@ export class UserService {
       return mapUserRow(result.rows[0]);
     } catch (err) {
       await client.query('ROLLBACK');
+      if (err.code === '23505' && err.constraint === 'users_phone_number_key') {
+        throw createHttpError(409, 'PHONE_NUMBER_IN_USE', 'Phone number is already in use');
+      }
       throw err;
     } finally {
       client.release();

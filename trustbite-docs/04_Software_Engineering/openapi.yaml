@@ -164,6 +164,12 @@ paths:
                 displayName:
                   type: string
                   maxLength: 120
+                dateOfBirth:
+                  type: string
+                  format: date
+                phoneNumber:
+                  type: string
+                  description: E.164 or a Vietnamese ten-digit local number.
                 avatarUrl:
                   type: string
                   format: uri
@@ -178,6 +184,10 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
@@ -1287,21 +1297,27 @@ components:
       type: object
       required:
       - id
-      - displayName
-      - role
       - rankCode
       - status
       - expPoints
+      - profileComplete
       properties:
         id:
           type: string
           format: uuid
         phoneNumber:
           type: string
+          nullable: true
           description: Mask in admin/public contexts.
         displayName:
           type: string
           nullable: true
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        profileComplete:
+          type: boolean
         role:
           type: string
           enum:

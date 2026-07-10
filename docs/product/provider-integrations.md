@@ -29,6 +29,19 @@ Implementation must keep provider-specific validation explicit: issuer, access-t
 
 Cognito verification lives behind the identity provider adapter boundary accepted in `docs/decisions/0011-auth-provider-adapter-boundary.md`. Business services consume normalized `req.user` state rather than provider JWT claims directly. TrustBite-local `user_roles` remains the product-role source of truth; Cognito groups are diagnostics unless a future accepted decision defines role synchronization.
 
+For the mobile email-first onboarding flow, the Cognito user pool and app
+client must provide:
+
+- email signup confirmation delivery;
+- Secure Remote Password (SRP) for the one-time post-confirmation session
+  bootstrap; and
+- the custom authentication flow and its three Lambda triggers for existing
+  passwordless users.
+
+The custom Lambda must never accept all answers outside a short-lived manual
+diagnostic. Production challenge code delivery and verification must be
+implemented through the selected Cognito/SES boundary before release.
+
 ## LocalStack And Test Doubles
 
 LocalStack is configured for local AWS simulation. Cognito coverage may differ from production AWS. When LocalStack cannot prove a Cognito behavior, use an explicit Cognito-compatible test double that preserves the relevant provider semantics for tests. For token verification this means JWT claim and JWKS behavior; for account cleanup this means the real Cognito provider boundary issues global sign-out before admin delete and treats `UserNotFoundException` as idempotent.

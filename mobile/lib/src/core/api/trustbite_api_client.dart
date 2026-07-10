@@ -104,20 +104,40 @@ class TrustBiteApiClient {
     return _requestJson(method: 'POST', path: path, body: jsonEncode(body));
   }
 
+  Future<Map<String, dynamic>> patchJson(
+    String path,
+    Map<String, dynamic> body,
+  ) {
+    return _requestJson(method: 'PATCH', path: path, body: jsonEncode(body));
+  }
+
   Future<Map<String, dynamic>> _requestJson({
     required String method,
     required String path,
     Map<String, String?>? queryParameters,
     String? body,
   }) async {
-    final response = await _transport.send(
-      ApiTransportRequest(
-        method: method,
-        uri: _config.apiUri(path, queryParameters),
-        headers: await _buildHeaders(),
-        body: body,
-      ),
-    );
+    late final ApiTransportResponse response;
+    try {
+      response = await _transport.send(
+        ApiTransportRequest(
+          method: method,
+          uri: _config.apiUri(path, queryParameters),
+          headers: await _buildHeaders(),
+          body: body,
+        ),
+      );
+    } on SocketException {
+      throw const ApiException(
+        HttpStatus.serviceUnavailable,
+        'Không thể kết nối máy chủ TrustBite. Vui lòng bật backend rồi thử lại.',
+      );
+    } on HttpException {
+      throw const ApiException(
+        HttpStatus.serviceUnavailable,
+        'Máy chủ TrustBite không phản hồi. Vui lòng thử lại.',
+      );
+    }
 
     if (response.statusCode == HttpStatus.unauthorized) {
       await _sessionStore.clear();

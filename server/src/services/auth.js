@@ -90,6 +90,30 @@ const selectUserByCognitoSubject = (subject, queryable = pool) => queryable.quer
   [subject],
 );
 
+const insertCognitoUser = (subject, queryable) => queryable.query(
+  `INSERT INTO users (phone_number, cognito_sub)
+   VALUES (NULL, $1)
+   ON CONFLICT (cognito_sub) WHERE cognito_sub IS NOT NULL
+   DO UPDATE SET cognito_sub = EXCLUDED.cognito_sub
+   RETURNING *`,
+  [subject],
+);
+
+const provisionCognitoUser = async (identity) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await insertCognitoUser(identity.subject, client);
+    await client.query('COMMIT');
+    return result;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const findUserByIdentity = async (identity) => {
   if (identity.localUserId) {
     if (!UUID_REGEX.test(identity.localUserId)) {
@@ -100,7 +124,7 @@ const findUserByIdentity = async (identity) => {
 
   if (identity.subject) {
     const subjectResult = await selectUserByCognitoSubject(identity.subject);
-    if (subjectResult.rowCount > 0 || !identity.phoneNumber) {
+    if (subjectResult.rowCount > 0) {
       return subjectResult;
     }
   }
@@ -124,6 +148,17 @@ const findUserByIdentity = async (identity) => {
 
       if (phoneResult.rowCount === 0) {
         const remappedResult = await selectUserByCognitoSubject(identity.subject, client);
+        if (remappedResult.rowCount > 0) {
+          await client.query('COMMIT');
+          return remappedResult;
+        }
+
+        if (identity.provider === 'cognito') {
+          const provisionedResult = await insertCognitoUser(identity.subject, client);
+          await client.query('COMMIT');
+          return provisionedResult;
+        }
+
         await client.query('COMMIT');
         return remappedResult;
       }
@@ -162,6 +197,10 @@ const findUserByIdentity = async (identity) => {
     } finally {
       client.release();
     }
+  }
+
+  if (identity.provider === 'cognito' && identity.subject) {
+    return provisionCognitoUser(identity);
   }
 
   throw createUnmappedIdentityError();

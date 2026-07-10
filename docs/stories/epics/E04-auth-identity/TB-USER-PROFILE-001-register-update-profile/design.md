@@ -2,7 +2,9 @@
 
 ## Domain Model
 
-- User profile fields from schema: `id`, `phone_number`, `display_name`, `avatar_url`, `status`, `exp_points`, `rank_code`, timestamps.
+- User profile fields from schema: `id`, `phone_number`, `display_name`,
+  `date_of_birth`, `avatar_url`, `status`, `exp_points`, `rank_code`, timestamps.
+- `profileComplete` is derived from non-empty display name, phone, and birth date.
 - Cognito identity is stored on `users.cognito_sub` and is the stable external identity key for mapped local users.
 - API uses camelCase response fields such as `phoneNumber`, `displayName`, `avatarUrl`, `rankCode`, `expPoints`.
 - Role is derived from `user_roles`/`roles` when needed; `users.role` is not a schema field.
@@ -18,8 +20,10 @@
    - Runtime fallback may bind only when exactly one local row matches the normalized verified phone and has `cognito_sub IS NULL`. Zero matches, multiple matches, unverified phone claims, or rows that already have a different `cognito_sub` fail closed as unmapped identity and require manual migration cleanup.
    - Production-like environments default the fallback off; explicit `AUTH_PHONE_FALLBACK_ENABLED=true` is allowed only after the backfill proof above. The transition ends after backfill completion plus one release with zero production fallback binds; changing the default on outside local/test requires a new accepted high-risk decision/story update.
 5. `GET /users/me` returns current user profile.
-6. `PATCH /users/me` validates body and updates only `display_name`/`avatar_url`.
+6. `PATCH /users/me` validates and updates `display_name`, `date_of_birth`,
+   `phone_number`, and `avatar_url`.
 7. `SUSPENDED`, `DELETED`, and active deletion-request users are rejected for profile mutation.
+8. Mobile routes incomplete users to onboarding after OTP and session restore.
 
 ## Interface Contract
 
@@ -28,11 +32,14 @@
 
 ## Data Model
 
-Uses existing `users` and optional `user_roles` joins. No schema field additions.
+Migration `007_add_user_date_of_birth.sql` adds nullable
+`users.date_of_birth`. Phone stays nullable for initial Cognito provisioning
+and unique when set.
 
 ## UI / Platform Impact
 
-Backend-only. Client/mobile signup, login, forgot-password, and token handoff are tracked by `TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery`.
+Flutter adds one required onboarding screen shared by immediate login and
+restored-session paths.
 
 ## Observability
 
