@@ -24,6 +24,23 @@ const parseBoolean = (value, defaultValue = false) => {
   return value.trim().toLowerCase() === 'true';
 };
 
+// Express `trust proxy` setting. Deployments behind a reverse proxy / load
+// balancer (Nginx, AWS ALB) must set TRUST_PROXY so req.ip reflects the real
+// client IP (used by the MULTI_ACCOUNT_SAME_DEVICE anti-fraud signal) instead of
+// the proxy IP. Default false (no proxy) is the safe local/no-proxy value and
+// avoids trusting spoofable X-Forwarded-For headers.
+//   ''/unset -> false; 'true'/'false' -> boolean; digits -> hop count;
+//   anything else -> passed through (e.g. 'loopback', '10.0.0.0/8', a CSV list).
+const parseTrustProxy = (value) => {
+  if (value === undefined || value === '') return false;
+  const trimmed = value.trim();
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'true') return true;
+  if (lowered === 'false') return false;
+  if (/^\d+$/.test(trimmed)) return Number(trimmed);
+  return trimmed;
+};
+
 const explicitNodeEnv = process.env.NODE_ENV;
 const env = explicitNodeEnv || 'development';
 const phoneFallbackDefault = ['development', 'test'].includes(explicitNodeEnv);
@@ -41,6 +58,7 @@ export default {
   port: parseInt(process.env.PORT, 10) || 5000,
   env,
   corsOrigins,
+  trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   avatarAllowedHosts,
   trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
   auth: {

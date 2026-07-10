@@ -100,7 +100,11 @@ function deriveMerchantSimilarity(receipt, venue) {
  *   legal/consent/retention decision exists (spec §9, V1.1).
  */
 async function deriveBehavioralSignals(client, { review, receipt, now, rules }) {
-  const userId = review.user_id;
+  // Use the receipt's own user_id (the row under decision) so the
+  // receipt_verifications-based counts stay consistent with their source column
+  // even if a data inconsistency made it diverge from review.user_id. Upload
+  // enforces they match, so this is normally identical to review.user_id.
+  const userId = receipt.user_id;
 
   // --- New account + first review ---
   // Anchor account age on review submission time, not the decision time: OCR is

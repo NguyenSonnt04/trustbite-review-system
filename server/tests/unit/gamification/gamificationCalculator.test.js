@@ -52,4 +52,20 @@ describe('resolveRank — Gamification_Design §3 ladder', () => {
     const { level } = resolveRank(Number.NaN, undefined, RULES);
     expect(level.code).toBe('NEWBIE');
   });
+
+  it('accepts the shipped ladder (monotonic non-decreasing)', () => {
+    expect(() => resolveRank(0, 0, RULES)).not.toThrow();
+  });
+
+  it('throws when a future ladder breaks the monotonic invariant', () => {
+    const badRules = {
+      rankLadder: [
+        { code: 'NEWBIE', label: 'Newbie', minExp: 0, minVerifiedReviews: 0 },
+        { code: 'FOODIE', label: 'Foodie', minExp: 500, minVerifiedReviews: 10 },
+        // Regression: higher tier needs FEWER verified reviews than the one below.
+        { code: 'BROKEN', label: 'Broken', minExp: 2000, minVerifiedReviews: 5 },
+      ],
+    };
+    expect(() => resolveRank(3000, 10, badRules)).toThrow(/non-decreasing/i);
+  });
 });
