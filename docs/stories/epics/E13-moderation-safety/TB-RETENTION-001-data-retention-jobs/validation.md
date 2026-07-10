@@ -11,7 +11,7 @@ change is introduced.
 
 | Layer | Cases |
 | --- | --- |
-| Unit (`dataRetentionService.test.js`) | OTP purge uses 30-day cutoff + commits; receipt anonymize uses 90-day cutoff, nulls IP/GPS but not `gps_distance_meters`; notification purge uses 365-day cutoff; `runDataRetention` aggregates counts; rollback + rethrow on failure; ROLLBACK failure does not mask the original error |
+| Unit (`dataRetentionService.test.js`) | OTP purge uses 30-day cutoff + commits; receipt anonymize uses 90-day cutoff, nulls IP/GPS but not `gps_distance_meters`; notification purge uses 365-day cutoff; `runDataRetention` aggregates counts (`errors: null`); continue-on-error: an earlier action failing still runs later actions and reports the error; rollback + rethrow on failure; ROLLBACK failure does not mask the original error |
 | Integration | OTP: stale row deleted, fresh kept; notifications: stale deleted, fresh kept; receipts: stale IP/GPS nulled while `gps_distance_meters` retained, fresh receipt untouched |
 | E2E | N/A (no UI) |
 | Platform | Runner entrypoint `retention:process` executes and prints a JSON summary |
@@ -35,15 +35,15 @@ npm run server:build
 
 ## Acceptance Evidence
 
-- `npm run server:test:unit` — 327 passed (33 files); includes
-  `tests/unit/privacy/dataRetentionService.test.js` (6 cases).
+- `npm run server:test:unit` — 328 passed (33 files); includes
+  `tests/unit/privacy/dataRetentionService.test.js` (7 cases, incl. continue-on-error).
 - `npx vitest run tests/integration/dataRetention.integration.test.js` — 3/3
   passed against live PostgreSQL (2026-07-10). Stale rows purged/anonymized,
   recent rows and derived `gps_distance_meters` retained; each case cleans up in
   `afterEach`.
 - `npm run retention:process --prefix server` — ran end-to-end, printed
-  `{"otpDeleted":0,"receiptSignalsAnonymized":0,"notificationsDeleted":0}` on a
-  clean DB and closed the pool.
+  `{"otpDeleted":0,"receiptSignalsAnonymized":0,"notificationsDeleted":0,"errors":null}`
+  on a clean DB and closed the pool.
 - Full integration suite — 127 passed, LocalStack-dependent suites skipped.
 - `npm run server:build` — syntax check passed for 120 files.
 

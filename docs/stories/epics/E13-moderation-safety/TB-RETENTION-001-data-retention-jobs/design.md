@@ -22,11 +22,16 @@ Thresholds live in `config/retentionRules.js` (decision 0021), in days:
 - Each action runs inside `runInTransaction` (BEGIN → work → COMMIT, guarded
   ROLLBACK on error that never masks the original error) and returns its
   affected-row count.
-- `runDataRetention({ now, rules })` runs the three actions sequentially and
-  returns `{ otpDeleted, receiptSignalsAnonymized, notificationsDeleted }`.
+- `runDataRetention({ now, rules })` runs all three actions and returns
+  `{ otpDeleted, receiptSignalsAnonymized, notificationsDeleted, errors }`. A
+  successful action reports its count; a failed action reports `null` and its
+  message under `errors` (which is `null` when all succeeded).
 
-Actions are independent: each commits on its own, so one failure does not roll
-back rows already retained by an earlier action.
+Actions are independent and fault-tolerant: each commits in its own transaction,
+and `runDataRetention` attempts every action even if an earlier one fails, so a
+single failing job cannot indefinitely block the others (time-based policy
+resilience). The runner (`process-retention.mjs`) prints the JSON summary and
+exits non-zero when `errors` is present or an unexpected error is thrown.
 
 ## Interface Contract
 

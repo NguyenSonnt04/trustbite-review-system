@@ -146,7 +146,38 @@ describe('runDataRetention', () => {
       otpDeleted: 4,
       receiptSignalsAnonymized: 2,
       notificationsDeleted: 7,
+      errors: null,
     });
+    expect(pool.connect).toHaveBeenCalledTimes(3);
+  });
+
+  it('continues running later actions when an earlier action fails and reports the error', async () => {
+    // Action order: OTP (fails), receipt anonymize (ok), notifications (ok).
+    let call = 0;
+    pool.connect.mockImplementation(async () => {
+      const client = createClient();
+      if (call === 0) {
+        client.query
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockRejectedValueOnce(new Error('otp table locked')) // DELETE fails
+          .mockResolvedValueOnce({}); // ROLLBACK
+      } else {
+        const rowCount = call; // 1 then 2
+        client.query
+          .mockResolvedValueOnce({}) // BEGIN
+          .mockResolvedValueOnce({ rowCount }) // work
+          .mockResolvedValueOnce({}); // COMMIT
+      }
+      call += 1;
+      return client;
+    });
+
+    const summary = await runDataRetention({ now: NOW, rules: RULES });
+
+    expect(summary.otpDeleted).toBeNull();
+    expect(summary.receiptSignalsAnonymized).toBe(1);
+    expect(summary.notificationsDeleted).toBe(2);
+    expect(summary.errors).toEqual({ otpDeleted: 'otp table locked' });
     expect(pool.connect).toHaveBeenCalledTimes(3);
   });
 });

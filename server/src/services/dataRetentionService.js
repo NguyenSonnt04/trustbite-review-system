@@ -78,7 +78,8 @@ export async function anonymizeStaleReceiptSignals(now, rules) {
 }
 
 /**
- * Delete notifications past the retention window (read/expired-by-age).
+ * Delete notifications older than the retention window. This is a hard age-based
+ * limit: all notifications past the window are removed regardless of read state.
  * @returns {Promise<number>} rows deleted
  */
 export async function purgeExpiredNotifications(now, rules) {
@@ -93,13 +94,33 @@ export async function purgeExpiredNotifications(now, rules) {
 }
 
 /**
- * Run all data-retention actions sequentially and return a summary of affected
- * rows. Actions are independent; the first failure propagates to the caller.
+ * Run all data-retention actions and return a summary of affected rows.
+ *
+ * Actions are independent (each runs in its own transaction), so every action is
+ * attempted even if an earlier one fails — a single failing retention job must
+ * not indefinitely block the others, which would risk a time-based policy
+ * violation. A successful action reports its affected-row count; a failed action
+ * reports `null` and its message is collected under `errors`. `errors` is `null`
+ * when every action succeeded. The caller (runner) decides how to signal overall
+ * failure.
  */
 export async function runDataRetention({ now = new Date(), rules = getRetentionRules() } = {}) {
-  const otpDeleted = await purgeExpiredOtpVerifications(now, rules);
-  const receiptSignalsAnonymized = await anonymizeStaleReceiptSignals(now, rules);
-  const notificationsDeleted = await purgeExpiredNotifications(now, rules);
+  const actions = [
+    ['otpDeleted', purgeExpiredOtpVerifications],
+    ['receiptSignalsAnonymized', anonymizeStaleReceiptSignals],
+    ['notificationsDeleted', purgeExpiredNotifications],
+  ];
 
-  return { otpDeleted, receiptSignalsAnonymized, notificationsDeleted };
+  const summary = { otpDeleted: null, receiptSignalsAnonymized: null, notificationsDeleted: null };
+  const errors = {};
+
+  for (const [key, action] of actions) {
+    try {
+      summary[key] = await action(now, rules);
+    } catch (err) {
+      errors[key] = err?.message ?? String(err);
+    }
+  }
+
+  return { ...summary, errors: Object.keys(errors).length > 0 ? errors : null };
 }

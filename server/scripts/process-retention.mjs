@@ -8,6 +8,22 @@ import { runDataRetention } from '../src/services/dataRetentionService.js';
 try {
   const result = await runDataRetention();
   console.log(JSON.stringify(result));
+  // Per-action failures are collected (not thrown) so every job still runs;
+  // surface them to the scheduler via a non-zero exit code.
+  if (result.errors) {
+    process.exitCode = 1;
+  }
+} catch (err) {
+  // Emit the failure in the same JSON shape as the success path so log ingestion
+  // stays uniform, and signal failure to the scheduler.
+  console.error(JSON.stringify({ error: err?.message ?? String(err) }));
+  process.exitCode = 1;
 } finally {
-  await disconnectDB();
+  try {
+    await disconnectDB();
+  } catch (disconnectErr) {
+    // Do not let a disconnect failure mask the original run error above.
+    console.error(JSON.stringify({ error: `disconnect failed: ${disconnectErr?.message ?? String(disconnectErr)}` }));
+    process.exitCode = 1;
+  }
 }

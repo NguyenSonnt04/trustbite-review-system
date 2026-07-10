@@ -18,7 +18,8 @@ const RETENTION_RULES = Object.freeze({
   // bound; the derived gps_distance_meters (non-PII) is retained for audit.
   receiptSignalRetentionDays: 90,
 
-  // Notifications: 1 year, then delete read/expired records.
+  // Notifications: hard 1-year limit; delete all records older than this window
+  // regardless of read state.
   notificationRetentionDays: 365,
 });
 
