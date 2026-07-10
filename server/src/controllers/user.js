@@ -1,5 +1,6 @@
 import { userService } from '../services/userService.js';
 import { avatarUploadService } from '../services/avatarStorageService.js';
+import { getUserGamification } from '../services/gamificationService.js';
 import { sendAccepted, sendSuccess } from '../utils/responses.js';
 
 export const getMe = async (req, res, next) => {
@@ -15,6 +16,15 @@ export const updateMe = async (req, res, next) => {
   try {
     const user = await userService.updateCurrentUser(req.user.id, req.body || {});
     sendSuccess(res, user);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getMyGamification = async (req, res, next) => {
+  try {
+    const gamification = await getUserGamification(req.user.id);
+    sendSuccess(res, gamification);
   } catch (err) {
     next(err);
   }
