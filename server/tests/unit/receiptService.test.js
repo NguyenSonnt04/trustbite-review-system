@@ -194,6 +194,24 @@ describe('uploadReceiptForReview', () => {
     expect(client.query.mock.invocationCallOrder.at(-1)).toBeLessThan(enqueueReceiptOcr.mock.invocationCallOrder[0]);
   });
 
+  it('normalizes an IPv4-mapped IPv6 request IP to plain IPv4 before persisting', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    mockReceiptHappyPath(client);
+
+    await uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+      requestIp: '::ffff:203.0.113.7',
+    });
+
+    const insertParams = client.query.mock.calls[11][1];
+    expect(client.query.mock.calls[11][0]).toContain('request_ip');
+    expect(insertParams.at(-1)).toBe('203.0.113.7');
+  });
+
   it('degrades the committed receipt to admin review when OCR enqueue fails after commit', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);

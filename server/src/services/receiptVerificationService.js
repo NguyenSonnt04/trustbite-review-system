@@ -140,6 +140,9 @@ async function deriveBehavioralSignals(client, { review, receipt, now, rules }) 
   const manyRejectedReceipts = (rejectedResult.rows[0]?.count ?? 0) >= rules.rejectedReceiptThreshold;
 
   // --- Multi-account same IP for the same restaurant within 24h ---
+  // request_ip is normalized at capture (receiptService via normalizeIpAddress),
+  // so this stored-vs-stored INET comparison is consistent even when the same
+  // client appears as IPv4-mapped IPv6 on one request and plain IPv4 on another.
   let multiAccountSameDevice = false;
   if (receipt.request_ip) {
     const sameIpWindowStart = new Date(now.getTime() - rules.sameIpWindowMs);
