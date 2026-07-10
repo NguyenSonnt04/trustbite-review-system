@@ -15,6 +15,17 @@
 5. Express verifies the access token through the Cognito adapter or consumes trusted authorizer claims at the deployment boundary.
 6. Express maps the external identity to a local `users` row and enforces local `ACTIVE`/`SUSPENDED`/`DELETED` account state.
 
+The Flutter mobile implementation uses `amplify_auth_cognito`. The default
+`LoginScreen` sends the identifier and password only to the Cognito gateway,
+then handles Cognito signup confirmation, SMS/TOTP/email MFA, and required-new-
+password challenge states before loading `/users/me`. Amplify remains the sole
+owner of the Cognito session and token lifecycle. `TrustBiteApiClient` asks the
+Cognito session provider for the current access token on every protected
+request instead of copying a token into TrustBite's local session store.
+Trusted-local metadata remains isolated in that local store and the development
+signup endpoint is not a fallback for the Cognito button. Missing Cognito
+runtime configuration fails closed with a user-visible configuration error.
+
 ## Interface Contract
 
 - No new production Express auth issuance endpoint is added by this story.

@@ -47,7 +47,7 @@ This repository contains the structured skeleton folders for development.
 ### 1. Requirements
 - Node.js (v20.9+; CI and Docker images currently use Node.js 24)
 - Docker & Docker Compose
-- Flutter SDK 3.4+ for mobile development
+- Flutter SDK 3.35+ with Dart 3.9+ for mobile development
 
 ### 2. Install Workspace Dependencies
 Run this in the root directory:
@@ -98,6 +98,13 @@ Run the Flutter mobile app:
 npm run mobile:pubget
 npm run mobile:run
 ```
+
+`npm run mobile:run` maps only `AWS_REGION`,
+`AWS_COGNITO_USER_POOL_ID`, and `AWS_COGNITO_CLIENT_ID` from the ignored
+`server/.env` file into Flutter `--dart-define` values. AWS access keys,
+secrets, database credentials, and other server-only settings are never passed
+to the mobile process. Explicit `TRUSTBITE_*` environment variables override
+the mapped values.
 
 If `mobile/android`, `mobile/ios`, `mobile/web`, or another Flutter platform runner folder is missing, generate runners first:
 ```bash
@@ -184,6 +191,7 @@ AWS_SES_SENDER_EMAIL=noreply@trustbite.com
 AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
 AWS_COGNITO_CLIENT_ID=local-cognito-client
 AUTH_PHONE_FALLBACK_ENABLED=true
+TRUSTBITE_TRUSTED_AUTH_HEADERS=true
 TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test
 GPS_PROXIMITY_THRESHOLD_METERS=200
 TRUST_PROXY=false
@@ -197,6 +205,8 @@ for a single proxy hop, or a subnet/keyword such as `10.0.0.0/8`). Do not set it
 spoofable.
 
 `AUTH_PHONE_FALLBACK_ENABLED=true` is a local transition setting. Production-like environments default this fallback off and should opt in only after verified-phone backfill proof.
+
+`TRUSTBITE_TRUSTED_AUTH_HEADERS=true` is for local development and mobile emulator smoke tests only. It enables the dev-only trusted-local auth path used when Cognito signup/login is not available locally. Keep it disabled in production.
 
 If a temporary JWT fallback is ever needed for isolated test doubles, keep it out of the default runtime path and document the exception in a decision record.
 

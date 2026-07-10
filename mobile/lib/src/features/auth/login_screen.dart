@@ -1,11 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
+import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
+import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
+import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 
 /// Login/register entry screen styled after the TrustBite discover screen.
 ///
-/// This is a visual UI only: the buttons and inputs are ready to wire into
-/// Cognito-backed auth later, but they do not perform authentication yet.
+/// Cognito owns credential verification and token issuance. Credentials never
+/// pass through TrustBite Express.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({
+    super.key,
+    this.authService,
+    this.cognitoAuthGateway,
+    this.onContinueWithGoogle,
+  });
+
+  final MobileAuthService? authService;
+  final CognitoAuthGateway? cognitoAuthGateway;
+  final VoidCallback? onContinueWithGoogle;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -15,14 +28,114 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _brand = Color(0xFFFF5E00);
   static const Color _muted = Color(0xFF8E8E9A);
 
-  int _activeTab = 0;
+  bool _isSubmitting = false;
+  CognitoAuthStep? _pendingStep;
 
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _identifierController = TextEditingController();
+  final TextEditingController _confirmationController = TextEditingController();
+
+  MobileAuthService get _authService =>
+      widget.authService ?? appMobileAuthService;
+
+  CognitoAuthGateway get _cognitoAuthGateway =>
+      widget.cognitoAuthGateway ?? appCognitoAuthGateway;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _identifierController.dispose();
+    _confirmationController.dispose();
     super.dispose();
+  }
+
+  void _showMessage(String message) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.white,
+        elevation: 18,
+        margin: EdgeInsets.fromLTRB(28, 0, 28, screenHeight * 0.44),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: const BorderSide(color: Color(0xFFF0F0F0)),
+        ),
+        content: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 14,
+            height: 1.25,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handlePrimaryAuth() async {
+    setState(() => _isSubmitting = true);
+    try {
+      late final CognitoAuthResult result;
+      final pendingStep = _pendingStep;
+      if (pendingStep != null) {
+        result = await _cognitoAuthGateway.confirmOtp(
+          _confirmationController.text,
+        );
+      } else {
+        result = await _cognitoAuthGateway.requestOtp(
+          identifier: _identifierController.text,
+        );
+      }
+
+      await _handleCognitoResult(result);
+    } on ApiException catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } on ArgumentError catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } on CognitoAuthGatewayException catch (err) {
+      if (!mounted) return;
+      _showMessage(err.message);
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  Future<void> _handleCognitoResult(CognitoAuthResult result) async {
+    if (!result.isSignedIn) {
+      if (!mounted) return;
+      setState(() {
+        _pendingStep = result.step;
+        _confirmationController.clear();
+      });
+      return;
+    }
+
+    final user = await _authService.completeCognitoSignIn();
+    if (!mounted) return;
+    final displayName =
+        user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản';
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(user);
+    } else {
+      _showMessage('Đã đăng nhập với $displayName.');
+    }
+  }
+
+  Future<void> _cancelChallenge() async {
+    await _cognitoAuthGateway.signOut();
+    if (!mounted) return;
+    setState(() {
+      _pendingStep = null;
+      _confirmationController.clear();
+    });
   }
 
   @override
@@ -51,12 +164,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 44),
+                      const SizedBox(height: 18),
                       _buildHero(),
                       const SizedBox(height: 30),
                       _buildAuthCard(),
                       const SizedBox(height: 20),
                       _buildTrustNote(),
+                      const SizedBox(height: 24),
+                      _buildAssuranceStrip(),
                     ],
                   ),
                 ],
@@ -69,52 +184,44 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _brand,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'T',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+        Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            color: _brand,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(5),
+            child: Image.asset(
+              'assets/app_icon_foreground.png',
+              fit: BoxFit.contain,
             ),
-            const SizedBox(width: 8),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'TrustBite',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Review thật, vị ngon thật',
-                  style: TextStyle(
-                    color: _muted,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'TrustBite',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Text(
+          'Review thật, vị ngon thật',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _muted,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -124,7 +231,6 @@ class _LoginScreenState extends State<LoginScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 30),
         Center(
           child: RichText(
             textAlign: TextAlign.center,
@@ -136,9 +242,13 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               children: [
                 TextSpan(
-                    text: 'Đăng nhập ',
-                    style: TextStyle(color: Color.fromARGB(255, 0, 0, 0))),
-                TextSpan(text: 'TrustBite', style: TextStyle(color: _brand)),
+                  text: 'Xác thực ',
+                  style: TextStyle(color: Color.fromARGB(255, 0, 0, 0)),
+                ),
+                TextSpan(
+                  text: 'tài khoản',
+                  style: TextStyle(color: _brand),
+                ),
               ],
             ),
           ),
@@ -165,85 +275,78 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: Column(
         children: [
-          _buildTabs(),
-          const SizedBox(height: 18),
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: _buildPhoneFields(),
+            child: _pendingStep == null
+                ? _buildIdentifierFields()
+                : _buildConfirmationField(),
           ),
-          const SizedBox(height: 16),
-          _primaryButton('Gửi mã OTP'),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
+          _primaryButton(
+            _primaryButtonLabel(),
+            _isSubmitting ? null : _handlePrimaryAuth,
+          ),
+          if (_pendingStep != null)
+            TextButton(
+              onPressed: _isSubmitting ? null : _cancelChallenge,
+              child: const Text('Quay lại'),
+            ),
+          const SizedBox(height: 18),
           _divider(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 18),
           _googleButton(),
         ],
       ),
     );
   }
 
-  Widget _buildTabs() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          _tabButton(0, 'Đăng nhập'),
-          _tabButton(1, 'Đăng ký'),
-        ],
-      ),
-    );
-  }
-
-  Widget _tabButton(int index, String label) {
-    final active = _activeTab == index;
-    return Expanded(
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => setState(() => _activeTab = index),
-          borderRadius: BorderRadius.circular(15),
-          child: Semantics(
-            button: true,
-            selected: active,
-            label: label,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              height: 42,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: active ? _brand : Colors.transparent,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: active ? Colors.white : _muted,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ),
+  Widget _buildIdentifierFields() {
+    return Column(
+      key: const ValueKey('cognito-identifier-fields'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Nhập email để nhận mã xác thực tài khoản.',
+          style: TextStyle(
+            color: _muted,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            height: 1.35,
           ),
         ),
-      ),
+        const SizedBox(height: 12),
+        _inputField(
+          controller: _identifierController,
+          icon: Icons.person_outline_rounded,
+          hint: 'Email',
+          keyboardType: TextInputType.emailAddress,
+          textInputAction: TextInputAction.next,
+          autofillHints: const [AutofillHints.email],
+        ),
+      ],
     );
   }
 
-  Widget _buildPhoneFields() {
-    final helperText = _activeTab == 0
-        ? 'Nhập số điện thoại để nhận mã đăng nhập.'
-        : 'Tạo tài khoản mới bằng số điện thoại của bạn.';
+  Widget _buildConfirmationField() {
+    final step = _pendingStep!;
+    final description = switch (step) {
+      CognitoAuthStep.confirmOtp => 'Nhập mã xác thực đã gửi để tiếp tục.',
+      CognitoAuthStep.confirmSignUp =>
+        'Nhập mã xác thực đã gửi để xác nhận tài khoản.',
+      CognitoAuthStep.confirmSmsMfa => 'Nhập mã MFA được gửi qua SMS.',
+      CognitoAuthStep.confirmTotpMfa => 'Nhập mã từ ứng dụng xác thực.',
+      CognitoAuthStep.confirmEmailMfa => 'Nhập mã MFA được gửi qua email.',
+      CognitoAuthStep.confirmNewPassword =>
+        'Cognito yêu cầu bạn đặt mật khẩu mới.',
+      CognitoAuthStep.signedIn => '',
+    };
 
     return Column(
-      key: ValueKey('phone-fields-$_activeTab'),
+      key: ValueKey('cognito-confirm-${step.name}'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          helperText,
+          description,
           style: const TextStyle(
             color: _muted,
             fontSize: 12,
@@ -253,18 +356,26 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 12),
         _inputField(
-          controller: _phoneController,
-          icon: Icons.phone_iphone_rounded,
-          hint: 'Số điện thoại',
-          keyboardType: TextInputType.phone,
+          fieldKey: const ValueKey('cognito-confirmation-field'),
+          controller: _confirmationController,
+          icon: Icons.verified_user_outlined,
+          hint: 'Mã xác nhận',
+          keyboardType: TextInputType.number,
           textInputAction: TextInputAction.done,
-          autofillHints: const [AutofillHints.telephoneNumber],
+          autofillHints: const [AutofillHints.oneTimeCode],
         ),
       ],
     );
   }
 
+  String _primaryButtonLabel() {
+    if (_isSubmitting) return 'Đang xử lý...';
+    if (_pendingStep != null) return 'Xác nhận';
+    return 'Tiếp tục';
+  }
+
   Widget _inputField({
+    Key? fieldKey,
     required TextEditingController controller,
     required IconData icon,
     required String hint,
@@ -290,6 +401,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: TextField(
+        key: fieldKey,
         controller: controller,
         keyboardType: keyboardType,
         textInputAction: textInputAction,
@@ -310,7 +422,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _primaryButton(String label) {
+  Widget _primaryButton(String label, VoidCallback? onPressed) {
     return Container(
       height: 52,
       width: double.infinity,
@@ -326,7 +438,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ],
       ),
       child: TextButton(
-        onPressed: () {},
+        onPressed: onPressed,
         child: Text(
           label,
           style: const TextStyle(
@@ -364,18 +476,19 @@ class _LoginScreenState extends State<LoginScreen> {
       height: 52,
       width: double.infinity,
       child: OutlinedButton(
-        onPressed: () {},
+        onPressed:
+            widget.onContinueWithGoogle ??
+            () => _showMessage('Google sign-in chưa được cấu hình cho mobile.'),
         style: OutlinedButton.styleFrom(
           side: const BorderSide(color: Color(0xFFF0F0F0)),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('G',
-                style: TextStyle(
-                    color: _brand, fontSize: 18, fontWeight: FontWeight.w900)),
+            _GoogleGLogo(size: 18),
             SizedBox(width: 10),
             Text(
               'Tiếp tục với Google',
@@ -400,7 +513,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       child: const Row(
         children: [
-          Icon(Icons.receipt_long_outlined, color: _brand, size: 20),
+          Icon(Icons.receipt_long_outlined, color: Colors.black, size: 20),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -418,6 +531,55 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildAssuranceStrip() {
+    return Row(
+      children: [
+        Expanded(
+          child: _assuranceItem(Icons.verified_user_outlined, 'Tài khoản thật'),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _assuranceItem(Icons.receipt_long_outlined, 'Review có kiểm'),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _assuranceItem(Icons.lock_outline_rounded, 'Dữ liệu an toàn'),
+        ),
+      ],
+    );
+  }
+
+  Widget _assuranceItem(IconData icon, String label) {
+    return Container(
+      height: 72,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFF0F0F0)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.black, size: 19),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF737383),
+              fontSize: 11,
+              height: 1.15,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _glowCircle(double size, Color color) {
     return Container(
       width: size,
@@ -425,4 +587,53 @@ class _LoginScreenState extends State<LoginScreen> {
       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
     );
   }
+}
+
+class _GoogleGLogo extends StatelessWidget {
+  const _GoogleGLogo({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size.square(size),
+      painter: const _GoogleGLogoPainter(),
+    );
+  }
+}
+
+class _GoogleGLogoPainter extends CustomPainter {
+  const _GoogleGLogoPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final strokeWidth = size.shortestSide * 0.18;
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height / 2),
+      radius: (size.shortestSide - strokeWidth) / 2,
+    );
+
+    Paint stroke(Color color) => Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.butt;
+
+    canvas
+      ..drawArc(rect, 4.02, 1.20, false, stroke(const Color(0xFFEA4335)))
+      ..drawArc(rect, 2.85, 1.18, false, stroke(const Color(0xFFFBBC05)))
+      ..drawArc(rect, 1.28, 1.58, false, stroke(const Color(0xFF34A853)))
+      ..drawArc(rect, -0.03, 1.30, false, stroke(const Color(0xFF4285F4)));
+
+    final blue = stroke(const Color(0xFF4285F4))..strokeCap = StrokeCap.butt;
+    canvas.drawLine(
+      Offset(size.width * 0.52, size.height * 0.50),
+      Offset(size.width * 0.90, size.height * 0.50),
+      blue,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -4,11 +4,13 @@ publish_to: "none"
 version: 0.1.0+1
 
 environment:
-  sdk: ">=3.4.0 <4.0.0"
+  sdk: ">=3.9.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
+  amplify_auth_cognito: ^2.12.0
+  amplify_flutter: ^2.12.0
   cupertino_icons: ^1.0.8
 
 dev_dependencies:
@@ -20,7 +22,15 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/images/logo.png"
+  image_path: "assets/app_icon.png"
+  adaptive_icon_background: "#120906"
+  adaptive_icon_foreground: "assets/app_icon_foreground.png"
+  remove_alpha_ios: true
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/app_icon.png
+    - assets/app_icon_foreground.png
+    - assets/icons/
+    - assets/bg/

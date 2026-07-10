@@ -21,7 +21,7 @@ The Flutter mobile app must integrate with the Express backend through documente
 ## Acceptance Criteria
 
 - Mobile runtime configuration defines a backend base URL per environment without hardcoding secrets.
-- Authenticated mobile requests send a backend-accepted bearer token once Cognito/JWT auth is implemented.
+- Authenticated mobile requests send a Cognito access token as a backend-accepted bearer token.
 - Receipt OCR, GPS verification, restaurant discovery, review creation, and trust-score reads have documented endpoint contracts before implementation.
 - Mobile UI may show placeholders, but final trust and verification outcomes must come from backend responses.
 
@@ -34,10 +34,11 @@ The Flutter mobile app must integrate with the Express backend through documente
 - Queries:
   - Restaurant discovery should pass latitude, longitude, radius, filters, and pagination through query parameters.
 - API:
-  - `POST /api/auth/login`
-    - Request: phone/password or future Cognito token exchange.
-    - Response: access token plus user profile.
-    - Auth: public.
+  - Cognito signup/login/password recovery is owned by the configured Cognito client flow, not TrustBite Express.
+  - `GET /api/v1/users/me`
+    - Request: `Authorization: Bearer <Cognito access token>`.
+    - Response: current TrustBite user profile from the backend local account mapping.
+    - Auth: required; backend rejects missing, invalid, unmapped, suspended, or deleted identities.
   - `GET /api/restaurants/nearby`
     - Query: `lat`, `lng`, optional `radiusMeters`, filters, and pagination.
     - Response: restaurant summaries with trust score, menu verification status, and price-deviation flags.
@@ -83,3 +84,5 @@ Harness CLI is not installed in `scripts/bin/` in this workspace, so no durable 
 - Story created to document planned mobile/backend API contract before implementation.
 - 2026-07-07 review follow-up added `MobileRuntimeConfig` with API v1 URI normalization, null-query filtering, and Cognito config readiness checks to satisfy the existing Flutter contract test. Local validation remains blocked because `flutter` is not on PATH, so `npm run mobile:test` cannot run on this machine.
 - 2026-07-07 review follow-up tightened `MobileRuntimeConfig.hasCognitoConfig` so mobile auth is only enabled when `awsRegion`, `cognitoUserPoolId`, and `cognitoClientId` are all non-empty. Added a Flutter contract test for the missing-region case. Local validation remains blocked because neither `flutter` nor `dart` is on PATH.
+- 2026-07-08 added a Flutter backend API client and mobile auth handoff service. `MobileAuthService.completeCognitoSignIn` stores a Cognito access token, calls `GET /api/v1/users/me`, sends `Authorization: Bearer <token>`, clears the session on backend `401`, and avoids backend-issued login/OTP/token flows. `npm run mobile:test` passed locally with 10 tests.
+- 2026-07-08 added local mobile signup smoke support for development only. Android emulator defaults to `http://10.0.2.2:5000`; `POST /api/v1/auth/dev/local-signup` creates or reuses a local user only when the backend has `TRUSTBITE_TRUSTED_AUTH_HEADERS=true` outside production, then mobile calls protected APIs with trusted-local headers. Production auth remains Cognito-owned.
