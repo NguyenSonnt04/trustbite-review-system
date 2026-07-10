@@ -43,13 +43,20 @@ Validated 2026-07-10:
   than the async decision time).
 - `npm run server:build` — syntax check passed for 104 files.
 
-## DB Proof (blocker)
+## DB Proof
 
-Live insert/update + rollback proof for migration `007_add_receipt_request_ip.sql`
-was **not** run: local Docker/PostgreSQL was unavailable during implementation
-(`docker ps` → daemon not running). The migration is written with
-`ADD COLUMN IF NOT EXISTS` + a documented rollback, and the derivation logic is
-proven via mocked-pool unit tests. Live `npm run db:migrate` apply + a
-transaction/rollback proof of the new column and the same-IP lookup remain
-outstanding and must be run when local infrastructure is available before this
-story is claimed fully complete.
+PASS (2026-07-10) against local PostgreSQL (`trustbite-postgres`).
+
+- `npm run db:migrate` applied `007_add_receipt_request_ip.sql` (5 migrations
+  applied). Verified `receipt_verifications.request_ip` is `inet` and index
+  `idx_receipts_request_ip_restaurant` exists.
+- A throwaway proof script (seed inside one transaction, then ROLLBACK) proved:
+  same-IP multi-account lookup finds another account's receipt for the same
+  restaurant within 24h; a different IP finds no match; the rejected-receipt
+  velocity count query runs. Residue check after rollback: 0 rows left.
+- The script was removed after running (not committed).
+
+Remaining (not a migration blocker): the daily hard rate limits (BR-RATE-003/004)
+are still deferred to a separate slice, and a committed integration test through
+the HTTP boundary is deferred (behavioral derivation is unit-proven with mocks
+plus this live DB proof).

@@ -33,10 +33,21 @@ Validated 2026-07-10:
 - `npm run test:unit` — 23 files / 251 tests passed (was 232; +19).
 - `npm run server:build` — syntax check passed for 107 files.
 
-## DB Proof (blocker)
+## DB Proof
 
-No migration is introduced (all columns exist). Live recompute against migrated
-PostgreSQL (seed reviews across HIGH/LOW/NONE buckets and reviewer ranks, run
-`recomputeRestaurantTrustScore`, assert persisted `trust_score`/counts, roll
-back) was not run because local Docker/PostgreSQL was unavailable. Logic is
-proven via mocked-pool unit tests; live proof remains outstanding.
+PASS (2026-07-10) against local PostgreSQL (`trustbite-postgres`, `npm run db:migrate`
+applied). A throwaway script seeded, inside one transaction, a restaurant with a
+verified FOODIE review (avg 5, weight 1.0), a reference review (avg 1, weight 0.1),
+and a rejected NONE review (excluded), then called
+`recomputeRestaurantTrustScore(restaurantId, { client })` joining that transaction:
+
+- returned `{ trustScore: 4.64, verifiedReviewCount: 1, referenceReviewCount: 1 }`
+  (`(5*1.0 + 1*0.1)/1.1 = 4.636 → 4.64`),
+- `restaurants.trust_score` / `verified_review_count` / `reference_review_count`
+  persisted `4.64` / `1` / `1`,
+- NONE-bucket review excluded from both math and counts.
+
+The transaction was rolled back; residue check afterward found 0 rows. The script
+was removed after running (not committed). Remaining: no committed integration
+test and no auto-recompute trigger yet (recompute is not wired into
+verification/admin/deletion).
