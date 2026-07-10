@@ -1,6 +1,7 @@
 import { userService } from '../services/userService.js';
 import { avatarUploadService } from '../services/avatarStorageService.js';
 import { getUserGamification } from '../services/gamificationService.js';
+import { blockUser, unblockUser } from '../services/userBlockService.js';
 import { sendAccepted, sendSuccess } from '../utils/responses.js';
 
 export const getMe = async (req, res, next) => {
@@ -65,6 +66,24 @@ export const cancelDeletionRequest = async (req, res, next) => {
   try {
     const deletionRequest = await userService.cancelDeletionRequest(req.user.id);
     sendSuccess(res, deletionRequest);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const blockUserById = async (req, res, next) => {
+  try {
+    const result = await blockUser(req.user.id, req.params.userId, req.body || {});
+    sendSuccess(res, result, 201);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const unblockUserById = async (req, res, next) => {
+  try {
+    const result = await unblockUser(req.user.id, req.params.userId);
+    sendSuccess(res, result);
   } catch (err) {
     next(err);
   }

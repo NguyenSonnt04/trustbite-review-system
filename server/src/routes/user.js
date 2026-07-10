@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.js';
 import {
+  blockUserById,
   cancelDeletionRequest,
   createAvatarUploadUrl,
   createDeletionRequest,
   getDeletionRequest,
   getMe,
   getMyGamification,
+  unblockUserById,
   updateMe
 } from '../controllers/user.js';
 
@@ -20,5 +22,9 @@ router.post('/me/avatar-upload-url', createAvatarUploadUrl);
 router.post('/me/deletion-request', createDeletionRequest);
 router.get('/me/deletion-request', getDeletionRequest);
 router.post('/me/deletion-request/cancel', cancelDeletionRequest);
+
+// UGC safety block — task 6.2 (PHASE 6 — Moderation & Compliance), SAFETY-001 / BR-SAFE-003
+router.post('/:userId/block', blockUserById);
+router.delete('/:userId/block', unblockUserById);
 
 export default router;
