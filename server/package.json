@@ -11,6 +11,7 @@
     "db:migrate": "node scripts/migrate.js",
     "smoke:aws-mvp": "node scripts/smoke-aws-mvp.mjs",
     "deletions:process": "node scripts/process-deletions.mjs",
+    "retention:process": "node scripts/process-retention.mjs",
     "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
