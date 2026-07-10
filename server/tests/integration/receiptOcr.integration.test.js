@@ -25,6 +25,10 @@ function struct(overrides = {}) {
 
 async function seedReceipt({ restaurantName = 'Highlands Coffee', fileHash, fileUrl, withGps = true, gpsAccuracyMeters = 20 } = {}) {
   const user = await createUser();
+  // Backdate the reviewer so the behavioral "new account + first review" signal
+  // (+15, TB-FRAUD-005) does not contaminate these merchant/GPS/age scoring
+  // isolation tests. The new-account signal has dedicated unit coverage.
+  await query(`UPDATE users SET created_at = now() - interval '30 days' WHERE id=$1`, [user.id]);
   const restaurant = await createRestaurant({
     name: restaurantName,
     latitude: VENUE_LAT,

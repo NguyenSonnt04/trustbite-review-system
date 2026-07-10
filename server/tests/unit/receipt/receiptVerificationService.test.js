@@ -39,6 +39,7 @@ function receiptRow(overrides = {}) {
     gps_accuracy_meters: '20',
     gps_distance_meters: null,
     captured_at: null,
+    request_ip: null,
     created_at: NOW, // server-side reference for the 1h window
     ...overrides,
   };
@@ -72,6 +73,11 @@ function setupScenario({
   restaurant = restaurantRow(),
   branch = null,
   duplicateRows = [],
+  user = null,
+  earlierReviewRows = [],
+  rejectedCount = 0,
+  sameIpRows = [],
+  reviewCreatedAt = NOW,
 } = {}) {
   const calls = [];
   client.query.mockReset();
@@ -89,22 +95,37 @@ function setupScenario({
     if (/FROM\s+receipt_verifications/i.test(text) && /FOR\s+UPDATE/i.test(text)) {
       return { rows: receipt ? [receipt] : [] };
     }
-      if (/FROM\s+reviews/i.test(text)) {
-        return { rows: [{ id: REVIEW_ID, user_id: USER_ID, restaurant_id: RESTAURANT_ID }] };
-      }
-      if (/FROM\s+restaurant_branches/i.test(text)) {
-        if (!branch) return { rows: [] };
-        if (params.length >= 2) {
-          return { rows: branch.parent_restaurant_id === params[1] ? [branch] : [] };
-        }
-        return { rows: [branch] };
-      }
-      if (/FROM\s+restaurants/i.test(text)) {
-        return { rows: restaurant ? [restaurant] : [] };
-      }
     // Duplicate transaction-hash lookup.
     if (/FROM\s+receipt_verifications/i.test(text) && /transaction_unique_hash\s*=/i.test(text)) {
       return { rows: duplicateRows };
+    }
+    // Behavioral: rejected-receipt velocity count.
+    if (/FROM\s+receipt_verifications/i.test(text) && /status\s*=\s*'REJECTED'/i.test(text)) {
+      return { rows: [{ count: rejectedCount }] };
+    }
+    // Behavioral: multi-account same-IP lookup.
+    if (/FROM\s+receipt_verifications/i.test(text) && /request_ip\s*=/i.test(text)) {
+      return { rows: sameIpRows };
+    }
+    // Behavioral: earlier-review existence check (new-account + first-review).
+    if (/FROM\s+reviews/i.test(text) && /created_at\s*</i.test(text)) {
+      return { rows: earlierReviewRows };
+    }
+    if (/FROM\s+reviews/i.test(text)) {
+      return { rows: [{ id: REVIEW_ID, user_id: USER_ID, restaurant_id: RESTAURANT_ID, created_at: reviewCreatedAt }] };
+    }
+    if (/FROM\s+users/i.test(text)) {
+      return { rows: user ? [user] : [] };
+    }
+    if (/FROM\s+restaurant_branches/i.test(text)) {
+      if (!branch) return { rows: [] };
+      if (params.length >= 2) {
+        return { rows: branch.parent_restaurant_id === params[1] ? [branch] : [] };
+      }
+      return { rows: [branch] };
+    }
+    if (/FROM\s+restaurants/i.test(text)) {
+      return { rows: restaurant ? [restaurant] : [] };
     }
     if (/INSERT\s+INTO\s+fraud_flags/i.test(text)) {
       return { rows: [{ id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee' }] };
@@ -343,5 +364,143 @@ describe('verifyReceipt orchestrator', () => {
     const rec = receiptUpdate(calls);
     // >200m + within server 1h window → +40 (not +10). Score 40 → PENDING.
     expect(rec.params).toContain(40);
+  });
+
+  // --- Behavioral / velocity / device signals (TB-FRAUD-005, Anti-Fraud §4.1) ---
+
+  it('new account (<24h) on its first review adds +15', async () => {
+    const { calls } = setupScenario({
+      user: { created_at: new Date(NOW.getTime() - 60 * 60 * 1000) }, // 1h old
+      earlierReviewRows: [], // no earlier review → first review
+    });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(15);
+    expect(result.decision).toBe('VERIFIED'); // 15 stays in the 0-30 bucket
+    expect(result.breakdown.map((b) => b.code)).toContain('NEW_ACCOUNT_FIRST_REVIEW');
+  });
+
+  it('measures new-account age at review submission time, not the (async) decision time', async () => {
+    // Account created 23h before the review was submitted (still new), but the
+    // OCR/decision runs 30h after account creation. Anchoring on submission keeps
+    // the +15; anchoring on `now` would wrongly drop it.
+    const accountCreatedAt = new Date('2026-06-11T05:00:00.000Z');
+    const reviewSubmittedAt = new Date(accountCreatedAt.getTime() + 23 * 60 * 60 * 1000); // T0+23h
+    const decisionNow = new Date(accountCreatedAt.getTime() + 30 * 60 * 60 * 1000); // T0+30h
+
+    const { calls } = setupScenario({
+      user: { created_at: accountCreatedAt },
+      reviewCreatedAt: reviewSubmittedAt,
+      earlierReviewRows: [],
+      // Keep every other signal clean at decisionNow: fresh receipt, matching GPS.
+      receipt: receiptRow({
+        ocr_receipt_time: new Date(decisionNow.getTime() - 60 * 60 * 1000), // 1h old
+        created_at: decisionNow,
+      }),
+    });
+    const result = await verifyReceipt(RECEIPT_ID, { now: decisionNow });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(15);
+    expect(result.breakdown.map((b) => b.code)).toContain('NEW_ACCOUNT_FIRST_REVIEW');
+  });
+
+  it('new account that already has an earlier review adds no new-account penalty', async () => {
+    const { calls } = setupScenario({
+      user: { created_at: new Date(NOW.getTime() - 60 * 60 * 1000) },
+      earlierReviewRows: [{ '?column?': 1 }], // an earlier review exists
+    });
+    await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(0); // clean signals, no +15
+  });
+
+  it('established account (>24h) adds no new-account penalty', async () => {
+    const { calls } = setupScenario({
+      user: { created_at: new Date(NOW.getTime() - 10 * 24 * 60 * 60 * 1000) }, // 10 days old
+    });
+    await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(0);
+  });
+
+  it('>=3 rejected receipts in the trailing 7d adds +40 → PENDING', async () => {
+    const { calls } = setupScenario({ rejectedCount: 3 });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(40);
+    expect(result.reviewStatus).toBe('PENDING_ADMIN_REVIEW');
+    expect(result.breakdown.map((b) => b.code)).toContain('MANY_REJECTED_RECEIPTS');
+  });
+
+  it('fewer than 3 rejected receipts adds no velocity penalty', async () => {
+    const { calls } = setupScenario({ rejectedCount: 2 });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(0);
+    expect(result.decision).toBe('VERIFIED');
+  });
+
+  it('another account uploading from the same IP for the same restaurant within 24h adds +50', async () => {
+    const { calls } = setupScenario({
+      receipt: receiptRow({ request_ip: '203.0.113.7' }),
+      sameIpRows: [{ '?column?': 1 }],
+    });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(50);
+    expect(result.reviewStatus).toBe('PENDING_ADMIN_REVIEW');
+    expect(result.breakdown.map((b) => b.code)).toContain('MULTI_ACCOUNT_SAME_DEVICE');
+
+    // The same-IP lookup must exclude the current user and scope to the restaurant.
+    const sameIpLookup = calls.find((c) => (
+      /FROM\s+receipt_verifications/i.test(String(c.sql)) && /request_ip\s*=/i.test(String(c.sql))
+    ));
+    expect(sameIpLookup.params).toEqual(['203.0.113.7', RESTAURANT_ID, USER_ID, expect.any(Date)]);
+  });
+
+  it('same IP with no other account present adds no device penalty', async () => {
+    const { calls } = setupScenario({
+      receipt: receiptRow({ request_ip: '203.0.113.7' }),
+      sameIpRows: [],
+    });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(0);
+    expect(result.decision).toBe('VERIFIED');
+  });
+
+  it('no request IP skips the same-IP lookup entirely', async () => {
+    const { calls } = setupScenario({ receipt: receiptRow({ request_ip: null }) });
+    await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    const sameIpLookup = calls.find((c) => (
+      /FROM\s+receipt_verifications/i.test(String(c.sql)) && /request_ip\s*=/i.test(String(c.sql))
+    ));
+    expect(sameIpLookup).toBeUndefined();
+  });
+
+  it('stacks behavioral signals: new account + many rejected + same IP → REJECTED with fraud flag', async () => {
+    const { calls } = setupScenario({
+      receipt: receiptRow({ request_ip: '203.0.113.7' }),
+      user: { created_at: new Date(NOW.getTime() - 60 * 60 * 1000) },
+      earlierReviewRows: [],
+      rejectedCount: 3,
+      sameIpRows: [{ '?column?': 1 }],
+    });
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    // 15 + 40 + 50 = 105 → REJECTED and a fraud flag on the dominant signal.
+    expect(result.reviewStatus).toBe('REJECTED');
+    expect(findWrite(calls, /INSERT\s+INTO\s+fraud_flags/i).length).toBe(1);
+    const rec = receiptUpdate(calls);
+    expect(rec.params).toContain(100); // capped at 100 for the column CHECK
   });
 });

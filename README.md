@@ -186,7 +186,15 @@ AWS_COGNITO_CLIENT_ID=local-cognito-client
 AUTH_PHONE_FALLBACK_ENABLED=true
 TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test
 GPS_PROXIMITY_THRESHOLD_METERS=200
+TRUST_PROXY=false
 ```
+
+`TRUST_PROXY` controls Express `trust proxy`. Keep it `false` for direct/local
+runs. Behind a reverse proxy or load balancer (Nginx, AWS ALB) set it so `req.ip`
+is the real client IP used by the anti-fraud same-device signal (e.g. `TRUST_PROXY=1`
+for a single proxy hop, or a subnet/keyword such as `10.0.0.0/8`). Do not set it to
+`true` unless every upstream hop is trusted, since it makes `X-Forwarded-For`
+spoofable.
 
 `AUTH_PHONE_FALLBACK_ENABLED=true` is a local transition setting. Production-like environments default this fallback off and should opt in only after verified-phone backfill proof.
 

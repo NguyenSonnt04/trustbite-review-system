@@ -7,6 +7,7 @@ import {
   uploadReceiptObject,
 } from './s3ReceiptStorageService.js';
 import { enqueueReceiptOcr } from './queue/receiptOcrQueue.js';
+import { normalizeIpAddress } from '../utils/net.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -500,7 +501,11 @@ async function findReceiptByHashOutsideTransaction(fileHash) {
   }
 }
 
-export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file }) {
+export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file, requestIp = null }) {
+  // Normalize at the single write point so IPv4-mapped IPv6 (::ffff:x) and plain
+  // IPv4 forms of the same client store identically and stay comparable for the
+  // same-device anti-fraud signal across direct-socket and proxy deployments.
+  const normalizedRequestIp = normalizeIpAddress(requestIp);
   validateIdempotencyKey(idempotencyKey);
   const data = validateReceiptFields(fields);
   validateFile(file);
@@ -626,9 +631,10 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
          gps_latitude,
          gps_longitude,
          gps_accuracy_meters,
-         captured_at
+         captured_at,
+         request_ip
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10, $11)
        RETURNING id, status`,
       [
         data.reviewId,
@@ -641,6 +647,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
         data.longitude,
         data.gpsAccuracyMeters,
         data.capturedAt,
+        normalizedRequestIp,
       ],
     );
 
