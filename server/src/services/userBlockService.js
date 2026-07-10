@@ -8,45 +8,18 @@ import { createHttpError } from '../utils/httpErrors.js';
  * Business_Rules.md BR-SAFE-003. A block is only a relationship between two users;
  * it never changes the target's account status (that is admin suspend, BR-ADM-006).
  *
+ * Input parsing/validation happens at the HTTP boundary (controllers/userBlock.js).
+ * This service receives well-formed values and owns business rules + persistence.
+ *
  * Schema note (001_init_schema.sql): user_blocks has UNIQUE(blocker_user_id,
  * blocked_user_id) that ignores deleted_at, plus a soft-delete column. A re-block
  * after unblock must reactivate the existing row, never insert a second one.
  */
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const REASON_CODE_MAX_LENGTH = 60;
-
-function assertTargetUserId(value) {
-  if (typeof value !== 'string' || !UUID_REGEX.test(value)) {
-    throw createHttpError(422, 'VALIDATION_ERROR', 'userId must be a valid UUID');
-  }
-}
-
-function normalizeReasonCode(value) {
-  if (value === undefined || value === null) return null;
-  if (typeof value !== 'string') {
-    throw createHttpError(422, 'VALIDATION_ERROR', 'reasonCode must be a string');
-  }
-  const trimmed = value.trim();
-  if (trimmed.length === 0) return null;
-  if (trimmed.length > REASON_CODE_MAX_LENGTH) {
-    throw createHttpError(422, 'VALIDATION_ERROR', `reasonCode must be at most ${REASON_CODE_MAX_LENGTH} characters`);
-  }
-  return trimmed;
-}
-
-function normalizeSourceReviewId(value) {
-  if (value === undefined || value === null || value === '') return null;
-  if (typeof value !== 'string' || !UUID_REGEX.test(value)) {
-    throw createHttpError(422, 'VALIDATION_ERROR', 'sourceReviewId must be a valid UUID');
-  }
-  return value;
-}
-
 /**
  * Map raw persistence errors to stable HTTP contract errors. HttpErrors we threw
  * intentionally pass through unchanged; Postgres constraint codes guard races and
- * bad references.
+ * bad references so a broken invariant never surfaces as a bare 500.
  */
 function mapDbError(err) {
   if (err && typeof err.statusCode === 'number') {
@@ -67,18 +40,28 @@ function mapDbError(err) {
       return createHttpError(404, 'NOT_FOUND', 'Target user not found');
     }
   }
+  if (err && err.code === '22P02') {
+    return createHttpError(422, 'VALIDATION_ERROR', 'Invalid identifier format');
+  }
   return err;
 }
 
-export async function blockUser(blockerUserId, targetUserId, body = {}) {
-  assertTargetUserId(targetUserId);
+/**
+ * Roll back without masking the original failure. If the connection is already
+ * broken, the ROLLBACK itself throws; swallowing that keeps the real cause.
+ */
+async function safeRollback(client) {
+  try {
+    await client.query('ROLLBACK');
+  } catch {
+    // Intentionally ignored: preserve the original error for the caller.
+  }
+}
 
+export async function blockUser(blockerUserId, targetUserId, { reasonCode = null, sourceReviewId = null } = {}) {
   if (blockerUserId === targetUserId) {
     throw createHttpError(400, 'CANNOT_BLOCK_SELF', 'Users cannot block themselves');
   }
-
-  const reasonCode = normalizeReasonCode(body.reasonCode);
-  const sourceReviewId = normalizeSourceReviewId(body.sourceReviewId);
 
   const client = await pool.connect();
   try {
@@ -120,7 +103,7 @@ export async function blockUser(blockerUserId, targetUserId, body = {}) {
     await client.query('COMMIT');
     return { blockedUserId: row.blocked_user_id, blockedAt: row.created_at };
   } catch (err) {
-    await client.query('ROLLBACK');
+    await safeRollback(client);
     throw mapDbError(err);
   } finally {
     client.release();
@@ -128,8 +111,6 @@ export async function blockUser(blockerUserId, targetUserId, body = {}) {
 }
 
 export async function unblockUser(blockerUserId, targetUserId) {
-  assertTargetUserId(targetUserId);
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -149,8 +130,8 @@ export async function unblockUser(blockerUserId, targetUserId) {
     await client.query('COMMIT');
     return { success: true };
   } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
+    await safeRollback(client);
+    throw mapDbError(err);
   } finally {
     client.release();
   }

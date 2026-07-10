@@ -1,16 +1,15 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.js';
 import {
-  blockUserById,
   cancelDeletionRequest,
   createAvatarUploadUrl,
   createDeletionRequest,
   getDeletionRequest,
   getMe,
   getMyGamification,
-  unblockUserById,
   updateMe
 } from '../controllers/user.js';
+import { blockUserById, unblockUserById } from '../controllers/userBlock.js';
 
 const router = Router();
 

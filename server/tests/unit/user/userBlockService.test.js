@@ -71,24 +71,6 @@ describe('blockUser', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
-  it('rejects an invalid target UUID before opening a transaction', async () => {
-    await expect(blockUser(BLOCKER_ID, 'not-a-uuid', {}))
-      .rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
-    expect(pool.connect).not.toHaveBeenCalled();
-  });
-
-  it('rejects a reasonCode longer than 60 characters before opening a transaction', async () => {
-    await expect(blockUser(BLOCKER_ID, TARGET_ID, { reasonCode: 'x'.repeat(61) }))
-      .rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
-    expect(pool.connect).not.toHaveBeenCalled();
-  });
-
-  it('rejects an invalid sourceReviewId before opening a transaction', async () => {
-    await expect(blockUser(BLOCKER_ID, TARGET_ID, { sourceReviewId: 'nope' }))
-      .rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
-    expect(pool.connect).not.toHaveBeenCalled();
-  });
-
   it('returns 404 and rolls back when the target user does not exist', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
@@ -167,9 +149,30 @@ describe('unblockUser', () => {
     expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 
-  it('rejects an invalid target UUID before opening a transaction', async () => {
-    await expect(unblockUser(BLOCKER_ID, 'not-a-uuid'))
-      .rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
-    expect(pool.connect).not.toHaveBeenCalled();
+  it('maps a unique-violation race on unblock cleanup to a mapped error, not a bare 500', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    const dbErr = Object.assign(new Error('deadlock'), { code: '23505' });
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(dbErr) // UPDATE fails
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(unblockUser(BLOCKER_ID, TARGET_ID))
+      .rejects.toMatchObject({ statusCode: 409, code: 'USER_ALREADY_BLOCKED' });
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('does not mask the original error when ROLLBACK also fails', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    const originalErr = Object.assign(new Error('connection terminated'), { code: '08006' });
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockRejectedValueOnce(originalErr) // UPDATE fails (connection dropped)
+      .mockRejectedValueOnce(new Error('rollback failed: no connection')); // ROLLBACK also fails
+
+    await expect(unblockUser(BLOCKER_ID, TARGET_ID)).rejects.toBe(originalErr);
+    expect(client.release).toHaveBeenCalled();
   });
 });

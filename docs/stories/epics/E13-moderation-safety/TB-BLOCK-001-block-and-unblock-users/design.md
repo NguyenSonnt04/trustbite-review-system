@@ -23,13 +23,15 @@ never insert a second row.
 
 ## Application Flow
 
+Input parsing/validation is done at the HTTP boundary
+(`controllers/userBlock.js`): `userId` must be a UUID (422), `reasonCode` is a
+string ≤ 60 chars (empty → null), `sourceReviewId` is a UUID or null. The service
+receives normalized values and owns business rules + persistence only.
+
 Block command (`blockUser(blockerUserId, targetUserId, { reasonCode, sourceReviewId })`):
 
-1. Validate `targetUserId` is a UUID (422 otherwise, avoids `22P02`).
-2. Reject self-block: `blockerUserId === targetUserId` → `400 CANNOT_BLOCK_SELF`.
-3. Normalize `reasonCode` (≤ 60 chars, empty → null) and `sourceReviewId`
-   (UUID or null).
-4. In a transaction:
+1. Reject self-block: `blockerUserId === targetUserId` → `400 CANNOT_BLOCK_SELF`.
+2. In a transaction:
    - `404 NOT_FOUND` if target user row is absent.
    - `SELECT ... FOR UPDATE` the pair row:
      - exists and active (`deleted_at IS NULL`) → `409 USER_ALREADY_BLOCKED`;
@@ -39,10 +41,13 @@ Block command (`blockUser(blockerUserId, targetUserId, { reasonCode, sourceRevie
 
 Unblock command (`unblockUser(blockerUserId, targetUserId)`):
 
-1. Validate `targetUserId` is a UUID (422).
-2. In a transaction: soft-delete the active row
+1. In a transaction: soft-delete the active row
    (`deleted_at = now()` WHERE active). `0` rows → `404 NOT_FOUND`.
-3. COMMIT and return `{ success: true }`.
+2. COMMIT and return `{ success: true }`.
+
+Both commands roll back inside a guarded helper so a failing `ROLLBACK` (e.g. a
+dropped connection) never masks the original error, and both map persistence
+errors through the same `mapDbError` helper.
 
 ## Interface Contract
 
@@ -52,17 +57,22 @@ Unblock command (`unblockUser(blockerUserId, targetUserId)`):
 - `201` → `{ "blockedUserId": uuid, "blockedAt": timestamptz }`
 - Errors: `400 CANNOT_BLOCK_SELF`, `401 AUTH_REQUIRED`,
   `403 ACCOUNT_SUSPENDED` / `403 ACCOUNT_DELETED` (actor, via middleware),
-  `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`, `422 VALIDATION_ERROR`.
+  `404 NOT_FOUND`, `409 USER_ALREADY_BLOCKED`,
+  `409 DELETION_REQUEST_ACTIVE` (actor has an open deletion request, via
+  middleware), `422 VALIDATION_ERROR`.
 
 `DELETE /api/v1/users/{userId}/block` (auth required)
 
 - `200` → `{ "success": true }`
 - Errors: `401 AUTH_REQUIRED`, `403 ACCOUNT_SUSPENDED` / `403 ACCOUNT_DELETED`,
-  `404 NOT_FOUND`, `422 VALIDATION_ERROR`.
+  `404 NOT_FOUND`, `409 DELETION_REQUEST_ACTIVE` (actor, via middleware),
+  `422 VALIDATION_ERROR`.
 
-Actor account-state (`SUSPENDED`/`DELETED`/active deletion request) is enforced
-by the existing `authMiddleware` before the controller runs, matching the
-API spec's actor `403` cases.
+Actor account-state is enforced by the existing `authMiddleware` before the
+controller runs: `SUSPENDED` → `403 ACCOUNT_SUSPENDED`, `DELETED` →
+`403 ACCOUNT_DELETED`, and an open deletion request →
+`409 DELETION_REQUEST_ACTIVE` (a repo-wide gate applied to every non-lifecycle
+mutation route, so block/unblock inherit it).
 
 ## Data Model
 

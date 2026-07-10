@@ -151,6 +151,18 @@ describe('user block API', () => {
     expect(response.body.error.code).toBe('NOT_FOUND');
   });
 
+  it('rejects a non-UUID target at the HTTP boundary with 422', async () => {
+    const blocker = await newUser({ displayName: 'Boundary Blocker' });
+
+    const response = await requestApp()
+      .post('/api/v1/users/not-a-uuid/block')
+      .set(authHeaders(blocker.id))
+      .send({})
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('rejects a suspended actor with 403 before any block write', async () => {
     const blocker = await newUser({ displayName: 'Suspended Blocker', status: 'SUSPENDED' });
     const target = await newUser({ displayName: 'Suspended Target' });
