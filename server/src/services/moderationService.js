@@ -14,11 +14,16 @@ import { createHttpError } from '../utils/httpErrors.js';
  */
 
 // Fixed allow-list: keyed by the boundary-validated entityType, so no user input
-// ever reaches the SQL identifier.
-const ENTITY_TABLES = {
-  REVIEW: 'reviews',
-  USER: 'users',
-  RESTAURANT: 'restaurants',
+// ever reaches the SQL identifier. `ownerColumn` is the column holding the entity
+// owner's user id, used to reject self-reporting; null means no owner-based guard.
+//   - USER: self-report is handled by the pre-transaction id check below.
+//   - REVIEW: `user_id` is the review author.
+//   - RESTAURANT: ownership is a merchant-claim relationship (not a simple user
+//     id, merchant scope is P1/deferred), so no self-report guard is applied.
+const ENTITY_QUERIES = {
+  REVIEW: { table: 'reviews', ownerColumn: 'user_id' },
+  USER: { table: 'users', ownerColumn: null },
+  RESTAURANT: { table: 'restaurants', ownerColumn: null },
 };
 
 function mapDbError(err) {
@@ -29,7 +34,9 @@ function mapDbError(err) {
     return createHttpError(409, 'REPORT_DUPLICATE', 'An open report already exists for this entity');
   }
   if (err && err.code === '23503') {
-    return createHttpError(422, 'VALIDATION_ERROR', 'reasonCode is not a known report reason');
+    // After the explicit reason_code lookup, the only FK that can fire on INSERT
+    // is reporter_id -> users.id (reporter deleted between auth and insert).
+    return createHttpError(422, 'VALIDATION_ERROR', 'Invalid report: a referenced record no longer exists');
   }
   if (err && err.code === '22P02') {
     return createHttpError(422, 'VALIDATION_ERROR', 'Invalid identifier format');
@@ -65,10 +72,14 @@ export async function createReport(reporterId, { entityType, entityId, reasonCod
       throw createHttpError(422, 'VALIDATION_ERROR', 'reasonCode does not match entityType');
     }
 
-    const table = ENTITY_TABLES[entityType];
-    const entity = await client.query(`SELECT id FROM ${table} WHERE id = $1`, [entityId]);
+    const { table, ownerColumn } = ENTITY_QUERIES[entityType];
+    const selectColumns = ownerColumn ? `id, ${ownerColumn} AS owner_id` : 'id';
+    const entity = await client.query(`SELECT ${selectColumns} FROM ${table} WHERE id = $1`, [entityId]);
     if (entity.rowCount === 0) {
       throw createHttpError(422, 'VALIDATION_ERROR', 'Reported entity does not exist');
+    }
+    if (ownerColumn && entity.rows[0].owner_id === reporterId) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'You cannot report your own content');
     }
 
     const existing = await client.query(

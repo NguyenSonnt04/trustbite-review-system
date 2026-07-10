@@ -27,11 +27,16 @@ Input parsing/validation is done at the HTTP boundary
 
 `createReport(reporterId, { entityType, entityId, reasonCode, description })`:
 
-1. Self-report guard: `entityType === 'USER' && entityId === reporterId` → `422`.
+1. Self-report guard (USER): `entityType === 'USER' && entityId === reporterId`
+   → `422` (fast path, before the transaction).
 2. In a transaction:
    - Look up `reasonCode`; missing → `422`; `entity_type` mismatch → `422`.
    - Verify the reported entity row exists in the mapped table
      (`REVIEW→reviews`, `USER→users`, `RESTAURANT→restaurants`); missing → `422`.
+   - Self-report guard (owner-based): if the entity has an owner column
+     (`REVIEW.user_id`) and it equals `reporterId` → `422`. RESTAURANT has no
+     such guard — ownership is a merchant-claim relationship (merchant scope is
+     P1/deferred), not a simple user id.
    - Pre-check for an existing open report by the same reporter for the same
      entity → `409 REPORT_DUPLICATE`.
    - Insert the report (`status = SUBMITTED`).

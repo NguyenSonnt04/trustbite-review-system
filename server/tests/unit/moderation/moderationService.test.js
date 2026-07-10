@@ -13,6 +13,7 @@ const { createReport } = await import('../../../src/services/moderationService.j
 const REPORTER_ID = '11111111-1111-4111-8111-111111111111';
 const ENTITY_ID = '22222222-2222-4222-8222-222222222222';
 const REPORT_ID = '33333333-3333-4333-8333-333333333333';
+const AUTHOR_ID = '44444444-4444-4444-8444-444444444444';
 
 function createClient() {
   return {
@@ -40,7 +41,7 @@ describe('createReport', () => {
     client.query
       .mockResolvedValueOnce({}) // BEGIN
       .mockResolvedValueOnce({ rows: [{ entity_type: 'REVIEW' }], rowCount: 1 }) // reason code
-      .mockResolvedValueOnce({ rows: [{ id: ENTITY_ID }], rowCount: 1 }) // entity exists
+      .mockResolvedValueOnce({ rows: [{ id: ENTITY_ID, owner_id: AUTHOR_ID }], rowCount: 1 }) // entity exists, other author
       .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // no open duplicate
       .mockResolvedValueOnce({ rows: [{ id: REPORT_ID, status: 'SUBMITTED' }], rowCount: 1 }) // INSERT
       .mockResolvedValueOnce({}); // COMMIT
@@ -78,6 +79,20 @@ describe('createReport', () => {
     client.query
       .mockResolvedValueOnce({}) // BEGIN
       .mockResolvedValueOnce({ rows: [{ entity_type: 'USER' }], rowCount: 1 }) // mismatch
+      .mockResolvedValueOnce({}); // ROLLBACK
+
+    await expect(createReport(REPORTER_ID, reviewReport()))
+      .rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('rejects reporting your own review and rolls back', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rows: [{ entity_type: 'REVIEW' }], rowCount: 1 }) // reason ok
+      .mockResolvedValueOnce({ rows: [{ id: ENTITY_ID, owner_id: REPORTER_ID }], rowCount: 1 }) // own review
       .mockResolvedValueOnce({}); // ROLLBACK
 
     await expect(createReport(REPORTER_ID, reviewReport()))

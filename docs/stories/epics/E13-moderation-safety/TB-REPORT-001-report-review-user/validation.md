@@ -12,8 +12,8 @@ idempotent seed data (no schema change); its rollback is documented in the file.
 | Layer | Cases |
 | --- | --- |
 | Unit (boundary, `moderationController.test.js`) | valid parse + normalization, blank/absent description → null, non-object body (422), invalid entityType (422), invalid entityId (422), missing reasonCode (422), reasonCode too long (422), non-string description (422), description too long (422) |
-| Unit (service, `moderationService.test.js`) | insert SUBMITTED report, self-report (422), unknown reason code (422), reason/entity type mismatch (422), non-existent entity (422), duplicate open report (409), unique-violation race → 409, ROLLBACK failure does not mask original error |
-| Integration | create SUBMITTED review report (persisted), create user report, duplicate open report (409) keeps a single row, unknown reason code (422), reason/entity mismatch (422), non-existent entity (422), self-report (422), suspended actor (403) with no write |
+| Unit (service, `moderationService.test.js`) | insert SUBMITTED report, self-report USER (422), self-report own REVIEW (422), unknown reason code (422), reason/entity type mismatch (422), non-existent entity (422), duplicate open report (409), unique-violation race → 409, ROLLBACK failure does not mask original error |
+| Integration | create SUBMITTED review report (persisted), create user report, duplicate open report (409) keeps a single row, unknown reason code (422), reason/entity mismatch (422), self-report own review (422), non-existent entity (422), self-report USER (422), unauthenticated request (401) with no write, suspended actor (403) with no write |
 | E2E | Deferred (no web/mobile report UI in this slice) |
 | Platform | N/A |
 | Logs/Audit | No moderation_actions/audit_logs write on submission (admin actions belong to task 6.4) |
@@ -39,14 +39,14 @@ npm run server:build
 - `npm run db:migrate` — applied `008_seed_report_reason_codes.sql` (1 migration),
   earlier migrations skipped (idempotent tracking), 2026-07-10, live
   `trustbite-postgres` container.
-- `npm run server:test:unit` — 320 passed (32 files); includes
+- `npm run server:test:unit` — 321 passed (32 files); includes
   `tests/unit/moderation/moderationController.test.js` and
   `tests/unit/moderation/moderationService.test.js`.
-- `npx vitest run tests/integration/moderationReport.integration.test.js` — 8/8
+- `npx vitest run tests/integration/moderationReport.integration.test.js` — 10/10
   passed against live PostgreSQL. Real inserts proven; rejected paths
-  (403/409/422) leave the correct row count with no residue (each case cleans up
-  in `afterEach`).
-- Full integration suite — 122 passed, LocalStack-dependent suites skipped.
+  (401/403/409/422) leave the correct row count with no residue (each case cleans
+  up in `afterEach`).
+- Full integration suite — 124 passed, LocalStack-dependent suites skipped.
 - `npm run server:build` — syntax check passed for 118 files.
 
 ## Notes

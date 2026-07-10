@@ -161,6 +161,20 @@ describe('moderation report API', () => {
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
   });
 
+  it('rejects reporting your own review with 422', async () => {
+    const author = await newUser({ displayName: 'Own Review Author' });
+    const restaurant = await newRestaurant();
+    const review = await newReview({ userId: author.id, restaurantId: restaurant.id });
+
+    const response = await requestApp()
+      .post('/api/v1/moderation/reports')
+      .set(authHeaders(author.id))
+      .send({ entityType: 'REVIEW', entityId: review.id, reasonCode: 'SPAM_OR_FAKE' })
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('rejects a report against a non-existent entity with 422', async () => {
     const reporter = await newUser({ displayName: 'Ghost Reporter' });
     const missingId = '99999999-9999-4999-8999-999999999999';
@@ -184,6 +198,23 @@ describe('moderation report API', () => {
       .expect(422);
 
     expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects an unauthenticated request with 401 before reaching the controller', async () => {
+    const target = await newUser({ displayName: 'Unauth Report Target' });
+
+    const response = await requestApp()
+      .post('/api/v1/moderation/reports')
+      .send({ entityType: 'USER', entityId: target.id, reasonCode: 'ABUSIVE_BEHAVIOR' })
+      .expect(401);
+
+    expect(response.body.error.code).toBe('AUTH_REQUIRED');
+
+    const count = await query(
+      'SELECT count(*)::int AS n FROM moderation_reports WHERE entity_id = $1',
+      [target.id],
+    );
+    expect(count.rows[0].n).toBe(0);
   });
 
   it('rejects a suspended actor with 403 before any report write', async () => {
