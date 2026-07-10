@@ -4,8 +4,28 @@ import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_screen.dart';
+import 'package:trustbite_mobile/src/features/launch/brand_launch_screen.dart';
 
 void main() {
+  testWidgets('shows branded launch screen before handing off', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: BrandLaunchScreen(
+          duration: Duration(milliseconds: 10),
+          child: Text('Home ready'),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('brand-launch-view')), findsOneWidget);
+    expect(find.text('Review thật, ăn yên tâm.'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 10));
+    await tester.pump(const Duration(milliseconds: 260));
+
+    expect(find.text('Home ready'), findsOneWidget);
+  });
+
   testWidgets('opens login screen from the guest home header', (tester) async {
     final authService = _FakeMobileAuthService();
     final cognitoGateway = _FakeCognitoAuthGateway();
@@ -23,25 +43,26 @@ void main() {
     await tester.tap(find.text('Trust 0'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Email hoặc số điện thoại'), findsOneWidget);
-    expect(find.text('Tiếp tục với Cognito'), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Tiếp tục'), findsOneWidget);
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'Email hoặc số điện thoại'),
+      find.widgetWithText(TextField, 'Email'),
       'reviewer@example.com',
     );
+    await tester.tap(find.text('Tiếp tục'));
+    await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Mật khẩu Cognito'),
-      'CorrectHorse1!',
+      find.byKey(const ValueKey('cognito-confirmation-field')),
+      '123456',
     );
-    await tester.tap(find.text('Tiếp tục với Cognito'));
+    await tester.tap(find.text('Xác nhận'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Email hoặc số điện thoại'), findsNothing);
+    expect(find.text('Email'), findsNothing);
     expect(find.text('Đã đăng nhập với Local Test User.'), findsOneWidget);
     expect(cognitoGateway.lastIdentifier, 'reviewer@example.com');
-    expect(cognitoGateway.lastPassword, 'CorrectHorse1!');
-    expect(cognitoGateway.signInCalls, 1);
+    expect(cognitoGateway.requestOtpCalls, 1);
     expect(authService.cognitoSignInCalls, 1);
     expect(authService.localDevelopmentSignUpCalls, 0);
   });
@@ -58,6 +79,70 @@ void main() {
 
     expect(find.text('Bạn chưa đăng nhập'), findsOneWidget);
     expect(find.text('Đăng nhập ngay'), findsOneWidget);
+  });
+
+  testWidgets('signs out from the profile tab and returns to guest state', (
+    tester,
+  ) async {
+    final authService = _FakeMobileAuthService();
+    final cognitoGateway = _FakeCognitoAuthGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authService: authService,
+          cognitoAuthGateway: cognitoGateway,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Trust 0'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Email'),
+      'reviewer@example.com',
+    );
+    await tester.tap(find.text('Tiếp tục'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('cognito-confirmation-field')),
+      '123456',
+    );
+    await tester.tap(find.text('Xác nhận'));
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tôi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Local Test User'), findsOneWidget);
+    expect(find.text('Đăng xuất'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Đăng xuất'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Đăng xuất'));
+    await tester.pumpAndSettle();
+
+    expect(authService.signOutCalls, 1);
+    expect(find.text('Đã đăng xuất.'), findsOneWidget);
+    expect(find.text('Bạn chưa đăng nhập'), findsOneWidget);
+    expect(find.text('Đăng nhập ngay'), findsOneWidget);
+  });
+
+  testWidgets('shows the polished favorites empty state and suggestions', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(authService: _FakeMobileAuthService())),
+    );
+
+    await tester.tap(find.text('Yêu thích'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('favorites-page')), findsOneWidget);
+    expect(find.text('Chưa có quán yêu thích'), findsOneWidget);
+    expect(find.text('Gợi ý để lưu'), findsOneWidget);
+    expect(find.text('Phở Thìn Bờ Hồ'), findsOneWidget);
+    expect(find.text('Có review xác thực'), findsWidgets);
   });
 
   testWidgets('opens the mock notifications page from the home header', (
@@ -95,45 +180,32 @@ void main() {
       ),
     );
 
-    expect(find.text('Đăng nhập'), findsWidgets);
-    expect(find.text('Đăng ký'), findsOneWidget);
-    expect(find.text('Email hoặc số điện thoại'), findsOneWidget);
-    expect(find.text('Mật khẩu Cognito'), findsOneWidget);
+    expect(find.text('Đăng ký'), findsNothing);
+    expect(find.text('Email'), findsOneWidget);
     expect(
-      find.text(
-        'Đăng nhập bằng Cognito rồi gửi access token tới backend TrustBite.',
-      ),
+      find.text('Nhập email để nhận mã xác thực tài khoản.'),
       findsOneWidget,
     );
-    expect(find.text('Tiếp tục với Cognito'), findsOneWidget);
+    expect(find.text('Tiếp tục'), findsOneWidget);
     expect(find.text('Tiếp tục với Google'), findsOneWidget);
 
-    await tester.tap(find.text('Đăng ký'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Email'),
+      'signup@example.com',
+    );
+    await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Tạo tài khoản qua Cognito; TrustBite chỉ nhận token đã xác thực.',
-      ),
-      findsOneWidget,
-    );
-    expect(find.text('Tạo tài khoản Cognito'), findsOneWidget);
-
     await tester.enterText(
-      find.widgetWithText(TextField, 'Email hoặc số điện thoại'),
-      '+84901234567',
+      find.byKey(const ValueKey('cognito-confirmation-field')),
+      '123456',
     );
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Mật khẩu Cognito'),
-      'CorrectHorse1!',
-    );
-    await tester.tap(find.text('Tạo tài khoản Cognito'));
+    await tester.tap(find.text('Xác nhận'));
     await tester.pumpAndSettle();
 
     expect(find.text('Đã đăng nhập với Local Test User.'), findsOneWidget);
   });
 
-  testWidgets('completes an SMS MFA challenge before loading the user', (
+  testWidgets('completes an OTP challenge before loading the user', (
     tester,
   ) async {
     final authService = _FakeMobileAuthService();
@@ -153,14 +225,10 @@ void main() {
     );
 
     await tester.enterText(
-      find.widgetWithText(TextField, 'Email hoặc số điện thoại'),
+      find.widgetWithText(TextField, 'Email'),
       'reviewer@example.com',
     );
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Mật khẩu Cognito'),
-      'CorrectHorse1!',
-    );
-    await tester.tap(find.text('Tiếp tục với Cognito'));
+    await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
 
     expect(find.text('Nhập mã MFA được gửi qua SMS.'), findsOneWidget);
@@ -176,7 +244,9 @@ void main() {
     expect(find.text('Đã đăng nhập với Local Test User.'), findsOneWidget);
   });
 
-  testWidgets('confirms Cognito signup before signing in', (tester) async {
+  testWidgets('shows Cognito signup confirmation challenge when required', (
+    tester,
+  ) async {
     final authService = _FakeMobileAuthService();
     final cognitoGateway = _FakeCognitoAuthGateway(
       results: const [
@@ -193,21 +263,15 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Đăng ký'));
-    await tester.pumpAndSettle();
     await tester.enterText(
-      find.widgetWithText(TextField, 'Email hoặc số điện thoại'),
+      find.widgetWithText(TextField, 'Email'),
       'new-user@example.com',
     );
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Mật khẩu Cognito'),
-      'CorrectHorse1!',
-    );
-    await tester.tap(find.text('Tạo tài khoản Cognito'));
+    await tester.tap(find.text('Tiếp tục'));
     await tester.pumpAndSettle();
 
     expect(
-      find.text('Nhập mã Cognito đã gửi để xác nhận tài khoản.'),
+      find.text('Nhập mã xác thực đã gửi để xác nhận tài khoản.'),
       findsOneWidget,
     );
     await tester.enterText(
@@ -217,8 +281,7 @@ void main() {
     await tester.tap(find.text('Xác nhận'));
     await tester.pumpAndSettle();
 
-    expect(cognitoGateway.lastSignUpConfirmationCode, '654321');
-    expect(cognitoGateway.signInCalls, 1);
+    expect(cognitoGateway.lastConfirmationValue, '654321');
     expect(authService.cognitoSignInCalls, 1);
   });
 }
@@ -226,6 +289,7 @@ void main() {
 class _FakeMobileAuthService implements MobileAuthService {
   int cognitoSignInCalls = 0;
   int localDevelopmentSignUpCalls = 0;
+  int signOutCalls = 0;
 
   @override
   Future<Map<String, dynamic>> completeCognitoSignIn() async {
@@ -243,54 +307,35 @@ class _FakeMobileAuthService implements MobileAuthService {
   }
 
   @override
-  Future<void> signOut() async {}
+  Future<void> signOut() async {
+    signOutCalls += 1;
+  }
 }
 
 class _FakeCognitoAuthGateway implements CognitoAuthGateway {
   _FakeCognitoAuthGateway({
-    List<CognitoAuthResult> results = const [CognitoAuthResult.signedIn()],
+    List<CognitoAuthResult> results = const [
+      CognitoAuthResult(CognitoAuthStep.confirmOtp),
+      CognitoAuthResult.signedIn(),
+    ],
   }) : _results = List.of(results);
 
   final List<CognitoAuthResult> _results;
   String? lastIdentifier;
-  String? lastPassword;
   String? lastConfirmationValue;
-  String? lastSignUpConfirmationCode;
-  int signInCalls = 0;
+  int requestOtpCalls = 0;
 
   @override
-  Future<CognitoAuthResult> signIn({
-    required String identifier,
-    required String password,
-  }) async {
+  Future<CognitoAuthResult> requestOtp({required String identifier}) async {
     lastIdentifier = identifier;
-    lastPassword = password;
-    signInCalls += 1;
+    requestOtpCalls += 1;
     return _results.removeAt(0);
   }
 
   @override
-  Future<CognitoAuthResult> signUp({
-    required String identifier,
-    required String password,
-  }) async {
-    lastIdentifier = identifier;
-    lastPassword = password;
-    return _results.removeAt(0);
-  }
-
-  @override
-  Future<CognitoAuthResult> confirmSignIn(String confirmationValue) async {
+  Future<CognitoAuthResult> confirmOtp(String confirmationValue) async {
     lastConfirmationValue = confirmationValue;
     return _results.removeAt(0);
-  }
-
-  @override
-  Future<void> confirmSignUp({
-    required String identifier,
-    required String confirmationCode,
-  }) async {
-    lastSignUpConfirmationCode = confirmationCode;
   }
 
   @override

@@ -69,6 +69,21 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadAuthState();
   }
 
+  Future<void> _logout() async {
+    await (widget.authService ?? appMobileAuthService).signOut();
+    if (!mounted) return;
+    setState(() {
+      _isSignedIn = false;
+      _currentUser = null;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã đăng xuất.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -158,6 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isSignedIn: _isSignedIn,
         currentUser: _currentUser,
         onLogin: _openLogin,
+        onLogout: _logout,
       ),
     };
   }

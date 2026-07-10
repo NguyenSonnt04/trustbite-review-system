@@ -2,11 +2,13 @@ import 'dart:convert';
 
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
+import 'package:flutter/foundation.dart';
 import 'package:trustbite_mobile/src/core/auth/cognito_session_provider.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 
 enum CognitoAuthStep {
   signedIn,
+  confirmOtp,
   confirmSignUp,
   confirmSmsMfa,
   confirmTotpMfa,
@@ -26,22 +28,9 @@ class CognitoAuthResult {
 }
 
 abstract interface class CognitoAuthGateway implements CognitoSessionProvider {
-  Future<CognitoAuthResult> signIn({
-    required String identifier,
-    required String password,
-  });
+  Future<CognitoAuthResult> requestOtp({required String identifier});
 
-  Future<CognitoAuthResult> signUp({
-    required String identifier,
-    required String password,
-  });
-
-  Future<CognitoAuthResult> confirmSignIn(String confirmationValue);
-
-  Future<void> confirmSignUp({
-    required String identifier,
-    required String confirmationCode,
-  });
+  Future<CognitoAuthResult> confirmOtp(String confirmationValue);
 }
 
 class CognitoAuthGatewayException implements Exception {
@@ -97,22 +86,24 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
   });
 
   @override
-  Future<CognitoAuthResult> signIn({
-    required String identifier,
-    required String password,
-  }) async {
-    final normalizedIdentifier = _validateCredentials(identifier, password);
+  Future<CognitoAuthResult> requestOtp({required String identifier}) async {
+    final normalizedIdentifier = _validateIdentifier(identifier);
 
     try {
       await initialize();
       final result = await Amplify.Auth.signIn(
         username: normalizedIdentifier,
-        password: password,
+        options: const SignInOptions(
+          pluginOptions: CognitoSignInPluginOptions(
+            authFlowType: AuthenticationFlowType.customAuthWithoutSrp,
+          ),
+        ),
       );
       return _mapSignInResult(result);
     } on CognitoAuthGatewayException {
       rethrow;
     } on AuthException catch (error) {
+      _logAuthException('requestOtp', error);
       throw CognitoAuthGatewayException(_messageForException(error));
     } on Exception {
       throw const CognitoAuthGatewayException(
@@ -122,46 +113,10 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
   }
 
   @override
-  Future<CognitoAuthResult> signUp({
-    required String identifier,
-    required String password,
-  }) async {
-    final normalizedIdentifier = _validateCredentials(identifier, password);
-
-    try {
-      await initialize();
-      final result = await Amplify.Auth.signUp(
-        username: normalizedIdentifier,
-        password: password,
-        options: SignUpOptions(
-          userAttributes: _attributesFor(normalizedIdentifier),
-        ),
-      );
-      if (!result.isSignUpComplete) {
-        return CognitoAuthResult(
-          CognitoAuthStep.confirmSignUp,
-          destination: result.nextStep.codeDeliveryDetails?.destination,
-        );
-      }
-      return signIn(identifier: normalizedIdentifier, password: password);
-    } on CognitoAuthGatewayException {
-      rethrow;
-    } on AuthException catch (error) {
-      throw CognitoAuthGatewayException(_messageForException(error));
-    } on Exception {
-      throw const CognitoAuthGatewayException(
-        'Không thể kết nối với Cognito. Vui lòng thử lại.',
-      );
-    }
-  }
-
-  @override
-  Future<CognitoAuthResult> confirmSignIn(String confirmationValue) async {
+  Future<CognitoAuthResult> confirmOtp(String confirmationValue) async {
     final normalizedValue = confirmationValue.trim();
     if (normalizedValue.isEmpty) {
-      throw const CognitoAuthGatewayException(
-        'Vui lòng nhập thông tin xác nhận.',
-      );
+      throw const CognitoAuthGatewayException('Vui lòng nhập mã xác nhận.');
     }
 
     try {
@@ -173,41 +128,7 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
     } on CognitoAuthGatewayException {
       rethrow;
     } on AuthException catch (error) {
-      throw CognitoAuthGatewayException(_messageForException(error));
-    } on Exception {
-      throw const CognitoAuthGatewayException(
-        'Không thể kết nối với Cognito. Vui lòng thử lại.',
-      );
-    }
-  }
-
-  @override
-  Future<void> confirmSignUp({
-    required String identifier,
-    required String confirmationCode,
-  }) async {
-    final normalizedIdentifier = identifier.trim();
-    final normalizedCode = confirmationCode.trim();
-    if (normalizedIdentifier.isEmpty || normalizedCode.isEmpty) {
-      throw const CognitoAuthGatewayException(
-        'Vui lòng nhập mã xác nhận đăng ký.',
-      );
-    }
-
-    try {
-      await initialize();
-      final result = await Amplify.Auth.confirmSignUp(
-        username: normalizedIdentifier,
-        confirmationCode: normalizedCode,
-      );
-      if (!result.isSignUpComplete) {
-        throw const CognitoAuthGatewayException(
-          'Cognito chưa hoàn tất xác nhận tài khoản.',
-        );
-      }
-    } on CognitoAuthGatewayException {
-      rethrow;
-    } on AuthException catch (error) {
+      _logAuthException('confirmOtp', error);
       throw CognitoAuthGatewayException(_messageForException(error));
     } on Exception {
       throw const CognitoAuthGatewayException(
@@ -241,17 +162,22 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
     await Amplify.Auth.signOut();
   }
 
-  String _validateCredentials(String identifier, String password) {
-    final normalizedIdentifier = identifier.trim();
+  String _validateIdentifier(String identifier) {
+    final normalizedIdentifier = _normalizeEmailIdentifier(identifier);
     if (normalizedIdentifier.isEmpty) {
-      throw const CognitoAuthGatewayException(
-        'Vui lòng nhập email hoặc số điện thoại.',
-      );
-    }
-    if (password.isEmpty) {
-      throw const CognitoAuthGatewayException('Vui lòng nhập mật khẩu.');
+      throw const CognitoAuthGatewayException('Vui lòng nhập email.');
     }
     return normalizedIdentifier;
+  }
+
+  String _normalizeEmailIdentifier(String identifier) {
+    final normalized = identifier.trim().toLowerCase();
+    if (normalized.isEmpty) return '';
+    final isEmail = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(normalized);
+    if (!isEmail) {
+      throw const CognitoAuthGatewayException('Vui lòng nhập email hợp lệ.');
+    }
+    return normalized;
   }
 
   CognitoAuthResult _mapSignInResult(SignInResult result) {
@@ -261,6 +187,10 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
 
     final destination = result.nextStep.codeDeliveryDetails?.destination;
     return switch (result.nextStep.signInStep) {
+      AuthSignInStep.confirmSignInWithCustomChallenge => CognitoAuthResult(
+        CognitoAuthStep.confirmOtp,
+        destination: destination,
+      ),
       AuthSignInStep.confirmSignUp => CognitoAuthResult(
         CognitoAuthStep.confirmSignUp,
         destination: destination,
@@ -285,19 +215,37 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
     };
   }
 
-  Map<AuthUserAttributeKey, String> _attributesFor(String identifier) {
-    if (identifier.contains('@')) {
-      return {CognitoUserAttributeKey.email: identifier};
+  void _logAuthException(String operation, AuthException error) {
+    if (!kDebugMode) return;
+
+    final recoverySuggestion = error.recoverySuggestion?.trim();
+    final sanitizedMessage = _sanitizeAuthLog(error.message);
+    final sanitizedRecovery =
+        recoverySuggestion == null || recoverySuggestion.isEmpty
+        ? null
+        : _sanitizeAuthLog(recoverySuggestion);
+
+    debugPrint(
+      'Cognito auth error during $operation: '
+      '${error.runtimeType}: $sanitizedMessage',
+    );
+    if (sanitizedRecovery != null) {
+      debugPrint('Cognito recovery suggestion: $sanitizedRecovery');
     }
-    if (identifier.startsWith('+')) {
-      return {CognitoUserAttributeKey.phoneNumber: identifier};
-    }
-    return const {};
+  }
+
+  String _sanitizeAuthLog(String value) {
+    return value
+        .replaceAll(
+          RegExp(r'[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}'),
+          '[email]',
+        )
+        .replaceAll(RegExp(r'\+?\d[\d\s().-]{7,}\d'), '[phone]');
   }
 
   String _messageForException(AuthException error) {
     if (error is AuthNotAuthorizedException || error is UserNotFoundException) {
-      return 'Email/số điện thoại hoặc mật khẩu không đúng.';
+      return 'Email hoặc mã xác nhận không đúng.';
     }
     if (error is UsernameExistsException) {
       return 'Tài khoản Cognito này đã tồn tại.';

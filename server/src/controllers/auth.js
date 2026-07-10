@@ -73,12 +73,12 @@ export const createLocalDevelopmentUser = async (req, res, next) => {
        VALUES ($1, COALESCE($2, $3))
        ON CONFLICT (phone_number) DO UPDATE
        SET display_name = COALESCE($2, users.display_name)
-       RETURNING id, phone_number, display_name, status, created_at, updated_at`,
+       RETURNING id, phone_number, display_name, status, created_at, updated_at, (xmax = 0) AS inserted`,
       [phoneNumber, displayName, defaultLocalDisplayName(phoneNumber)]
     );
 
     const user = result.rows[0];
-    res.status(201).json({
+    res.status(user.inserted ? 201 : 200).json({
       user: {
         id: user.id,
         phoneNumber: user.phone_number,

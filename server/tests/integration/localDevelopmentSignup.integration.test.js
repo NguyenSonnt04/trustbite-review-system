@@ -72,7 +72,7 @@ describe('local development auth signup', () => {
     const reusedResponse = await requestApp()
       .post('/api/v1/auth/dev/local-signup')
       .send({ phoneNumber: '+84901234568' })
-      .expect(201);
+      .expect(200);
 
     expect(reusedResponse.body.user).toMatchObject({
       id: firstResponse.body.user.id,
@@ -84,7 +84,7 @@ describe('local development auth signup', () => {
     const blankNameResponse = await requestApp()
       .post('/api/v1/auth/dev/local-signup')
       .send({ phoneNumber: '+84901234568', displayName: '   ' })
-      .expect(201);
+      .expect(200);
 
     expect(blankNameResponse.body.user).toMatchObject({
       id: firstResponse.body.user.id,

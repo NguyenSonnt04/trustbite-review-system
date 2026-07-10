@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 
 const mobileDir = join(process.cwd(), 'mobile');
 const serverEnvPath = join(process.cwd(), 'server', '.env');
+const clientEnvPath = join(process.cwd(), 'client', '.env.local');
 const platformDirs = ['android', 'ios', 'web', 'windows', 'macos', 'linux'];
 const hasPlatformRunner = platformDirs.some((dir) => existsSync(join(mobileDir, dir)));
 
@@ -34,16 +35,24 @@ if (flutterCheck.status !== 0) {
 const serverEnv = existsSync(serverEnvPath)
   ? readEnvFile(serverEnvPath)
   : {};
+const clientEnv = existsSync(clientEnvPath)
+  ? readEnvFile(clientEnvPath)
+  : {};
 const mobileConfig = {
   TRUSTBITE_AWS_REGION:
-    process.env.TRUSTBITE_AWS_REGION ?? serverEnv.AWS_REGION,
+    process.env.TRUSTBITE_AWS_REGION ??
+    serverEnv.AWS_REGION ??
+    clientEnv.NEXT_PUBLIC_AWS_REGION,
   TRUSTBITE_COGNITO_USER_POOL_ID:
     process.env.TRUSTBITE_COGNITO_USER_POOL_ID ??
-    serverEnv.AWS_COGNITO_USER_POOL_ID,
+    serverEnv.AWS_COGNITO_USER_POOL_ID ??
+    clientEnv.NEXT_PUBLIC_COGNITO_USER_POOL_ID,
   TRUSTBITE_COGNITO_CLIENT_ID:
     process.env.TRUSTBITE_COGNITO_CLIENT_ID ??
-    serverEnv.AWS_COGNITO_CLIENT_ID,
-  TRUSTBITE_API_BASE_URL: process.env.TRUSTBITE_API_BASE_URL,
+    serverEnv.AWS_COGNITO_CLIENT_ID ??
+    clientEnv.NEXT_PUBLIC_COGNITO_CLIENT_ID,
+  TRUSTBITE_API_BASE_URL:
+    process.env.TRUSTBITE_API_BASE_URL ?? clientEnv.NEXT_PUBLIC_API_BASE_URL,
 };
 
 const dartDefines = Object.entries(mobileConfig)
@@ -59,6 +68,12 @@ const missingCognitoConfig = [
 if (missingCognitoConfig.length > 0) {
   console.warn(
     `Cognito mobile configuration is incomplete: ${missingCognitoConfig.join(', ')}`,
+  );
+  console.warn(
+    [
+      'Add AWS_COGNITO_USER_POOL_ID and AWS_COGNITO_CLIENT_ID to server/.env,',
+      'or run flutter with matching --dart-define values.',
+    ].join(' '),
   );
 }
 

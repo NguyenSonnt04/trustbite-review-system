@@ -25,10 +25,16 @@ mobile/
 ## Setup
 
 ```bash
-cd mobile
-flutter pub get
-flutter run
+cd ..
+npm run mobile:pubget
+npm run mobile:run
 ```
+
+Run from the repository root with `npm run mobile:run` when authentication is
+enabled. The script forwards the non-secret Cognito region, user pool ID, and
+app client ID from `server/.env` to Flutter as `--dart-define` values. Running
+`flutter run` directly leaves Cognito unconfigured unless you pass those
+`--dart-define` values yourself.
 
 ## Generate Platform Runners
 

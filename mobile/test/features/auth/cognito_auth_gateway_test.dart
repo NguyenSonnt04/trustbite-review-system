@@ -19,26 +19,16 @@ void main() {
     cognitoClientId: 'testclient123',
   );
 
-  test('rejects blank credentials before calling Cognito', () async {
+  test('rejects blank email before calling Cognito', () async {
     final gateway = AmplifyCognitoAuthGateway(config: unconfigured);
 
     await expectLater(
-      gateway.signIn(identifier: ' ', password: 'Password1!'),
+      gateway.requestOtp(identifier: ' '),
       throwsA(
         isA<CognitoAuthGatewayException>().having(
           (error) => error.message,
           'message',
-          'Vui lòng nhập email hoặc số điện thoại.',
-        ),
-      ),
-    );
-    await expectLater(
-      gateway.signIn(identifier: 'user@example.com', password: ''),
-      throwsA(
-        isA<CognitoAuthGatewayException>().having(
-          (error) => error.message,
-          'message',
-          'Vui lòng nhập mật khẩu.',
+          'Vui lòng nhập email.',
         ),
       ),
     );
@@ -48,7 +38,7 @@ void main() {
     final gateway = AmplifyCognitoAuthGateway(config: unconfigured);
 
     await expectLater(
-      gateway.signIn(identifier: 'user@example.com', password: 'Password1!'),
+      gateway.requestOtp(identifier: 'USER@EXAMPLE.COM'),
       throwsA(
         isA<CognitoAuthGatewayException>().having(
           (error) => error.message,
@@ -86,4 +76,34 @@ void main() {
       expect(auth['user_pool_client_id'], isNull);
     },
   );
+
+  test('rejects phone identifiers for the email-only Cognito flow', () async {
+    final gateway = AmplifyCognitoAuthGateway(config: unconfigured);
+
+    await expectLater(
+      gateway.requestOtp(identifier: '+84901234567'),
+      throwsA(
+        isA<CognitoAuthGatewayException>().having(
+          (error) => error.message,
+          'message',
+          'Vui lòng nhập email hợp lệ.',
+        ),
+      ),
+    );
+  });
+
+  test('rejects blank OTP before confirming Cognito challenge', () async {
+    final gateway = AmplifyCognitoAuthGateway(config: unconfigured);
+
+    await expectLater(
+      gateway.confirmOtp(' '),
+      throwsA(
+        isA<CognitoAuthGatewayException>().having(
+          (error) => error.message,
+          'message',
+          'Vui lòng nhập mã xác nhận.',
+        ),
+      ),
+    );
+  });
 }

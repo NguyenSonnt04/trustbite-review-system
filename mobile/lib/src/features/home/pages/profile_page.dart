@@ -10,11 +10,13 @@ class ProfilePage extends StatelessWidget {
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
+    required this.onLogout,
   });
 
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
   final VoidCallback onLogin;
+  final Future<void> Function() onLogout;
 
   @override
   Widget build(BuildContext context) {
@@ -102,7 +104,10 @@ class ProfilePage extends StatelessWidget {
         const SizedBox(height: 34),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _GeneralSettingsSection(showLogout: isSignedIn),
+          child: _GeneralSettingsSection(
+            showLogout: isSignedIn,
+            onLogout: onLogout,
+          ),
         ),
       ],
     );
@@ -116,7 +121,8 @@ class _SignedInProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = currentUser?['displayName'] ??
+    final displayName =
+        currentUser?['displayName'] ??
         currentUser?['phoneNumber'] ??
         'Tài khoản TrustBite';
     final phoneNumber = currentUser?['phoneNumber'];
@@ -132,10 +138,7 @@ class _SignedInProfileCard extends StatelessWidget {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: const Color(0xFFF1F3F5),
-                border: Border.all(
-                  color: const Color(0xFFE5E7EB),
-                  width: 3,
-                ),
+                border: Border.all(color: const Color(0xFFE5E7EB), width: 3),
               ),
               alignment: Alignment.center,
               child: const Icon(
@@ -196,21 +199,14 @@ class _SignedInProfileCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        const Icon(
-          Icons.tune_rounded,
-          color: Color(0xFF9CA3AF),
-          size: 24,
-        ),
+        const Icon(Icons.tune_rounded, color: Color(0xFF9CA3AF), size: 24),
       ],
     );
   }
 }
 
 class _ProfileActionSection extends StatelessWidget {
-  const _ProfileActionSection({
-    required this.title,
-    required this.items,
-  });
+  const _ProfileActionSection({required this.title, required this.items});
 
   final String title;
   final List<_ProfileActionItem> items;
@@ -287,11 +283,7 @@ class _ProfileActionTile extends StatelessWidget {
                     color: item.iconBackground,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    item.icon,
-                    color: item.iconColor,
-                    size: 18,
-                  ),
+                  child: Icon(item.icon, color: item.iconColor, size: 18),
                 ),
                 const SizedBox(width: 9),
                 Expanded(
@@ -331,9 +323,13 @@ class _ProfileActionItem {
 }
 
 class _GeneralSettingsSection extends StatefulWidget {
-  const _GeneralSettingsSection({required this.showLogout});
+  const _GeneralSettingsSection({
+    required this.showLogout,
+    required this.onLogout,
+  });
 
   final bool showLogout;
+  final Future<void> Function() onLogout;
 
   @override
   State<_GeneralSettingsSection> createState() =>
@@ -356,10 +352,7 @@ class _GeneralSettingsSectionState extends State<_GeneralSettingsSection> {
         icon: Icons.favorite_border_rounded,
         label: 'Địa chỉ đã lưu',
       ),
-      _SettingsItem(
-        icon: Icons.receipt_long_outlined,
-        label: 'Hóa đơn',
-      ),
+      _SettingsItem(icon: Icons.receipt_long_outlined, label: 'Hóa đơn'),
       _SettingsItem(
         icon: Icons.star_border_rounded,
         label: 'Đánh giá ứng dụng',
@@ -389,8 +382,8 @@ class _GeneralSettingsSectionState extends State<_GeneralSettingsSection> {
                     item: item,
                     onTap: item.label == 'Ngôn ngữ'
                         ? () => setState(
-                              () => _languagePickerOpen = !_languagePickerOpen,
-                            )
+                            () => _languagePickerOpen = !_languagePickerOpen,
+                          )
                         : null,
                   ),
               ],
@@ -412,7 +405,7 @@ class _GeneralSettingsSectionState extends State<_GeneralSettingsSection> {
           const SizedBox(height: 18),
           Center(
             child: TextButton.icon(
-              onPressed: () {},
+              onPressed: widget.onLogout,
               icon: const Icon(
                 Icons.logout_rounded,
                 color: Color(0xFF111827),
@@ -449,10 +442,7 @@ class _GeneralSettingsSectionState extends State<_GeneralSettingsSection> {
 }
 
 class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
-    required this.item,
-    this.onTap,
-  });
+  const _SettingsRow({required this.item, this.onTap});
 
   final _SettingsItem item;
   final VoidCallback? onTap;

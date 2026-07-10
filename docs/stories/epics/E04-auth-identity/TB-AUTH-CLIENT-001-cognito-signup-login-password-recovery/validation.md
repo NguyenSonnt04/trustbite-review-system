@@ -102,3 +102,22 @@ npm run test:integration --prefix server
   mobile test suite, and `flutter build apk --debug --no-pub`. The APK build
   retained the existing forward-looking Gradle, Android Gradle Plugin, and
   Kotlin warnings.
+
+2026-07-10 logout and local signup reuse semantics:
+
+- Wired the signed-in profile "Đăng xuất" action through `HomeScreen` to
+  `MobileAuthService.signOut()`, clearing TrustBite local session state,
+  signing out of Cognito through the configured session provider, and returning
+  the mobile UI to the guest profile state.
+- Added widget proof that a signed-in mobile user can open the profile tab,
+  tap "Đăng xuất", trigger the auth service sign-out once, and see the guest
+  login prompt again.
+- Corrected `POST /api/v1/auth/dev/local-signup` so a new local development
+  user returns `201 Created`, while reusing an existing `phoneNumber` through
+  the upsert conflict branch returns `200 OK`.
+- Updated integration proof for the local development signup reuse path,
+  including blank `displayName` reuse preserving the existing display name.
+- Validation passed: `flutter analyze`; `npm run mobile:test` with 27 tests;
+  `npm run server:build`; `npm run test:integration --prefix server` with 13
+  files passed, 1 skipped, 102 tests passed, and 2 skipped; Harness story
+  verification passed for `TB-AUTH-CLIENT-001`.
