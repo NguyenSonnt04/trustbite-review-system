@@ -256,7 +256,13 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
 
   @visibleForTesting
   String debugMessageForAuthException(AuthException error) =>
-      _messageForException(error);
+      _messageForException('requestOtp', error);
+
+  @visibleForTesting
+  bool debugShouldRestartAuthentication(
+    String operation,
+    AuthException error,
+  ) => _shouldRestartAuthentication(operation, error);
 
   String _validateIdentifier(String identifier) {
     final normalizedIdentifier = _normalizeEmailIdentifier(identifier);
@@ -363,14 +369,14 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
   ) {
     _logAuthException(operation, error);
     return CognitoAuthGatewayException(
-      _messageForException(error),
-      restartAuthentication:
-          error is ExpiredCodeException || _hasNoActiveSignInSession(error),
+      _messageForException(operation, error),
+      restartAuthentication: _shouldRestartAuthentication(operation, error),
     );
   }
 
-  bool _hasNoActiveSignInSession(AuthException error) =>
-      error.message.contains('without an active sign-in session');
+  bool _shouldRestartAuthentication(String operation, AuthException error) =>
+      error is ExpiredCodeException ||
+      (operation == 'confirmOtp' && error is AuthValidationException);
 
   String _sanitizeAuthLog(String value) {
     return value
@@ -381,7 +387,7 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
         .replaceAll(RegExp(r'\+?\d[\d\s().-]{7,}\d'), '[phone]');
   }
 
-  String _messageForException(AuthException error) {
+  String _messageForException(String operation, AuthException error) {
     if (error.message.contains('CUSTOM_AUTH is not enabled')) {
       return 'Cognito chưa bật xác thực bằng mã email cho app client này.';
     }
@@ -397,7 +403,7 @@ class AmplifyCognitoAuthGateway implements CognitoAuthGateway {
     if (error is ExpiredCodeException) {
       return 'Mã xác nhận đã hết hạn. Vui lòng nhập email lại.';
     }
-    if (_hasNoActiveSignInSession(error)) {
+    if (operation == 'confirmOtp' && error is AuthValidationException) {
       return 'Phiên xác thực đã hết hạn. Vui lòng nhập email lại.';
     }
     if (error is LimitExceededException) {

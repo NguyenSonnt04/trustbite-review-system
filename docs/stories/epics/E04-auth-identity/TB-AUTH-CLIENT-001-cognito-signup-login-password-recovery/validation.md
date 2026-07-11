@@ -160,3 +160,13 @@ npm run test:integration --prefix server
   or invoke Cognito again.
 - Added transport and widget regression tests. Local Express `/health` returned
   `{"status":"ok"}` on port `5000` after the server was started.
+
+2026-07-11 auth restore review fixes:
+
+- Home session restore now logs only the exception type and shows a user-safe
+  `SnackBar` when the profile backend cannot be reached, instead of silently
+  returning an authenticated user to the guest UI.
+- Cognito challenge reset now uses Amplify's public `AuthValidationException`
+  category scoped to `confirmOtp`, rather than matching SDK message wording.
+- `flutter analyze` passed and the targeted auth/widget suite passed 21 tests,
+  including provider-wording independence and the restore-failure message.

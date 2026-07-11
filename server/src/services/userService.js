@@ -12,9 +12,9 @@ const normalizeRoleList = (roles = []) => [...new Set(roles.map(normalizeRole).f
 const mapDateOnly = (value) => {
   if (value == null) return null;
   if (value instanceof Date) {
-    const year = value.getFullYear().toString().padStart(4, '0');
-    const month = (value.getMonth() + 1).toString().padStart(2, '0');
-    const day = value.getDate().toString().padStart(2, '0');
+    const year = value.getUTCFullYear().toString().padStart(4, '0');
+    const month = (value.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = value.getUTCDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
   return String(value).slice(0, 10);

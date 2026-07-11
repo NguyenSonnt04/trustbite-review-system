@@ -118,4 +118,18 @@ void main() {
       'Cognito chưa bật xác thực bằng mã email cho app client này.',
     );
   });
+
+  test('restarts a missing sign-in session by exception type, not wording', () {
+    final gateway = AmplifyCognitoAuthGateway(config: configured);
+    const error = AuthValidationException('provider wording may change');
+
+    expect(
+      gateway.debugShouldRestartAuthentication('confirmOtp', error),
+      isTrue,
+    );
+    expect(
+      gateway.debugShouldRestartAuthentication('requestOtp', error),
+      isFalse,
+    );
+  });
 }

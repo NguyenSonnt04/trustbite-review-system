@@ -37,9 +37,9 @@ const toE164VietnamPhone = (value) => `+84${value.slice(1)}`;
 const mapDateOnly = (value) => (
   value instanceof Date
     ? [
-      value.getFullYear().toString().padStart(4, '0'),
-      (value.getMonth() + 1).toString().padStart(2, '0'),
-      value.getDate().toString().padStart(2, '0'),
+      value.getUTCFullYear().toString().padStart(4, '0'),
+      (value.getUTCMonth() + 1).toString().padStart(2, '0'),
+      value.getUTCDate().toString().padStart(2, '0'),
     ].join('-')
     : String(value).slice(0, 10)
 );

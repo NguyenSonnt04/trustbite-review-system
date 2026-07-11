@@ -66,6 +66,22 @@ describe('UserService account deletion guards', () => {
     pool.connect.mockResolvedValue(mockClient);
   });
 
+  it('maps date-only Date values from their UTC calendar components', async () => {
+    pool.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [
+        activeUserRow({
+          date_of_birth: new Date('2004-11-20T20:00:00.000Z'),
+        }),
+      ],
+    });
+
+    const service = new UserService();
+    const result = await service.getCurrentUser(USER_ID);
+
+    expect(result.dateOfBirth).toBe('2004-11-20');
+  });
+
   it('normalizes and persists profile onboarding fields transactionally', async () => {
     mockClient.query
       .mockResolvedValueOnce({})

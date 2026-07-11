@@ -72,12 +72,23 @@ class _HomeScreenState extends State<HomeScreen> {
         _isSignedIn = true;
         _currentUser = user;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        'Unable to restore signed-in user profile: ${error.runtimeType}',
+      );
       if (!mounted) return;
       setState(() {
         _isSignedIn = false;
         _currentUser = null;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Không thể khôi phục phiên đăng nhập. Vui lòng kiểm tra kết nối và thử lại.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

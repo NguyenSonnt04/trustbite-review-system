@@ -447,6 +447,32 @@ void main() {
     expect(find.byType(ProfileOnboardingScreen), findsOneWidget);
     expect(authService.cognitoSignInCalls, 1);
   });
+
+  testWidgets('explains a temporary failure while restoring a signed-in user', (
+    tester,
+  ) async {
+    final authService = _FakeMobileAuthService(
+      cognitoResults: [Exception('backend unavailable')],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authService: authService,
+          cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Không thể khôi phục phiên đăng nhập. Vui lòng kiểm tra kết nối và thử lại.',
+      ),
+      findsOneWidget,
+    );
+    expect(authService.cognitoSignInCalls, 1);
+  });
 }
 
 class _FakeMobileAuthService implements MobileAuthService {

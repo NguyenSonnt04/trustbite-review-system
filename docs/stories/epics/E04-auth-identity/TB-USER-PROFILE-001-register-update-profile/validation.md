@@ -126,3 +126,14 @@ npm run server:build
 - Proof passed: `flutter analyze`; 35 Flutter tests; debug APK build; 216 server
   unit tests; 103 server integration tests with 2 skipped; server syntax check;
   idempotent migration rerun; and `git diff --check`.
+
+2026-07-11 date-only timezone review fixes:
+
+- The production profile mapper and integration-test helper now read `Date`
+  calendar components with UTC getters, preventing UTC-negative processes from
+  shifting PostgreSQL date-only values back one day.
+- Added a unit regression whose UTC date differs from the local calendar date.
+  The server unit suite passed 217 tests and the 102-file syntax check passed.
+- Profile integration proof was attempted but blocked because PostgreSQL at
+  `::1:5432` was unavailable; Docker CLI startup/status also hung, so no new DB
+  integration pass is claimed for this follow-up.
