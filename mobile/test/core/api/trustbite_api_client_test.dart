@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session.dart';
@@ -157,7 +159,71 @@ void main() {
       await client.getJson('/users/me');
       expect(transport.lastHeaders['Authorization'], 'Bearer access-token-2');
     });
+
+    test('maps a refused backend connection to a safe API error', () async {
+      final client = TrustBiteApiClient(
+        config: config,
+        transport: const _ThrowingApiTransport(
+          SocketException('Connection refused'),
+        ),
+        sessionStore: InMemoryAuthSessionStore(),
+        cognitoSessionProvider: _FakeCognitoSessionProvider('access-token'),
+      );
+
+      await expectLater(
+        () => client.getJson('/users/me'),
+        throwsA(
+          isA<ApiException>()
+              .having((error) => error.statusCode, 'statusCode', 503)
+              .having(
+                (error) => error.message,
+                'message',
+                contains('bật backend'),
+              ),
+        ),
+      );
+    });
+
+    test(
+      'sends profile updates with PATCH and Cognito authorization',
+      () async {
+        final transport = _FakeApiTransport(
+          response: const ApiTransportResponse(
+            statusCode: 200,
+            body: '{"profileComplete":true}',
+          ),
+        );
+        final client = TrustBiteApiClient(
+          config: config,
+          transport: transport,
+          sessionStore: InMemoryAuthSessionStore(),
+          cognitoSessionProvider: _FakeCognitoSessionProvider('access-token'),
+        );
+
+        final result = await client.patchJson('/users/me', {
+          'displayName': 'Nguyen Son',
+          'dateOfBirth': '2004-11-20',
+          'phoneNumber': '0395665937',
+        });
+
+        expect(result['profileComplete'], isTrue);
+        expect(transport.lastMethod, 'PATCH');
+        expect(transport.lastBody, contains('2004-11-20'));
+        expect(transport.lastHeaders['Authorization'], 'Bearer access-token');
+      },
+    );
   });
+}
+
+class _ThrowingApiTransport implements ApiTransport {
+  const _ThrowingApiTransport(this.error);
+
+  final Object error;
+
+  @override
+  Future<ApiTransportResponse> send(ApiTransportRequest request) async {
+    throw error;
+  }
 }
 
 class _FakeApiTransport implements ApiTransport {
@@ -165,11 +231,15 @@ class _FakeApiTransport implements ApiTransport {
 
   final ApiTransportResponse response;
   Uri? lastUri;
+  String? lastMethod;
+  String? lastBody;
   Map<String, String> lastHeaders = const {};
 
   @override
   Future<ApiTransportResponse> send(ApiTransportRequest request) async {
     lastUri = request.uri;
+    lastMethod = request.method;
+    lastBody = request.body;
     lastHeaders = request.headers;
     return response;
   }

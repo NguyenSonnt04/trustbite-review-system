@@ -126,8 +126,10 @@ CREATE TABLE tags (
 -- users - người dùng
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phone_number VARCHAR(20) UNIQUE NOT NULL,
+  phone_number VARCHAR(20) UNIQUE,
+  cognito_sub VARCHAR(255),
   display_name VARCHAR(120),
+  date_of_birth DATE,
   avatar_url TEXT,
   status VARCHAR(30) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'SUSPENDED', 'DELETED')),
   exp_points INTEGER NOT NULL DEFAULT 0 CHECK (exp_points >= 0),

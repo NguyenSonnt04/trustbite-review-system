@@ -26,13 +26,14 @@ export async function createUser(overrides = {}) {
 
   const result = await query(
     `
-    INSERT INTO users (phone_number, display_name, status)
-    VALUES ($1, $2, $3)
+    INSERT INTO users (phone_number, display_name, date_of_birth, status)
+    VALUES ($1, $2, $3, $4)
     RETURNING *
     `,
     [
       phoneNumber,
       overrides.displayName ?? `Test User ${userSequence}`,
+      overrides.dateOfBirth ?? '1990-01-01',
       overrides.status ?? 'ACTIVE',
     ],
   );

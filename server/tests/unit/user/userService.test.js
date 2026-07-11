@@ -29,6 +29,7 @@ function activeUserRow(overrides = {}) {
     id: USER_ID,
     phone_number: '+849000000001',
     display_name: 'Test User',
+    date_of_birth: '1990-01-01',
     avatar_url: null,
     status: 'ACTIVE',
     exp_points: 0,
@@ -63,6 +64,93 @@ describe('UserService account deletion guards', () => {
     mockClient.query.mockReset();
     mockClient.release.mockReset();
     pool.connect.mockResolvedValue(mockClient);
+  });
+
+  it('maps date-only Date values from their UTC calendar components', async () => {
+    pool.query.mockResolvedValueOnce({
+      rowCount: 1,
+      rows: [
+        activeUserRow({
+          date_of_birth: new Date('2004-11-20T20:00:00.000Z'),
+        }),
+      ],
+    });
+
+    const service = new UserService();
+    const result = await service.getCurrentUser(USER_ID);
+
+    expect(result.dateOfBirth).toBe('2004-11-20');
+  });
+
+  it('normalizes and persists profile onboarding fields transactionally', async () => {
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow()] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [activeUserRow({
+          phone_number: '+84395665937',
+          display_name: 'Nguyen Son',
+          date_of_birth: '2004-11-20',
+        })],
+      })
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+    const result = await service.updateCurrentUser(USER_ID, {
+      displayName: '  Nguyen Son  ',
+      phoneNumber: '0395 665 937',
+      dateOfBirth: '2004-11-20',
+    });
+
+    expect(result).toMatchObject({
+      displayName: 'Nguyen Son',
+      phoneNumber: '+84395665937',
+      dateOfBirth: '2004-11-20',
+      profileComplete: true,
+    });
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('phone_number = $2'),
+      ['Nguyen Son', '+84395665937', '2004-11-20', USER_ID],
+    );
+    expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it.each([
+    [{ phoneNumber: 'not-a-phone' }, 'phoneNumber'],
+    [{ dateOfBirth: '2025-02-29' }, 'dateOfBirth'],
+    [{ dateOfBirth: '2999-01-01' }, 'dateOfBirth'],
+  ])('rejects malformed onboarding input %j before a transaction', async (body, field) => {
+    const service = new UserService();
+
+    await expect(service.updateCurrentUser(USER_ID, body))
+      .rejects
+      .toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+    expect(JSON.stringify(body)).toContain(field);
+  });
+
+  it('returns a conflict and rolls back when the phone number is already used', async () => {
+    const duplicateError = Object.assign(new Error('duplicate phone'), {
+      code: '23505',
+      constraint: 'users_phone_number_key',
+    });
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 1, rows: [activeUserRow()] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockRejectedValueOnce(duplicateError)
+      .mockResolvedValueOnce({});
+
+    const service = new UserService();
+
+    await expect(service.updateCurrentUser(USER_ID, { phoneNumber: '0395665937' }))
+      .rejects
+      .toMatchObject({ statusCode: 409, code: 'PHONE_NUMBER_IN_USE' });
+
+    expect(mockClient.query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 
   it.each(['REQUESTED', 'PROCESSING'])(

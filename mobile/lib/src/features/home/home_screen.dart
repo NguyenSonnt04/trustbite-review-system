@@ -3,6 +3,7 @@ import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
 import 'package:trustbite_mobile/src/features/home/pages/discover_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/favorites_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/profile_page.dart';
@@ -36,7 +37,59 @@ class _HomeScreenState extends State<HomeScreen> {
     final cognitoSignedIn =
         await (widget.cognitoAuthGateway ?? appCognitoAuthGateway).isSignedIn();
     if (!mounted) return;
-    setState(() => _isSignedIn = session != null || cognitoSignedIn);
+    if (session == null && !cognitoSignedIn) {
+      setState(() => _isSignedIn = false);
+      return;
+    }
+
+    final authService = widget.authService ?? appMobileAuthService;
+    try {
+      var user = cognitoSignedIn
+          ? await authService.completeCognitoSignIn()
+          : await authService.loadCurrentUser();
+      if (!mounted) return;
+      if (user['profileComplete'] != true) {
+        final completedUser = await Navigator.of(context)
+            .push<Map<String, dynamic>>(
+              MaterialPageRoute<Map<String, dynamic>>(
+                builder: (_) => ProfileOnboardingScreen(
+                  authService: authService,
+                  initialUser: user,
+                ),
+              ),
+            );
+        if (!mounted) return;
+        if (completedUser == null) {
+          setState(() {
+            _isSignedIn = false;
+            _currentUser = null;
+          });
+          return;
+        }
+        user = completedUser;
+      }
+      setState(() {
+        _isSignedIn = true;
+        _currentUser = user;
+      });
+    } catch (error) {
+      debugPrint(
+        'Unable to restore signed-in user profile: ${error.runtimeType}',
+      );
+      if (!mounted) return;
+      setState(() {
+        _isSignedIn = false;
+        _currentUser = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Không thể khôi phục phiên đăng nhập. Vui lòng kiểm tra kết nối và thử lại.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _openLogin() async {

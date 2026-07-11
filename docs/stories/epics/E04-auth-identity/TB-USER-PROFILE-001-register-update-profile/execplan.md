@@ -11,7 +11,8 @@ In scope:
 - Map Cognito-authenticated identities to local `users` rows by `users.cognito_sub`.
 - Preserve verified-phone fallback only for transition users without `cognito_sub`.
 - `GET /api/v1/users/me`.
-- `PATCH /api/v1/users/me` for `displayName` and `avatarUrl` only.
+- `PATCH /api/v1/users/me` for `displayName`, `dateOfBirth`, `phoneNumber`, and `avatarUrl`.
+- Required Flutter onboarding after Cognito auth and session restoration.
 - Reject profile update for `SUSPENDED`, `DELETED`, and active deletion-request users.
 
 Out of scope:
@@ -19,8 +20,7 @@ Out of scope:
 - Cognito signup/login/forgot-password UX or provider commands; tracked by `TB-AUTH-CLIENT-001-cognito-signup-login-password-recovery`.
 - Backend-issued OTP, access token, or refresh token flows.
 - Avatar upload URL endpoint.
-- UI/mobile changes.
-- Additional profile fields outside schema.
+- Additional profile fields beyond full name, date of birth, and phone.
 
 ## Risk Classification
 
@@ -44,7 +44,11 @@ Hard gates:
 4. Done: Add automated proof for Cognito subject mapping, verified-phone transition fallback, unmapped identity rejection, and active deletion-request profile mutation rejection.
 5. Done: Validate DB insert/update rollback and suspended/deleted user behavior against migrated PostgreSQL.
 6. Done: Update Harness evidence when automated proof is complete.
+7. Done: Add date-of-birth migration and profile completion contract.
+8. Done: Add Flutter onboarding for immediate and restored auth sessions.
+9. Done: Prove timezone-safe DATE mapping, phone uniqueness, rollback, mobile
+   routing, and APK build.
 
 ## Stop Conditions
 
-Pause if new user fields are requested or if arbitrary avatar URLs must be accepted contrary to OpenAPI.
+Pause if additional demographic fields or arbitrary avatar URLs are requested.

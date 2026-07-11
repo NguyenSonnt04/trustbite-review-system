@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
@@ -104,6 +105,31 @@ void main() {
           'Vui lòng nhập mã xác nhận.',
         ),
       ),
+    );
+  });
+
+  test('maps disabled custom auth app client errors to a setup message', () {
+    final gateway = AmplifyCognitoAuthGateway(config: configured);
+
+    expect(
+      gateway.debugMessageForAuthException(
+        const UnknownException('CUSTOM_AUTH is not enabled for the client.'),
+      ),
+      'Cognito chưa bật xác thực bằng mã email cho app client này.',
+    );
+  });
+
+  test('restarts a missing sign-in session by exception type, not wording', () {
+    final gateway = AmplifyCognitoAuthGateway(config: configured);
+    const error = AuthValidationException('provider wording may change');
+
+    expect(
+      gateway.debugShouldRestartAuthentication('confirmOtp', error),
+      isTrue,
+    );
+    expect(
+      gateway.debugShouldRestartAuthentication('requestOtp', error),
+      isFalse,
     );
   });
 }

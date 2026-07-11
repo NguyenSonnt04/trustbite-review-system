@@ -21,6 +21,21 @@ class MobileAuthService {
     return _apiClient.getJson('/users/me');
   }
 
+  Future<Map<String, dynamic>> loadCurrentUser() =>
+      _apiClient.getJson('/users/me');
+
+  Future<Map<String, dynamic>> completeProfile({
+    required String displayName,
+    required String dateOfBirth,
+    required String phoneNumber,
+  }) {
+    return _apiClient.patchJson('/users/me', {
+      'displayName': displayName.trim(),
+      'dateOfBirth': dateOfBirth,
+      'phoneNumber': phoneNumber.trim(),
+    });
+  }
+
   Future<Map<String, dynamic>> completeLocalDevelopmentSignUp({
     required String phoneNumber,
     String? displayName,

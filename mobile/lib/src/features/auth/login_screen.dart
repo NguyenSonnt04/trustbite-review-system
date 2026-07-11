@@ -3,6 +3,7 @@ import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
 
 /// Login/register entry screen styled after the TrustBite discover screen.
 ///
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   static const Color _muted = Color(0xFF8E8E9A);
 
   bool _isSubmitting = false;
+  bool _isCognitoSignedIn = false;
   CognitoAuthStep? _pendingStep;
 
   final TextEditingController _identifierController = TextEditingController();
@@ -79,12 +81,22 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handlePrimaryAuth() async {
     setState(() => _isSubmitting = true);
     try {
+      if (_isCognitoSignedIn) {
+        await _completeBackendSignIn();
+        return;
+      }
+
       late final CognitoAuthResult result;
       final pendingStep = _pendingStep;
       if (pendingStep != null) {
-        result = await _cognitoAuthGateway.confirmOtp(
-          _confirmationController.text,
-        );
+        result = pendingStep == CognitoAuthStep.confirmSignUp
+            ? await _cognitoAuthGateway.confirmSignUp(
+                identifier: _identifierController.text,
+                confirmationValue: _confirmationController.text,
+              )
+            : await _cognitoAuthGateway.confirmOtp(
+                _confirmationController.text,
+              );
       } else {
         result = await _cognitoAuthGateway.requestOtp(
           identifier: _identifierController.text,
@@ -99,6 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       _showMessage(err.message);
     } on CognitoAuthGatewayException catch (err) {
+      if (err.restartAuthentication) {
+        await _cancelChallenge();
+      }
       if (!mounted) return;
       _showMessage(err.message);
     } finally {
@@ -118,8 +133,36 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final user = await _authService.completeCognitoSignIn();
+    if (mounted) {
+      setState(() {
+        _isCognitoSignedIn = true;
+        _pendingStep = null;
+        _confirmationController.clear();
+      });
+    }
+    await _completeBackendSignIn();
+  }
+
+  Future<void> _completeBackendSignIn() async {
+    var user = await _authService.completeCognitoSignIn();
     if (!mounted) return;
+    if (user['profileComplete'] != true) {
+      final completedUser = await Navigator.of(context)
+          .push<Map<String, dynamic>>(
+            MaterialPageRoute<Map<String, dynamic>>(
+              builder: (_) => ProfileOnboardingScreen(
+                authService: _authService,
+                initialUser: user,
+              ),
+            ),
+          );
+      if (!mounted) return;
+      if (completedUser == null) {
+        setState(() => _isCognitoSignedIn = false);
+        return;
+      }
+      user = completedUser;
+    }
     final displayName =
         user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản';
     if (Navigator.of(context).canPop()) {
@@ -130,9 +173,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _cancelChallenge() async {
-    await _cognitoAuthGateway.signOut();
+    try {
+      await _cognitoAuthGateway.signOut();
+    } on Exception {
+      // The local UI can still restart when a stale provider session cannot be
+      // cleared, and the next Cognito sign-in will establish a fresh session.
+    }
     if (!mounted) return;
     setState(() {
+      _isCognitoSignedIn = false;
       _pendingStep = null;
       _confirmationController.clear();
     });
@@ -277,7 +326,9 @@ class _LoginScreenState extends State<LoginScreen> {
         children: [
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),
-            child: _pendingStep == null
+            child: _isCognitoSignedIn
+                ? _buildBackendRetryState()
+                : _pendingStep == null
                 ? _buildIdentifierFields()
                 : _buildConfirmationField(),
           ),
@@ -286,7 +337,7 @@ class _LoginScreenState extends State<LoginScreen> {
             _primaryButtonLabel(),
             _isSubmitting ? null : _handlePrimaryAuth,
           ),
-          if (_pendingStep != null)
+          if (_pendingStep != null || _isCognitoSignedIn)
             TextButton(
               onPressed: _isSubmitting ? null : _cancelChallenge,
               child: const Text('Quay lại'),
@@ -368,8 +419,25 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Widget _buildBackendRetryState() {
+    return const Align(
+      key: ValueKey('backend-retry-state'),
+      alignment: Alignment.centerLeft,
+      child: Text(
+        'Tài khoản đã xác thực. Kết nối TrustBite để hoàn tất đăng nhập.',
+        style: TextStyle(
+          color: _muted,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+
   String _primaryButtonLabel() {
     if (_isSubmitting) return 'Đang xử lý...';
+    if (_isCognitoSignedIn) return 'Thử lại';
     if (_pendingStep != null) return 'Xác nhận';
     return 'Tiếp tục';
   }

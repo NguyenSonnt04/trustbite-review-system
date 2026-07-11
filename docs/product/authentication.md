@@ -12,6 +12,34 @@ Cognito owns:
 - token/session lifecycle,
 - JWT signing keys and JWKS rotation.
 
+## Email-First Passwordless Onboarding
+
+The mobile entry screen accepts one email field and does not expose separate
+"sign up" and "sign in" modes.
+
+- For a new email, mobile calls Cognito `SignUp`, receives Cognito's email
+  confirmation code, confirms the account, and immediately starts a Cognito
+  session.
+- Cognito requires a password for the current user-pool signup policy. Mobile
+  generates a strong ephemeral value only for this provider call, retains it
+  only until the initial confirmed sign-in completes, and never displays,
+  persists, or logs it.
+- For an existing confirmed email, mobile starts the configured Cognito custom
+  authentication challenge. Cognito/Lambda owns challenge delivery and answer
+  verification.
+- Expired confirmation codes and stale SDK challenge sessions return the user
+  to the email entry state, where a fresh provider flow is started.
+
+After Cognito verifies an access token, Express creates the missing local
+`users` mapping transactionally for the Cognito `sub`. Email-first users do not
+have to provide a phone number; legacy verified-phone matching remains a
+transition-only mapping path. Express still does not issue OTPs, passwords,
+or tokens.
+
+Before entering the signed-in mobile product, users with an incomplete local
+profile complete the display name, date of birth, and phone number flow defined
+in `docs/product/user-profiles.md`.
+
 TrustBite Express owns:
 
 - business APIs for restaurants, reviews, verification, trust score, profiles, moderation, and account state,

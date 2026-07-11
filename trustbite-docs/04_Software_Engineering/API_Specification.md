@@ -144,6 +144,8 @@ Phản hồi:
   "id": "uuid",
   "phoneNumber": "+84901234567",
   "displayName": "Nguyen Van A",
+  "dateOfBirth": "2004-11-20",
+  "profileComplete": true,
   "status": "ACTIVE",
   "expPoints": 120,
   "rankCode": "APPRENTICE"
@@ -160,14 +162,21 @@ Yêu cầu:
 
 ```json
 {
-  "displayName": "Tên hiển thị",
+  "displayName": "Nguyen Van A",
+  "dateOfBirth": "2004-11-20",
+  "phoneNumber": "0901234567",
   "avatarUrl": "https://..."
 }
 ```
 
 Ghi chú triển khai:
 
-- Chỉ cập nhật các cột có trong schema `users`: `display_name`, `avatar_url`.
+- Chỉ cập nhật các cột có trong schema `users`: `display_name`,
+  `date_of_birth`, `phone_number`, `avatar_url`.
+- `dateOfBirth` dùng `YYYY-MM-DD`; backend trả `profileComplete=true` khi họ
+  tên, ngày sinh và số điện thoại đều có giá trị.
+- Số điện thoại Việt Nam dạng `0xxxxxxxxx` được chuẩn hóa sang `+84`; số đã
+  thuộc user khác trả `409 PHONE_NUMBER_IN_USE`.
 - `avatarUrl` phải là URL TrustBite-owned/allowlisted hoặc URL được tạo bởi avatar upload flow; không nhận arbitrary external URL.
 - Với custom CDN hoặc path-style S3 host, `avatarUrl` do avatar upload flow trả về phải giữ dạng `/<bucket>/avatars/...` để account deletion cleanup nhận diện và xóa object thuộc TrustBite.
 - User `SUSPENDED` hoặc `DELETED` không được cập nhật hồ sơ/avatar; trả `403 ACCOUNT_SUSPENDED` hoặc `403 ACCOUNT_DELETED`.

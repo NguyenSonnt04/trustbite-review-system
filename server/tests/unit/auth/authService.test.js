@@ -97,6 +97,72 @@ describe('AuthService local user mapping', () => {
     });
   });
 
+  it('provisions a local user for a verified Cognito identity without a phone number', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [activeUserRow({
+          phone_number: null,
+          cognito_sub: 'new-cognito-sub',
+        })],
+      })
+      .mockResolvedValueOnce({});
+
+    const service = new AuthService({ verifyAccessToken: vi.fn() });
+
+    await expect(service.mapIdentityToUser({
+      provider: 'cognito',
+      subject: 'new-cognito-sub',
+      phoneNumber: null,
+      phoneNumberVerified: false,
+      tokenUse: 'access',
+    })).resolves.toMatchObject({
+      id: USER_ID,
+      phoneNumber: null,
+      cognitoSub: 'new-cognito-sub',
+      roles: [],
+    });
+
+    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+    expect(mockClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO users (phone_number, cognito_sub)'),
+      ['new-cognito-sub'],
+    );
+    expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('rolls back local Cognito user provisioning when the insert fails', async () => {
+    const insertError = new Error('database unavailable');
+    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(insertError)
+      .mockResolvedValueOnce({});
+
+    const service = new AuthService({ verifyAccessToken: vi.fn() });
+
+    await expect(service.mapIdentityToUser({
+      provider: 'cognito',
+      subject: 'new-cognito-sub',
+      phoneNumber: null,
+      phoneNumberVerified: false,
+      tokenUse: 'access',
+    })).rejects.toBe(insertError);
+
+    expect(mockClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+    expect(mockClient.query).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('INSERT INTO users (phone_number, cognito_sub)'),
+      ['new-cognito-sub'],
+    );
+    expect(mockClient.query).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+    expect(mockClient.release).toHaveBeenCalledOnce();
+  });
+
   it('includes active deletion request state in the mapped local user', async () => {
     pool.query
       .mockResolvedValueOnce({
@@ -158,8 +224,20 @@ describe('AuthService local user mapping', () => {
     expect(identityProvider.verifyAccessToken).toHaveBeenCalledWith('test-access-token');
   });
 
-  it('rejects verified-phone transition mapping when fallback is not explicitly enabled', async () => {
-    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+  it('provisions a Cognito user instead of requiring phone fallback', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    mockClient.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [activeUserRow({
+          phone_number: null,
+          cognito_sub: 'new-cognito-sub',
+        })],
+      })
+      .mockResolvedValueOnce({});
 
     const service = new AuthService({ verifyAccessToken: vi.fn() });
 
@@ -169,12 +247,14 @@ describe('AuthService local user mapping', () => {
       phoneNumber: '+849000000001',
       phoneNumberVerified: true,
       tokenUse: 'access',
-    })).rejects.toMatchObject({
-      statusCode: 401,
-      code: 'UNMAPPED_IDENTITY',
+    })).resolves.toMatchObject({
+      id: USER_ID,
+      phoneNumber: null,
+      cognitoSub: 'new-cognito-sub',
     });
 
-    expect(pool.connect).not.toHaveBeenCalled();
+    expect(mockClient.query).toHaveBeenCalledWith('BEGIN');
+    expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
   });
 
   it('binds a verified phone transition user only when fallback is enabled', async () => {
@@ -227,13 +307,13 @@ describe('AuthService local user mapping', () => {
     expect(mockClient.query).toHaveBeenLastCalledWith('COMMIT');
   });
 
-  it('rejects unmapped identities without a verified phone fallback claim', async () => {
+  it('rejects unmapped identities from unsupported providers', async () => {
     pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
 
     const service = new AuthService({ verifyAccessToken: vi.fn() });
 
     await expect(service.mapIdentityToUser({
-      provider: 'cognito',
+      provider: 'unsupported',
       subject: 'new-cognito-sub',
       phoneNumber: '+849000000001',
       phoneNumberVerified: false,

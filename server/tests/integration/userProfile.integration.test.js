@@ -33,6 +33,22 @@ const cognitoPublicJwk = {
 
 const encodeJson = (value) => Buffer.from(JSON.stringify(value)).toString('base64url');
 
+const createVietnameseTestPhone = () => (
+  `09${crypto.randomInt(0, 100_000_000).toString().padStart(8, '0')}`
+);
+
+const toE164VietnamPhone = (value) => `+84${value.slice(1)}`;
+
+const mapDateOnly = (value) => (
+  value instanceof Date
+    ? [
+      value.getUTCFullYear().toString().padStart(4, '0'),
+      (value.getUTCMonth() + 1).toString().padStart(2, '0'),
+      value.getUTCDate().toString().padStart(2, '0'),
+    ].join('-')
+    : String(value).slice(0, 10)
+);
+
 function signCognitoAccessToken(subject) {
   const encodedHeader = encodeJson({ alg: 'RS256', kid: cognitoKeyId, typ: 'JWT' });
   const encodedPayload = encodeJson({
@@ -78,6 +94,7 @@ describe('current user profile API', () => {
 
   it('returns and updates schema-backed profile fields for the current user', async () => {
     const user = await createUser({ displayName: 'Profile User' });
+    const onboardingPhone = createVietnameseTestPhone();
 
     try {
       const getResponse = await requestApp()
@@ -89,6 +106,8 @@ describe('current user profile API', () => {
         id: user.id,
         phoneNumber: user.phone_number,
         displayName: 'Profile User',
+        dateOfBirth: '1990-01-01',
+        profileComplete: true,
         avatarUrl: null,
         status: 'ACTIVE',
         expPoints: 0,
@@ -100,6 +119,8 @@ describe('current user profile API', () => {
         .set(authHeaders(user.id))
         .send({
           displayName: 'Updated Profile',
+          phoneNumber: onboardingPhone,
+          dateOfBirth: '2004-11-20',
           avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
         })
         .expect(200);
@@ -107,14 +128,22 @@ describe('current user profile API', () => {
       expect(patchResponse.body).toMatchObject({
         id: user.id,
         displayName: 'Updated Profile',
+        phoneNumber: toE164VietnamPhone(onboardingPhone),
+        dateOfBirth: '2004-11-20',
+        profileComplete: true,
         avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
       });
 
-      const persisted = await query('SELECT display_name, avatar_url FROM users WHERE id = $1', [user.id]);
+      const persisted = await query(
+        'SELECT display_name, phone_number, date_of_birth, avatar_url FROM users WHERE id = $1',
+        [user.id],
+      );
       expect(persisted.rows[0]).toMatchObject({
         display_name: 'Updated Profile',
+        phone_number: toE164VietnamPhone(onboardingPhone),
         avatar_url: 'https://cdn.trustbite.test/avatars/profile-user.webp',
       });
+      expect(mapDateOnly(persisted.rows[0].date_of_birth)).toBe('2004-11-20');
     } finally {
       await cleanupUser(user.id);
     }
@@ -203,19 +232,89 @@ describe('current user profile API', () => {
     }
   });
 
-  it('rejects unmapped Cognito bearer identities at the route boundary', async () => {
+  it('provisions a local profile for a new Cognito bearer identity', async () => {
+    const cognitoSub = 'new-cognito-profile-sub';
+    const onboardingPhone = createVietnameseTestPhone();
     mockCognitoIdentity({
-      subject: 'unmapped-cognito-sub',
-      phoneNumber: '+849999999999',
-      phoneNumberVerified: true,
+      subject: cognitoSub,
+      phoneNumber: null,
+      phoneNumberVerified: false,
     });
 
     const response = await requestApp()
       .get('/api/v1/users/me')
-      .set('Authorization', 'Bearer unmapped-profile-token')
-      .expect(401);
+      .set('Authorization', 'Bearer new-cognito-profile-token')
+      .expect(200);
 
-    expect(response.body.error.code).toBe('UNMAPPED_IDENTITY');
+    try {
+      expect(response.body).toMatchObject({
+        phoneNumber: null,
+        displayName: null,
+        dateOfBirth: null,
+        profileComplete: false,
+        status: 'ACTIVE',
+      });
+
+      const completed = await requestApp()
+        .patch('/api/v1/users/me')
+        .set('Authorization', 'Bearer new-cognito-profile-token')
+        .send({
+          displayName: 'New Cognito User',
+          dateOfBirth: '2000-06-15',
+          phoneNumber: onboardingPhone,
+        })
+        .expect(200);
+
+      expect(completed.body).toMatchObject({
+        displayName: 'New Cognito User',
+        dateOfBirth: '2000-06-15',
+        phoneNumber: toE164VietnamPhone(onboardingPhone),
+        profileComplete: true,
+      });
+
+      const persisted = await query(
+        'SELECT cognito_sub, phone_number, date_of_birth FROM users WHERE id = $1',
+        [response.body.id],
+      );
+      expect(persisted.rows[0]).toMatchObject({
+        cognito_sub: cognitoSub,
+        phone_number: toE164VietnamPhone(onboardingPhone),
+      });
+      expect(mapDateOnly(persisted.rows[0].date_of_birth)).toBe('2000-06-15');
+    } finally {
+      await cleanupUser(response.body.id);
+    }
+  });
+
+  it('rejects invalid birth dates and phone numbers owned by another user', async () => {
+    const owner = await createUser({ displayName: 'Phone Owner' });
+    const user = await createUser({ displayName: 'Profile Conflict User' });
+
+    try {
+      const invalidDate = await requestApp()
+        .patch('/api/v1/users/me')
+        .set(authHeaders(user.id))
+        .send({ dateOfBirth: '2025-02-29' })
+        .expect(422);
+      expect(invalidDate.body.error.code).toBe('VALIDATION_ERROR');
+
+      const duplicatePhone = await requestApp()
+        .patch('/api/v1/users/me')
+        .set(authHeaders(user.id))
+        .send({ phoneNumber: owner.phone_number })
+        .expect(409);
+      expect(duplicatePhone.body.error.code).toBe('PHONE_NUMBER_IN_USE');
+
+      const persisted = await query(
+        'SELECT phone_number, date_of_birth FROM users WHERE id = $1',
+        [user.id],
+      );
+      expect(persisted.rows[0].phone_number).toBe(user.phone_number);
+      expect(mapDateOnly(persisted.rows[0].date_of_birth)).toBe('1990-01-01');
+    } finally {
+      await cleanupUser(user.id);
+      await cleanupUser(owner.id);
+    }
   });
 
   it('rejects a protected profile request without a bearer token', async () => {
