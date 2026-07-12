@@ -8,7 +8,7 @@ Prove Cognito identity mapping finds or safely binds the correct local user, pro
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Body validation, date-only mapping, phone normalization/conflict, avatar allowlist, deletion guard. |
+| Unit | Body validation, PostgreSQL DATE parser registration, date-only mapping, phone normalization/conflict, avatar allowlist, deletion guard. |
 | Integration | GET incomplete profile; PATCH completes required fields; persistence; invalid/conflicting values. |
 | E2E | Flutter gates immediate and restored Cognito sessions before Home. |
 | Platform | LocalStack Cognito where available, otherwise explicit Cognito-compatible test double preserving claim semantics. |
@@ -31,7 +31,7 @@ Prove Cognito identity mapping finds or safely binds the correct local user, pro
 
 ```text
 npm run db:migrate
-npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/auth/authService.test.js tests/unit/user/userService.test.js
+npm run test:unit --prefix server -- tests/unit/config/appConfig.test.js tests/unit/config/dbDateParser.test.js tests/unit/auth/authService.test.js tests/unit/user/userService.test.js
 npm run test:integration --prefix server -- tests/integration/userProfile.integration.test.js
 npm run server:build
 ```
@@ -137,3 +137,15 @@ npm run server:build
 - Profile integration proof was attempted but blocked because PostgreSQL at
   `::1:5432` was unavailable; Docker CLI startup/status also hung, so no new DB
   integration pass is claimed for this follow-up.
+
+2026-07-13 PR #49 DATE parser contract follow-up:
+
+- Added direct regression proof that PostgreSQL text OID `1082` remains the
+  exact `YYYY-MM-DD` string and is not converted into a JavaScript `Date`.
+- Clarified the product and story contracts that date-only values preserve
+  calendar semantics at the database boundary while timestamp parsers remain
+  unchanged.
+- `npm run harness -- story verify TB-USER-PROFILE-001` passed: migrations
+  applied 0; 34 unit files and 337 tests passed; 16 integration files and 128
+  tests passed with 2 files and 4 tests skipped; `server:build` passed for 120
+  files.

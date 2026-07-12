@@ -35,6 +35,9 @@
 Migration `007_add_user_date_of_birth.sql` adds nullable
 `users.date_of_birth`. Phone stays nullable for initial Cognito provisioning
 and unique when set.
+The PostgreSQL boundary registers text OID `1082` with an identity parser so
+date-only values remain `YYYY-MM-DD` strings. Timestamp and timestamp-with-time-
+zone parsers remain unchanged.
 
 ## UI / Platform Impact
 
