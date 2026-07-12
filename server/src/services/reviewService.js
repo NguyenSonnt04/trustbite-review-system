@@ -23,6 +23,7 @@ const REVIEW_SELECT_PROJECTION = `
     r.updated_at AS "updatedAt"
   FROM reviews r
 `;
+const PENDING_ADMIN_REVIEW_PUBLIC_REASON = 'Receipt verification requires manual review.';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MIN_VERIFIED_COMMENT_LENGTH = 50;
@@ -67,7 +68,9 @@ function toVerificationStatus(row) {
           receiptVerificationId: row.receiptVerificationId,
           status: row.receiptStatus,
           decision: row.receiptDecision,
-          decisionReason: row.receiptDecisionReason,
+          decisionReason: row.receiptStatus === 'PENDING_ADMIN_REVIEW'
+            ? PENDING_ADMIN_REVIEW_PUBLIC_REASON
+            : row.receiptDecisionReason,
           capturedAt: row.receiptCapturedAt,
           decidedAt: row.receiptDecidedAt,
           createdAt: row.receiptCreatedAt,
