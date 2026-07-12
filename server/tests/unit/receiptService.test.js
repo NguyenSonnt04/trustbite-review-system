@@ -253,7 +253,7 @@ describe('uploadReceiptForReview', () => {
     expect(client.query.mock.calls.some(([sql]) => String(sql).includes("SET status = 'FAILED'"))).toBe(false);
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining("SET status = 'PENDING_ADMIN_REVIEW'"),
-      ['55555555-5555-4555-8555-555555555555', 'OCR enqueue failed; pending manual review.'],
+      ['55555555-5555-4555-8555-555555555555', 'Receipt verification requires manual review.'],
     );
     expect(JSON.stringify(client.query.mock.calls)).not.toContain('queue unavailable');
     expect(deleteReceiptObject).not.toHaveBeenCalled();
@@ -295,7 +295,7 @@ describe('uploadReceiptForReview', () => {
     });
     expect(client.query).toHaveBeenCalledWith(
       expect.stringContaining("SET status = 'PENDING_ADMIN_REVIEW'"),
-      ['55555555-5555-4555-8555-555555555555', 'OCR enqueue failed; pending manual review.'],
+      ['55555555-5555-4555-8555-555555555555', 'Receipt verification requires manual review.'],
     );
     expect(JSON.stringify(client.query.mock.calls)).not.toContain('ambiguous queue timeout');
     expect(deleteReceiptObject).not.toHaveBeenCalled();

@@ -1,4 +1,5 @@
 import { pool } from '../config/db.js';
+import { PENDING_ADMIN_REVIEW_PUBLIC_REASON } from '../config/receiptStatus.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const REVIEW_SELECT_PROJECTION = `
@@ -67,7 +68,10 @@ function toVerificationStatus(row) {
           receiptVerificationId: row.receiptVerificationId,
           status: row.receiptStatus,
           decision: row.receiptDecision,
-          decisionReason: row.receiptDecisionReason,
+          // Never expose internal admin-review reasons through the public API.
+          decisionReason: row.receiptStatus === 'PENDING_ADMIN_REVIEW'
+            ? PENDING_ADMIN_REVIEW_PUBLIC_REASON
+            : row.receiptDecisionReason,
           capturedAt: row.receiptCapturedAt,
           decidedAt: row.receiptDecidedAt,
           createdAt: row.receiptCreatedAt,
