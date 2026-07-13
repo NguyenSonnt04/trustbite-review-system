@@ -1,494 +1,395 @@
-.container {
+.page {
   display: flex;
+  min-height: 100vh;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-  background-color: var(--background);
+  background: oklch(0.97 0.008 75);
+  color: var(--ink);
 }
 
 .header {
-  height: 70px;
-  border-bottom: 1px solid var(--card-border);
   display: flex;
+  width: min(1240px, calc(100% - 48px));
+  min-height: 76px;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  padding: 0 24px;
-  background-color: rgba(15, 23, 42, 0.8);
-  backdrop-filter: blur(12px);
-  z-index: 100;
-}
-
-.titleContainer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.logo {
-  font-size: 1.5rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--secondary) 0%, var(--primary) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  font-family: var(--font-display);
-}
-
-.logoDot {
-  color: var(--secondary);
-}
-
-.slogan {
-  color: var(--muted);
-  font-size: 0.85rem;
-  padding-left: 8px;
-  border-left: 1px solid var(--card-border);
-}
-
-.headerActions {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.authBadge {
-  background-color: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--card-border);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.statusDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #10b981;
-  box-shadow: 0 0 8px #10b981;
-}
-
-/* Layout Split-Screen default >= 1024px */
-.mainLayout {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-.sidebar {
-  width: 50%;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  border-right: 1px solid var(--card-border);
-  padding: 24px;
-  gap: 20px;
-}
-
-.mapContainer {
-  width: 50%;
-  height: 100%;
-  position: relative;
-  background-color: #0f172a;
-}
-
-/* Search and Filters Section */
-.searchSection {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.searchBar {
-  display: flex;
-  gap: 10px;
-}
-
-.searchInput {
-  flex: 1;
-  background-color: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
-  padding: 12px 16px;
-  color: #fff;
-  font-size: 0.95rem;
-  font-family: var(--font-sans);
-}
-
-.searchInput:focus {
-  outline: none;
-  border-color: var(--secondary);
-  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
-}
-
-.filters {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.filterBtn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--card-border);
-  color: var(--muted);
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
-}
-
-.filterBtn:hover, .filterActive {
-  background: rgba(0, 242, 254, 0.1);
-  border-color: var(--secondary);
-  color: var(--secondary);
-}
-
-.filterBtn:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-/* Restaurant List Section */
-.listSection {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.restaurantCard {
-  background-color: var(--card);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  padding: 20px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease, box-shadow 0.3s ease;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.restaurantCard:hover {
-  transform: translateY(-2px);
-  border-color: hsla(180, 100%, 50%, 0.3);
-  box-shadow: var(--shadow-lg), 0 0 15px rgba(0, 242, 254, 0.1);
-}
-
-.cardActive {
-  border-color: var(--secondary);
-  box-shadow: 0 0 10px rgba(0, 242, 254, 0.15);
-}
-
-.restaurantHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.restaurantInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.restaurantName {
-  font-size: 1.2rem;
-  color: #fff;
-}
-
-.restaurantCuisine {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.trustScoreBadge {
-  background: linear-gradient(135deg, rgba(0, 242, 254, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
-  border: 1px solid rgba(0, 242, 254, 0.3);
-  color: var(--secondary);
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 0.85rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.restaurantFooter {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-  color: var(--muted);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  margin: 0 auto;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
   padding-top: 12px;
-  margin-top: 4px;
 }
 
-.verifiedLabel {
-  color: var(--success);
+.brand {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-weight: 600;
+  gap: 11px;
 }
 
-.deviationWarning {
-  color: var(--danger);
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* Interactive Map Visual Mock */
-.mockMap {
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Simulated grid/topography lines */
-.mapGrid {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.mapPin {
-  position: absolute;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  transform: translate(-50%, -100%);
-  transition: z-index 0.3s ease;
-}
-
-.mapPin:hover {
-  z-index: 10;
-}
-
-.pinIcon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50% 50% 50% 0;
-  background: var(--primary);
-  transform: rotate(-45deg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid #fff;
-  box-shadow: 0 0 10px rgba(139, 92, 246, 0.5);
-  transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.pinIconActive {
-  background: var(--secondary);
-  box-shadow: 0 0 15px rgba(0, 242, 254, 0.8);
-  transform: rotate(-45deg) scale(1.15);
-}
-
-.pinEmoji {
-  transform: rotate(45deg);
-  font-size: 0.95rem;
-}
-
-.pinGlow {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: rgba(0, 242, 254, 0.35);
-  bottom: -4px;
-  opacity: 0;
-  transform: scaleY(0.5) scale(1.8);
-  transition: opacity 0.2s ease;
-}
-
-.pinGlowActive {
-  opacity: 0.7;
-}
-
-.pinPopup {
-  background-color: var(--card);
-  border: 1px solid var(--secondary);
+.brand > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
   border-radius: 8px;
-  padding: 8px 12px;
-  position: absolute;
-  bottom: 40px;
-  width: max-content;
-  max-width: 200px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-  text-align: center;
-  font-size: 0.8rem;
-  color: #fff;
-  z-index: 200;
-}
-
-/* TrustBite Verification Modal Widgets */
-.fraudWidget {
-  background-color: rgba(15, 23, 42, 0.9);
-  border: 1px solid var(--card-border);
-  border-radius: var(--radius);
-  padding: 20px;
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.widgetTitle {
-  font-size: 1.1rem;
-  color: var(--secondary);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fraudDescription,
-.emptyText {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.emptyText {
-  margin-top: 20px;
-  text-align: center;
-}
-
-.formStack,
-.actionRow {
-  display: flex;
-  gap: 8px;
-}
-
-.formStack {
-  flex-direction: column;
-}
-
-.fileInput {
-  color: #fff;
-  font-size: 0.85rem;
-}
-
-.actionRow .filterBtn {
-  flex: 1;
-  font-size: 0.75rem;
-}
-
-.verifyButton {
-  width: 100%;
-  padding: 10px 0;
-  border-color: rgba(0, 242, 254, 0.4);
-}
-
-.logPanel {
-  background-color: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--card-border);
-  border-radius: 6px;
-  padding: 12px;
-}
-
-.resultBanner {
-  margin-top: 12px;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 0.85rem;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 11px;
   font-weight: 700;
-  text-align: center;
+  letter-spacing: -0.03em;
 }
 
-.successBanner {
-  background: rgba(16, 185, 129, 0.1);
-  border: 1px solid var(--success);
-  color: var(--success);
-}
-
-.failBanner {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-}
-
-.stepList {
+.brand > div {
   display: flex;
   flex-direction: column;
-  gap: 10px;
 }
 
-.stepItem {
-  display: flex;
-  gap: 10px;
-  font-size: 0.85rem;
+.brand strong {
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.brand small {
   color: var(--muted);
-  align-items: center;
+  font-size: 12px;
 }
 
-.stepIcon {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
+.hero {
+  display: grid;
+  width: min(1240px, calc(100% - 48px));
+  flex: 1;
+  grid-template-columns: minmax(0, 1.15fr) minmax(420px, 0.72fr);
+  align-items: center;
+  gap: clamp(48px, 8vw, 120px);
+  margin: 0 auto;
+  padding: 72px 0;
+}
+
+.heroContent {
+  position: relative;
+  isolation: isolate;
+  max-width: 670px;
+}
+
+.kicker {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.heroContent h1 {
+  margin-top: 18px;
+  font-size: clamp(54px, 7vw, 92px);
+  font-weight: 540;
+  letter-spacing: -0.07em;
+  line-height: 0.96;
+}
+
+.heroContent > p {
+  max-width: 600px;
+  margin-top: 28px;
+  color: #5d5e65;
+  font-size: clamp(17px, 1.5vw, 20px);
+  line-height: 1.65;
+}
+
+.featureList {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  margin-top: 38px;
+}
+
+.featureList > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #46474d;
+  font-size: 13px;
+}
+
+.featureList svg {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: oklch(0.995 0.002 70 / 0.7);
+  padding: 5px;
+  box-shadow: 0 6px 16px oklch(0.2 0.008 285 / 0.05);
+}
+
+.loginCard {
+  border: 1px solid oklch(0.28 0.004 285 / 0.24);
+  border-radius: 16px;
+  background: var(--surface);
+  padding: 36px;
+}
+
+.loginHeader {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 26px;
+}
+
+.loginIcon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.loginHeader h2 {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.loginHeader p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-top: 28px;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: #4e4f55;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inputShell {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 11px;
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.inputShell > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  fill: none;
+  stroke-width: 1.6;
+}
+
+.inputShell input {
+  min-width: 0;
+  min-height: 48px;
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  font-size: 14px;
+  outline: 0;
+}
+
+.inputShell:focus-within {
+  border-color: oklch(0.28 0.004 285 / 0.5);
+  box-shadow: 0 0 0 3px oklch(0.3 0.005 285 / 0.07);
+  transform: translateY(-1px);
+}
+
+.inputShell button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.inputShell button:hover {
+  background: var(--surface-muted);
+  color: var(--ink);
+}
+
+.formNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid oklch(0.72 0.07 75 / 0.3);
+  border-radius: 9px;
+  background: oklch(0.97 0.025 75);
+  color: oklch(0.42 0.07 65);
+  padding: 12px 13px;
+}
+
+.formNotice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.formNotice p {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.loginButton {
+  display: flex;
+  position: relative;
+  min-height: 50px;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
+  border: 1px solid var(--ink);
+  border-radius: 8px;
+  background: var(--ink);
+  color: var(--surface);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  box-shadow: 0 10px 22px oklch(0.2 0.008 285 / 0.14);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), background 160ms ease, box-shadow 160ms ease;
 }
 
-.stepDone {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: var(--success);
-  border: 1px solid var(--success);
+.loginButton > svg {
+  position: absolute;
+  right: 20px;
 }
 
-.stepActive {
-  background-color: rgba(0, 242, 254, 0.15);
-  color: var(--secondary);
-  border: 1px solid var(--secondary);
+.loginButton:hover {
+  background: oklch(0.25 0.006 285);
+  transform: translateY(-1px);
+  box-shadow: 0 14px 28px oklch(0.2 0.008 285 / 0.18);
 }
 
-.stepWaiting {
-  background-color: rgba(255, 255, 255, 0.05);
+.loginButton:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 14px oklch(0.2 0.008 285 / 0.12);
+}
+
+.loginButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 22px;
   color: var(--muted);
-  border: 1px solid var(--card-border);
+  font-size: 12px;
 }
 
-.stepMessageDone {
-  color: #fff;
+.preview a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ink);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
-.stepMessageFail {
-  color: var(--danger);
+.securityCopy {
+  margin-top: 22px;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.65;
 }
 
-/* Responsiveness <= 1024px */
-@media (max-width: 1024px) {
-  .mainLayout {
+.footer {
+  display: flex;
+  width: min(1240px, calc(100% - 48px));
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 auto;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 52px;
+    padding: 64px 0;
+  }
+
+  .heroContent {
+    max-width: 760px;
+  }
+
+  .loginCard {
+    width: min(520px, 100%);
+  }
+}
+
+@media (max-width: 620px) {
+  .header,
+  .hero,
+  .footer {
+    width: min(100% - 28px, 1240px);
+  }
+
+  .hero {
+    gap: 40px;
+    padding: 48px 0;
+  }
+
+  .heroContent h1 {
+    font-size: clamp(46px, 16vw, 68px);
+  }
+
+  .heroContent > p {
+    font-size: 16px;
+  }
+
+  .featureList {
+    align-items: flex-start;
+    flex-direction: column;
+    margin-top: 30px;
+  }
+
+  .loginCard {
+    border-radius: 12px;
+    padding: 24px;
+  }
+
+  .preview {
+    align-items: flex-start;
     flex-direction: column;
   }
 
-  .sidebar {
-    width: 100%;
-    height: 50vh;
-    border-right: none;
-    border-bottom: 1px solid var(--card-border);
+  .footer {
+    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
   }
+}
 
-  .mapContainer {
-    width: 100%;
-    height: 50vh;
+@media (prefers-reduced-motion: reduce) {
+  .loginButton {
+    transition: none;
   }
 }

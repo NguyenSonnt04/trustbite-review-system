@@ -1,0 +1,58 @@
+import {
+  Activity,
+  ArrowRight,
+  Bell,
+  Eye,
+  EyeOff,
+  Info,
+  KeyRound,
+  LayoutDashboard,
+  LockKeyhole,
+  LogOut,
+  Mail,
+  Menu,
+  MessageSquareText,
+  Minus,
+  MoreHorizontal,
+  ReceiptText,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Store,
+  TrendingDown,
+  TrendingUp,
+  UsersRound,
+  X,
+} from 'lucide-react';
+
+const icons = {
+  dashboard: LayoutDashboard,
+  users: UsersRound,
+  store: Store,
+  reviews: MessageSquareText,
+  receipt: ReceiptText,
+  audit: ShieldCheck,
+  monitor: Activity,
+  search: Search,
+  bell: Bell,
+  menu: Menu,
+  close: X,
+  lock: LockKeyhole,
+  arrow: ArrowRight,
+  refresh: RefreshCw,
+  logout: LogOut,
+  trendUp: TrendingUp,
+  trendDown: TrendingDown,
+  neutral: Minus,
+  more: MoreHorizontal,
+  mail: Mail,
+  key: KeyRound,
+  eye: Eye,
+  eyeOff: EyeOff,
+  info: Info,
+};
+
+export default function AdminIcon({ name, size = 20, strokeWidth = 1.8 }) {
+  const Icon = icons[name] ?? LayoutDashboard;
+  return <Icon aria-hidden="true" size={size} strokeWidth={strokeWidth} />;
+}
