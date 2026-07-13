@@ -3,7 +3,21 @@
     "allow": [
       "PowerShell(npm run lint --prefix client)",
       "PowerShell($env:NEXT_PUBLIC_API_URL='http://localhost:5000'; $env:NEXT_PUBLIC_AWS_REGION='ap-southeast-1'; npm run build --prefix client)",
-      "PowerShell(npm run server:build)"
+      "PowerShell(npm run server:build)",
+      "Skill(simplify)",
+      "Skill(simplify:*)",
+      "Skill(code-review)",
+      "Skill(code-review:*)",
+      "PowerShell(npm run harness -- query matrix)",
+      "PowerShell(git -C \"D:\\\\DuongTanHuy\\\\trustbite-team-tcc\\\\trustbite-review-system\\\\.claude\\\\worktrees\\\\agent-a08317fcbf60b2b02\" diff -- client/src/app/page.js client/src/app/layout.js client/src/app/globals.css client/src/app/page.module.css)",
+      "PowerShell(git -C \"D:\\\\DuongTanHuy\\\\trustbite-team-tcc\\\\trustbite-review-system\\\\.claude\\\\worktrees\\\\agent-a08317fcbf60b2b02\" status --short)",
+      "PowerShell(git -C \"D:\\\\DuongTanHuy\\\\trustbite-team-tcc\\\\trustbite-review-system\\\\.claude\\\\worktrees\\\\agent-a08317fcbf60b2b02\" diff main...HEAD -- client/src/app/page.js client/src/app/layout.js client/src/app/globals.css client/src/app/page.module.css)",
+      "PowerShell(git -C \"D:\\\\DuongTanHuy\\\\trustbite-team-tcc\\\\trustbite-review-system\" worktree list)",
+      "PowerShell(dart format mobile/lib mobile/test)",
+      "PowerShell(flutter test)",
+      "PowerShell(git add -- server/src/services/receiptService.js server/tests/unit/receiptService.test.js)",
+      "PowerShell(git ls-remote origin refs/heads/feature/backend)",
+      "PowerShell(npm --prefix server run test:unit -- tests/unit/receiptService.test.js)"
     ]
   }
 }

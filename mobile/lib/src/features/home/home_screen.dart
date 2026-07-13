@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 import 'package:trustbite_mobile/src/features/map/map_screen.dart';
 
 /// Discover screen converted from the Builder.io / Figma "Tìm với TrustBite"
@@ -528,7 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            _NetworkRestaurantImage(
+            OptimizedNetworkImage(
               imageUrl: r.image,
               width: 240,
               height: 160,
@@ -880,64 +881,6 @@ class _HomeScreenState extends State<HomeScreen> {
           fontWeight: FontWeight.bold,
           color: Color(0xFFFF7300),
         ),
-      ),
-    );
-  }
-}
-
-class _NetworkRestaurantImage extends StatelessWidget {
-  const _NetworkRestaurantImage({
-    required this.imageUrl,
-    required this.width,
-    required this.height,
-    required this.borderRadius,
-    required this.semanticLabel,
-  });
-
-  final String imageUrl;
-  final double width;
-  final double height;
-  final double borderRadius;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: Image.network(
-          imageUrl,
-          fit: BoxFit.cover,
-          semanticLabel: semanticLabel,
-          cacheWidth: (width * devicePixelRatio).round(),
-          cacheHeight: (height * devicePixelRatio).round(),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return const _RestaurantImageFallback(icon: Icons.restaurant);
-          },
-          errorBuilder: (_, __, ___) =>
-              const _RestaurantImageFallback(icon: Icons.restaurant),
-        ),
-      ),
-    );
-  }
-}
-
-class _RestaurantImageFallback extends StatelessWidget {
-  const _RestaurantImageFallback({required this.icon});
-
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFE5E7EB),
-      child: Center(
-        child: Icon(icon, size: 32, color: const Color(0xFFFF5E00)),
       ),
     );
   }

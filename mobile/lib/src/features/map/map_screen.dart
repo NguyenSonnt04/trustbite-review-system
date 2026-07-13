@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 
 class MapScreen extends StatelessWidget {
   const MapScreen({super.key});
@@ -264,12 +265,13 @@ class MapScreen extends StatelessWidget {
       ),
       child: Row(
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: _MapRestaurantImage(
-              imageUrl: restaurant.image,
-              semanticLabel: restaurant.name,
-            ),
+          OptimizedNetworkImage(
+            imageUrl: restaurant.image,
+            width: 62,
+            height: 62,
+            semanticLabel: restaurant.name,
+            borderRadius: 16,
+            fallbackIconSize: 24,
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -346,54 +348,6 @@ class MapScreen extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MapRestaurantImage extends StatelessWidget {
-  const _MapRestaurantImage({
-    required this.imageUrl,
-    required this.semanticLabel,
-  });
-
-  static const double _size = 62;
-
-  final String imageUrl;
-  final String semanticLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
-
-    return SizedBox(
-      width: _size,
-      height: _size,
-      child: Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        semanticLabel: semanticLabel,
-        cacheWidth: (_size * devicePixelRatio).round(),
-        cacheHeight: (_size * devicePixelRatio).round(),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return const _MapRestaurantImageFallback();
-        },
-        errorBuilder: (_, __, ___) => const _MapRestaurantImageFallback(),
-      ),
-    );
-  }
-}
-
-class _MapRestaurantImageFallback extends StatelessWidget {
-  const _MapRestaurantImageFallback();
-
-  @override
-  Widget build(BuildContext context) {
-    return const ColoredBox(
-      color: Color(0xFFE5E7EB),
-      child: Center(
-        child: Icon(Icons.restaurant_rounded, color: MapScreen._brand),
       ),
     );
   }
