@@ -2,26 +2,24 @@
 
 ## Domain Model
 
-Admin access requires both:
-
-- a browser session marker for the `/admin` route middleware; and
-- a local browser auth token plus `ADMIN` or `SUPER_ADMIN` role before the admin workspace loads dashboard data.
+Admin access requires a browser session marker for the `/admin` route middleware. Browser JavaScript must not create that marker or place bearer tokens in cookies; future Cognito web login must exchange a verified Cognito token through a server boundary that sets an HttpOnly/Secure session marker.
 
 Cognito remains the token source of truth. This story does not introduce backend-issued TrustBite tokens.
 
 ## Application Flow
 
-1. Anonymous visitor requests `/admin`.
-2. Next.js middleware checks the admin session cookie scoped to `/admin`.
-3. Missing cookie redirects to `/` with `redirect=/admin`.
-4. If the admin shell renders, `AdminPortal` checks local token and admin role before calling health/restaurant APIs.
-5. Logout clears local token/user state and the admin session cookie.
+1. Anonymous visitor requests `/admin` or `/admin/preview`.
+2. Next.js middleware checks for the admin session marker on every admin path.
+3. Missing cookie redirects to `/` with the requested admin path in `redirect`.
+4. Future Cognito web login must set the admin session marker only from a server response with `HttpOnly; Secure`.
+5. Admin user-status mutations validate the `reason` request field before service-layer logic runs.
 
 ## Interface Contract
 
-- `GET /admin`: requires `trustbite_admin_session` cookie; redirects to `/` when missing.
+- `GET /admin` and `GET /admin/*`: require the `trustbite_admin_session` marker; redirect to `/` when missing.
 - `GET /api/v1/admin/session`: requires `Authorization: Bearer <Cognito access token>` or trusted local development headers, then requires `ADMIN` or `SUPER_ADMIN`; returns the authenticated admin user's safe profile fields.
-- Home login form: requires email and password fields, calls `authService.login({ email, password })`, and displays the unsupported Cognito-web-login error.
+- `POST /api/v1/admin/users/:userId/suspend` and `/reactivate`: require a JSON `reason` string no longer than 500 characters at the controller boundary before service validation enforces the existing business minimum.
+- Home login form: remains disabled until a safe Cognito web login flow can set a server-owned HttpOnly/Secure session marker.
 
 ## Data Model
 
@@ -29,9 +27,9 @@ No database schema or migration changes.
 
 ## UI / Platform Impact
 
-- Removes the read-only admin bypass link.
+- Removes public admin bypass links.
 - Keeps unavailable modules visibly locked.
-- Keeps the admin workspace responsive but inaccessible without a session marker.
+- Keeps the admin workspace responsive but inaccessible without a server-owned session marker.
 
 ## Observability
 

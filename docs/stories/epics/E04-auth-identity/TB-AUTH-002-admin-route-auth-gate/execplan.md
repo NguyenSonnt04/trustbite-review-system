@@ -8,11 +8,12 @@ Close the anonymous `/admin` access path while keeping unsupported login/admin o
 
 In scope:
 
-- Add a Next.js middleware gate for `/admin`.
-- Remove the read-only `/admin` bypass link.
-- Make the login form pass email/password into the auth service.
-- Add a client-side defensive guard before loading admin dashboard data.
+- Add a Next.js middleware gate for `/admin` and nested admin paths.
+- Remove public read-only admin bypass links.
+- Keep the login form disabled until a safe Cognito web login flow exists.
+- Ensure the client never writes bearer tokens into cookies.
 - Add a protected admin session endpoint that verifies bearer token auth and admin role.
+- Validate admin action reasons at the HTTP controller boundary.
 
 Out of scope:
 

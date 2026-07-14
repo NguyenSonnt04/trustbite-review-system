@@ -1,6 +1,5 @@
 const AUTH_TOKEN_KEY = 'auth_token';
 const USER_STORAGE_KEY = 'user';
-const ADMIN_SESSION_COOKIE = 'trustbite_admin_session';
 
 const getBrowserStorage = () => {
   if (typeof window === 'undefined') {
@@ -8,23 +7,6 @@ const getBrowserStorage = () => {
   }
 
   return window.localStorage;
-};
-
-const writeAdminSessionCookie = (token) => {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; Path=/admin; SameSite=Lax${secure}`;
-};
-
-const clearAdminSessionCookie = () => {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  document.cookie = `${ADMIN_SESSION_COOKIE}=; Path=/admin; Max-Age=0; SameSite=Lax`;
 };
 
 class AuthService {
@@ -48,7 +30,6 @@ class AuthService {
 
     storage.removeItem(AUTH_TOKEN_KEY);
     storage.removeItem(USER_STORAGE_KEY);
-    clearAdminSessionCookie();
   }
 
   getCurrentUser() {
@@ -74,22 +55,6 @@ class AuthService {
     const roles = Array.isArray(user?.roles) ? user.roles : [];
     return Boolean(token) && roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase()));
   }
-
-  persistAuthenticatedSession({ token, user }) {
-    if (!token || !user) {
-      throw new Error('Authenticated sessions require a token and user.');
-    }
-
-    const storage = getBrowserStorage();
-    if (!storage) {
-      return;
-    }
-
-    storage.setItem(AUTH_TOKEN_KEY, token);
-    storage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-    writeAdminSessionCookie(token);
-  }
 }
 
 export const authService = new AuthService();
-export { ADMIN_SESSION_COOKIE };

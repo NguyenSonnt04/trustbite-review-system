@@ -73,13 +73,13 @@ export default function AdminHome() {
           </div>
 
           <div className={styles.preview}>
-            <span>Cần xem giao diện hiện tại?</span>
-            <Link href="/admin/preview">Mở bản xem chỉ đọc <AdminIcon name="arrow" size={13} /></Link>
+            <span>Bản xem quản trị đã được khóa.</span>
+            <strong>Cần phiên quản trị hợp lệ để truy cập.</strong>
           </div>
 
           <p className={styles.securityCopy}>
-            Bản xem chỉ sử dụng dữ liệu công khai và không mở khóa thao tác quản trị.
-            Khi đăng nhập được triển khai, mọi quyền vẫn phải được server xác minh.
+            Không có đường xem công khai vào workspace quản trị. Khi đăng nhập được triển khai,
+            cookie phiên phải do server đặt với HttpOnly và mọi quyền vẫn phải được server xác minh.
           </p>
         </aside>
       </section>

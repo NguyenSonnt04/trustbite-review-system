@@ -6,7 +6,7 @@ The `/admin` web route rendered the admin workspace without a route-level sessio
 
 ## Target Behavior
 
-The `/admin` route is blocked by Next.js middleware unless an admin session cookie is present. The admin workspace also refuses to load data if the browser-side token/user role state is missing or not admin-capable. The backend exposes a protected `GET /api/v1/admin/session` role-check endpoint for future web auth wiring. The login form reads submitted fields and reports that Cognito web login is not connected instead of offering a read-only bypass.
+The `/admin` and `/admin/*` routes are blocked by Next.js middleware unless an admin session cookie is present. The cookie is not written by browser JavaScript; future Cognito web login must have the server set an HttpOnly/Secure session marker after verifying the Cognito token. The backend exposes a protected `GET /api/v1/admin/session` role-check endpoint for future web auth wiring. Unsupported login and public preview entry points stay locked instead of offering a read-only bypass.
 
 ## Affected Users
 
