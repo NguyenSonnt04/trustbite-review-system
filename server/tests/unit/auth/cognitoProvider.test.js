@@ -255,6 +255,43 @@ describe('CognitoIdentityProvider', () => {
     ]);
   });
 
+  it('preserves the verification error when refresh-token revocation fails', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: 'malformed-access-token',
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          throw new Error('Cognito unavailable');
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+  });
+
   it.each([
     ['issuer', { iss: 'https://invalid.example.test/pool' }, 'INVALID_TOKEN'],
     ['client id', { client_id: 'wrong-client' }, 'INVALID_TOKEN'],

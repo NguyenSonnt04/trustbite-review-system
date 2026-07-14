@@ -312,7 +312,7 @@ export class CognitoIdentityProvider {
     try {
       identity = await this.verifyAccessToken(accessToken, { clientId });
     } catch (err) {
-      await revokeRefreshToken();
+      await revokeRefreshToken().catch(() => undefined);
       throw err;
     }
     await revokeRefreshToken();
