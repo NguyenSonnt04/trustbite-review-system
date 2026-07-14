@@ -88,6 +88,17 @@ The administration website uses the BFF wrapper defined by
 
 The current production identity provider adapter is Cognito. `docs/decisions/0011-auth-provider-adapter-boundary.md` documents the adapter boundary so profile and account services do not parse Cognito claims directly.
 
+### Admin User Management BFF
+
+The user-management surface follows decision `0023`:
+
+- Browser JavaScript calls same-origin Next.js route handlers and never receives the opaque marker, Cognito tokens, or the BFF secret.
+- Next.js forwards the HttpOnly marker and server-only BFF credential to narrow Express `/admin-web/users` routes.
+- Express validates the marker and re-reads local account state and `user_roles` for every operation.
+- Admin-created users are pre-provisioned in Cognito with provider messaging suppressed and a verified email attribute. Express sets a generated permanent provider password that is never returned, logged, or persisted by TrustBite, moving the identity to `CONFIRMED` before transactionally mapping it to PostgreSQL for the existing OTP/custom-auth flow.
+- If local persistence fails after Cognito creation, Express attempts provider deletion compensation and does not claim success.
+- The admin portal does not expose account deletion.
+
 ## JWT Verification Requirements
 
 Express auth middleware/authorizer handling must validate:

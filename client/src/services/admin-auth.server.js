@@ -53,6 +53,9 @@ export const requestAdminAuthApi = async (path, {
   sessionToken = '',
   clientAddress = '',
   body,
+  rawBody,
+  contentType = '',
+  extraHeaders = {},
 } = {}) => {
   const { apiBaseUrl, bffSecret } = getConfiguration();
   if (!bffSecret) {
@@ -71,6 +74,7 @@ export const requestAdminAuthApi = async (path, {
   const headers = {
     Accept: 'application/json',
     'x-trustbite-bff-secret': bffSecret,
+    ...extraHeaders,
   };
   if (sessionToken) {
     headers['x-trustbite-admin-session'] = sessionToken;
@@ -78,7 +82,9 @@ export const requestAdminAuthApi = async (path, {
   if (clientAddress) {
     headers['x-trustbite-client-address'] = clientAddress;
   }
-  if (body !== undefined) {
+  if (rawBody !== undefined && contentType) {
+    headers['Content-Type'] = contentType;
+  } else if (body !== undefined) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -87,9 +93,13 @@ export const requestAdminAuthApi = async (path, {
     response = await fetch(`${apiBaseUrl}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: rawBody !== undefined
+        ? rawBody
+        : body === undefined
+          ? undefined
+          : JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(rawBody !== undefined ? 15000 : 5000),
     });
   } catch {
     return {

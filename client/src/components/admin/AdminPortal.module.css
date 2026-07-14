@@ -229,7 +229,7 @@
 }
 
 .pageTitle h1 {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 650;
   letter-spacing: -0.02em;
 }
@@ -329,6 +329,331 @@
   max-width: 1480px;
   margin: 0 auto;
   padding: 26px 24px 48px;
+}
+
+.overviewSection,
+.restaurantSection {
+  font-family: "Segoe UI Variable", var(--font-sans);
+}
+
+.overviewSection .metricLabel span {
+  font-size: 14px;
+}
+
+.overviewSection .metricCard > p {
+  font-size: 13px;
+}
+
+.overviewSection .metricCard > strong {
+  font-size: clamp(28px, 2.6vw, 34px);
+}
+
+.overviewSection .metricTrend {
+  font-size: 12px;
+}
+
+.overviewSection .chartHeader > div:first-child span,
+.overviewSection .panelHeader > div > span {
+  font-size: 12px;
+}
+
+.overviewSection .capabilityItem strong {
+  font-size: 14px;
+}
+
+.overviewSection .capabilityItem small {
+  font-size: 12px;
+}
+
+.overviewSection .panelHeader h2 {
+  font-size: 17px;
+}
+
+.overviewSection .textButton {
+  font-size: 12px;
+}
+
+.overviewSection .compactRow {
+  min-height: 70px;
+}
+
+.overviewSection .compactMain strong {
+  font-size: 14px;
+}
+
+.overviewSection .compactMain span {
+  font-size: 12px;
+}
+
+.overviewSection .entityAvatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.overviewSection .tableScore {
+  font-size: 14px;
+}
+
+.overviewSection .pulseList > div {
+  min-height: 48px;
+  font-size: 13px;
+}
+
+.overviewSection .badge {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.overviewSection .securityNote,
+.overviewSection .emptyInline {
+  font-size: 12px;
+}
+
+.restaurantSection .searchBox {
+  min-height: 44px;
+}
+
+.restaurantSection .searchBox input {
+  font-size: 13px;
+}
+
+.restaurantSection .boundaryNotice {
+  padding: 11px 12px;
+  font-size: 12px;
+}
+
+.restaurantSection .dataTable th {
+  padding: 13px 12px;
+  font-size: 12px;
+}
+
+.restaurantSection .dataTable td {
+  padding: 15px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.restaurantSection .entityAvatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.restaurantSection .entityCell strong {
+  font-size: 14px;
+}
+
+.restaurantSection .entityCell div span {
+  font-size: 12px;
+}
+
+.restaurantSection .badge {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.restaurantSection .primaryButton {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.restaurantSection .smallButton {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.restaurantSection .iconButton {
+  width: 44px;
+  height: 44px;
+}
+
+.restaurantSection .emptyInline,
+.restaurantSection .errorBanner {
+  font-size: 13px;
+}
+
+.restaurantTableImage {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  object-fit: cover;
+}
+
+.restaurantDetailModal {
+  width: min(1180px, 100%);
+}
+
+.restaurantDetailLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
+  gap: 24px;
+}
+
+.restaurantProfileForm,
+.restaurantGallerySection {
+  min-width: 0;
+}
+
+.restaurantGallerySection {
+  border-left: 1px solid var(--line);
+  padding-left: 24px;
+}
+
+.restaurantModalSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.restaurantModalSectionHeader h3 {
+  font-size: 17px;
+  font-weight: 650;
+}
+
+.restaurantModalSectionHeader p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.restaurantDetailModal .formField select {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 11px;
+  font-size: 14px;
+}
+
+.restaurantDetailModal .formField select:focus {
+  border-color: oklch(0.28 0.004 285 / 0.52);
+  box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.07);
+}
+
+.restaurantImageUpload {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.imagePrimaryToggle {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  color: #56575e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.restaurantGalleryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.restaurantImageCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.restaurantImageCard > a {
+  display: block;
+  background: var(--surface-muted);
+}
+
+.restaurantImageCard img {
+  display: block;
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+}
+
+.restaurantImageCardBody {
+  padding: 12px;
+}
+
+.restaurantImageMeta {
+  display: flex;
+  min-height: 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.restaurantImageCardBody > input {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.restaurantImageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.restaurantImageActions .primaryButton,
+.restaurantImageActions .secondaryButton,
+.restaurantImageActions .dangerButton {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.restaurantImageActions label {
+  cursor: pointer;
+}
+
+.restaurantGalleryEmpty {
+  grid-column: 1 / -1;
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.restaurantGalleryEmpty strong {
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.restaurantGalleryEmpty p {
+  margin-top: 4px;
+  font-size: 12px;
 }
 
 .metricGrid {
@@ -795,10 +1120,494 @@
 }
 
 .errorBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   margin-bottom: 12px;
   border-radius: 7px;
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.userSectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.userManagement,
+.modal {
+  font-family: "Segoe UI Variable", var(--font-sans);
+}
+
+.userManagement .eyebrow {
+  font-size: 11px;
+}
+
+.userManagement .primaryButton,
+.userManagement .secondaryButton {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.userSectionHeader h2 {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.userSectionHeader p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.userStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 20px 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--line);
+}
+
+.userStats > div {
+  display: flex;
+  min-height: 76px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: var(--surface);
+  padding: 14px 18px;
+}
+
+.userStats span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.userStats strong {
+  overflow: hidden;
+  font-size: 20px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userFilters {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) 160px 170px 38px;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.userFilters .searchBox {
+  width: 100%;
+  min-height: 44px;
+}
+
+.userFilters .searchBox input {
+  font-size: 13px;
+}
+
+.userFilters select {
+  min-height: 44px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.roleBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.userManagement .dataTable th {
+  padding: 13px 12px;
+  font-size: 12px;
+}
+
+.userManagement .dataTable td {
+  padding: 15px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.userManagement .entityAvatar {
+  width: 36px;
+  height: 36px;
+  font-size: 13px;
+}
+
+.userManagement .entityCell strong {
+  font-size: 14px;
+}
+
+.userManagement .entityCell div span {
+  font-size: 12px;
+}
+
+.userManagement .badge {
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.userManagement .smallButton {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.userManagement .iconButton {
+  width: 44px;
+  height: 44px;
+}
+
+.userManagement .emptyInline,
+.userManagement .errorBanner {
+  font-size: 13px;
+}
+
+.userEmptyState {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.userEmptyState > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.userEmptyState strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.userEmptyState p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+}
+
+.pagination > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  overflow-y: auto;
+  place-items: center;
+  background: oklch(0.12 0.006 285 / 0.52);
+  padding: 24px;
+}
+
+.modal {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px oklch(0.12 0.006 285 / 0.24);
+}
+
+.modal .primaryButton,
+.modal .secondaryButton {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
+.modal .errorBanner,
+.modal .emptyInline {
+  font-size: 13px;
+}
+
+.modalHeader {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  padding: 20px 22px;
+}
+
+.modalHeader h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.modalHeader p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.modalBody {
+  padding: 22px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.formField,
+.readonlyField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.formField > span,
+.readonlyField > span,
+.roleFieldset legend {
+  color: #56575e;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.formField input,
+.formField textarea,
+.readonlyField strong {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 11px;
+  font-size: 14px;
+}
+
+.formField textarea {
+  min-height: 86px;
+  margin-top: 16px;
+  padding: 10px 11px;
+  resize: vertical;
+}
+
+.readonlyField strong {
+  display: flex;
+  align-items: center;
+  background: var(--surface-muted);
+  font-weight: 550;
+}
+
+.formField input:focus,
+.formField textarea:focus,
+.userFilters select:focus {
+  border-color: oklch(0.28 0.004 285 / 0.52);
+  box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.07);
+}
+
+.formField input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.formField small,
+.roleFieldset small {
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.infoCallout {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: 18px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: #65666d;
+  padding: 11px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.infoCallout svg {
+  flex: 0 0 auto;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.userDetailSummary {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.userAvatarLarge {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.userDetailSummary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.userDetailSummary strong {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.userDetailSummary div span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.roleFieldset {
+  margin-top: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 13px;
+}
+
+.roleFieldset legend {
+  padding: 0 5px;
+}
+
+.roleFieldset > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.roleFieldset label {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.roleFieldset small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+}
+
+.userActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 18px;
+  border: 1px solid #f0cece;
+  border-radius: 9px;
+  background: var(--danger-soft);
+  padding: 13px;
+}
+
+.userActionBar > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.userActionBar strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.userActionBar span {
+  color: #7a6262;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.dangerButton {
+  display: inline-flex;
+  min-height: 40px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--danger);
+  border-radius: 7px;
+  background: var(--danger);
+  color: white;
+  cursor: pointer;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dangerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
 }
 
 .lockedState {
@@ -960,6 +1769,17 @@
     display: none;
   }
 
+  .restaurantDetailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurantGallerySection {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding-top: 24px;
+    padding-left: 0;
+  }
+
 }
 
 @media (max-width: 860px) {
@@ -1002,6 +1822,10 @@
   .overviewGrid,
   .monitorGrid {
     grid-template-columns: 1fr;
+  }
+
+  .userFilters {
+    grid-template-columns: 1fr 1fr 1fr 38px;
   }
 }
 
@@ -1083,6 +1907,54 @@
 
   .toolbarActions .primaryButton {
     margin-left: auto;
+  }
+
+  .userSectionHeader,
+  .pagination,
+  .userActionBar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .userSectionHeader .primaryButton,
+  .userActionBar button {
+    width: 100%;
+  }
+
+  .userStats {
+    grid-template-columns: 1fr;
+  }
+
+  .userStats > div {
+    min-height: 58px;
+  }
+
+  .userFilters {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .userFilters .searchBox {
+    grid-column: 1 / -1;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurantImageUpload,
+  .restaurantGalleryGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modalBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 14px 14px 0 0;
   }
 }
 
