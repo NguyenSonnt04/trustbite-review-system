@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "TrustBite Admin",
-  description: "TrustBite operations and administration console",
+  title: "TrustBite",
+  description: "Nền tảng đánh giá ẩm thực đáng tin cậy",
 };
 
 export default function RootLayout({ children }) {

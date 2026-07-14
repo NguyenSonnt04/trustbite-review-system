@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminCapabilities, adminService } from '@/services/admin.service';
-import { authService } from '@/services/auth.service';
 import AdminIcon from './AdminIcon';
 import styles from './AdminPortal.module.css';
 
@@ -58,11 +57,6 @@ const capabilityModules = [
   { id: 'audit', label: 'Nhật ký', icon: 'audit' },
   { id: 'monitoring', label: 'Giám sát', icon: 'monitor' },
 ];
-
-const isAdminUser = (user) => {
-  const roles = Array.isArray(user?.roles) ? user.roles : [];
-  return roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase()));
-};
 
 const formatScore = (score) => {
   if (score === null || score === undefined || score === '') return null;
@@ -388,10 +382,8 @@ export default function AdminPortal() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [restaurantError, setRestaurantError] = useState('');
   const [search, setSearch] = useState('');
-  const [user] = useState(() => authService.getCurrentUser());
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
-  const adminSession = isAdminUser(user);
 
   const loadDashboard = useCallback(async () => {
     setApiState('loading');
@@ -469,11 +461,6 @@ export default function AdminPortal() {
     setMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    window.location.reload();
-  };
-
   const [title, subtitle] = sectionCopy[activeSection];
 
   return (
@@ -481,7 +468,7 @@ export default function AdminPortal() {
       <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`} id="admin-navigation">
         <div className={styles.brand}>
           <span className={styles.brandMark}>T</span>
-          <div><strong>TrustBite</strong><span>Cổng quản trị</span></div>
+          <div><strong>TrustBite</strong><span>Bản xem quản trị</span></div>
           <button
             aria-label="Đóng menu"
             className={styles.mobileClose}
@@ -519,10 +506,10 @@ export default function AdminPortal() {
 
         <div className={styles.sidebarFooter}>
           <div className={styles.accessCard}>
-            <span className={styles.accessIcon}><AdminIcon name={adminSession ? 'audit' : 'lock'} size={18} /></span>
+            <span className={styles.accessIcon}><AdminIcon name="lock" size={18} /></span>
             <div>
-              <strong>{adminSession ? 'Vai trò cục bộ' : 'Chế độ chỉ đọc'}</strong>
-              <span>{adminSession ? 'Server sẽ xác minh lại mọi thao tác' : 'Đăng nhập quản trị để thao tác'}</span>
+              <strong>Chế độ chỉ đọc</strong>
+              <span>Không có quyền quản trị cục bộ</span>
             </div>
           </div>
           <p>Tin cậy trong từng trải nghiệm.</p>
@@ -545,7 +532,7 @@ export default function AdminPortal() {
             <AdminIcon name="menu" />
           </button>
           <div className={styles.pageTitle}>
-            <span className={styles.mobileBrand}>Quản trị TrustBite</span>
+            <span className={styles.mobileBrand}>Bản xem TrustBite</span>
             <h1>{title}</h1>
           </div>
           <div className={styles.topbarActions}>
@@ -553,14 +540,9 @@ export default function AdminPortal() {
               <span className={`${styles.liveDot} ${apiState === 'online' ? styles.liveDotOnline : ''}`} />
             </div>
             <div className={styles.profile}>
-              <span>{user?.displayName?.slice(0, 1)?.toUpperCase() || 'A'}</span>
-              <div><strong>{user?.displayName || 'Quản trị viên'}</strong><small>{adminSession ? 'Vai trò được lưu cục bộ' : 'Bản xem chỉ đọc'}</small></div>
+              <span>X</span>
+              <div><strong>Khách xem</strong><small>Không có phiên quản trị</small></div>
             </div>
-            {adminSession && (
-              <button aria-label="Đăng xuất" className={styles.iconButton} onClick={handleLogout} type="button">
-                <AdminIcon name="logout" size={19} />
-              </button>
-            )}
           </div>
         </header>
 

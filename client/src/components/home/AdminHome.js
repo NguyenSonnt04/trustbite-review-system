@@ -1,30 +1,8 @@
-'use client';
-
 import Link from 'next/link';
-import { useState } from 'react';
-import { authService } from '@/services/auth.service';
 import AdminIcon from '@/components/admin/AdminIcon';
 import styles from '@/app/page.module.css';
 
 export default function AdminHome() {
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleLogin = async (event) => {
-    event.preventDefault();
-    setSubmitting(true);
-    setError('');
-
-    try {
-      await authService.login();
-    } catch {
-      setError('Phiên đăng nhập quản trị đang được hoàn thiện. Hiện tại, bạn có thể tiếp tục với bản quản trị chỉ đọc.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -62,12 +40,12 @@ export default function AdminHome() {
             </div>
           </div>
 
-          <form className={styles.form} onSubmit={handleLogin}>
+          <div className={styles.form}>
             <label>
               Email quản trị
               <span className={styles.inputShell}>
                 <AdminIcon name="mail" size={16} />
-                <input autoComplete="username" name="email" placeholder="admin@trustbite.com" type="email" />
+                <input disabled name="email" placeholder="Đăng nhập chưa khả dụng" type="email" />
               </span>
             </label>
             <label>
@@ -75,42 +53,33 @@ export default function AdminHome() {
               <span className={styles.inputShell}>
                 <AdminIcon name="key" size={16} />
                 <input
-                  autoComplete="current-password"
+                  disabled
                   name="password"
-                  placeholder="Nhập mật khẩu"
-                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Đăng nhập chưa khả dụng"
+                  type="password"
                 />
-                <button
-                  aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                  onClick={() => setShowPassword((visible) => !visible)}
-                  type="button"
-                >
-                  <AdminIcon name={showPassword ? 'eyeOff' : 'eye'} size={16} />
-                </button>
               </span>
             </label>
 
-            {error && (
-              <div className={styles.formNotice} role="status">
-                <AdminIcon name="info" size={17} />
-                <p>{error}</p>
-              </div>
-            )}
+            <div className={styles.formNotice} role="status">
+              <AdminIcon name="info" size={17} />
+              <p>Đăng nhập web chưa sẵn sàng. Các trường bên dưới được khóa để không thu thập thông tin đăng nhập khi chưa có luồng xác thực an toàn.</p>
+            </div>
 
-            <button className={styles.loginButton} disabled={submitting} type="submit">
-              <span>{submitting ? 'Đang kiểm tra...' : 'Đăng nhập'}</span>
+            <button className={styles.loginButton} disabled type="button">
+              <span>Đăng nhập chưa khả dụng</span>
               <AdminIcon name="arrow" size={16} />
             </button>
-          </form>
+          </div>
 
           <div className={styles.preview}>
-            <span>Chưa có phiên đăng nhập web?</span>
-            <Link href="/admin">Mở bản quản trị chỉ đọc <AdminIcon name="arrow" size={13} /></Link>
+            <span>Cần xem giao diện hiện tại?</span>
+            <Link href="/admin/preview">Mở bản xem chỉ đọc <AdminIcon name="arrow" size={13} /></Link>
           </div>
 
           <p className={styles.securityCopy}>
-            TrustBite không lưu mật khẩu trong trình duyệt. Mọi quyền quản trị
-            được server xác minh lại trước khi thực thi.
+            Bản xem chỉ sử dụng dữ liệu công khai và không mở khóa thao tác quản trị.
+            Khi đăng nhập được triển khai, mọi quyền vẫn phải được server xác minh.
           </p>
         </aside>
       </section>

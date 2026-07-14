@@ -1,9 +1,5 @@
-import AdminPortal from '@/components/admin/AdminPortal';
-
-export const metadata = {
-  title: 'Admin Console | TrustBite',
-};
+import { redirect } from 'next/navigation';
 
 export default function AdminPage() {
-  return <AdminPortal />;
+  redirect('/');
 }

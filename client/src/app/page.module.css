@@ -204,6 +204,11 @@
   outline: 0;
 }
 
+.inputShell input:disabled {
+  cursor: not-allowed;
+  color: var(--muted);
+}
+
 .inputShell:focus-within {
   border-color: oklch(0.28 0.004 285 / 0.5);
   box-shadow: 0 0 0 3px oklch(0.3 0.005 285 / 0.07);
@@ -283,7 +288,7 @@
 }
 
 .loginButton:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.65;
 }
 
