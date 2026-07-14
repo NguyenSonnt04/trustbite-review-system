@@ -117,6 +117,45 @@ describe('restaurant search API', () => {
     }
   });
 
+  it('returns the newest restaurant-level primary image and null when absent', async () => {
+    const token = `Image Search ${Date.now()}`;
+    const withImage = await createSearchRestaurant({ name: `${token} With Image` });
+    const withoutImage = await createSearchRestaurant({ name: `${token} Without Image` });
+    const olderUrl = 'https://cdn.trustbite.test/restaurants/older.jpg';
+    const newestUrl = 'https://cdn.trustbite.test/restaurants/newest.jpg';
+
+    try {
+      await query(
+        `
+        INSERT INTO restaurant_images (
+          restaurant_id, image_url, caption, is_primary, created_at
+        )
+        VALUES
+          ($1, $2, 'Older primary', TRUE, NOW() - INTERVAL '1 minute'),
+          ($1, $3, 'Newest primary', TRUE, NOW()),
+          ($1, $4, 'Non-primary', FALSE, NOW() + INTERVAL '1 minute')
+        `,
+        [
+          withImage.id,
+          olderUrl,
+          newestUrl,
+          'https://cdn.trustbite.test/restaurants/non-primary.jpg',
+        ],
+      );
+
+      const response = await requestApp()
+        .get('/api/v1/restaurants')
+        .query({ keyword: token, sort: 'name' })
+        .expect(200);
+
+      const itemsById = new Map(response.body.items.map((item) => [item.id, item]));
+      expect(itemsById.get(withImage.id).primaryImageUrl).toBe(newestUrl);
+      expect(itemsById.get(withoutImage.id).primaryImageUrl).toBeNull();
+    } finally {
+      await cleanupRestaurants([withImage.id, withoutImage.id]);
+    }
+  });
+
   it('filters by keyword and PostGIS radius while returning distanceMeters', async () => {
     const token = `Radius Search ${Date.now()}`;
     const near = await createSearchRestaurant({

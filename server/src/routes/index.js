@@ -8,6 +8,7 @@ import adminRoutes from './admin.js';
 import authRoutes from './auth.js';
 import awsRoutes from './aws.js';
 import moderationRoutes from './moderation.js';
+import merchantRoutes from './merchant.js';
 import receiptRoutes from './receipt.js';
 import restaurantRoutes from './restaurant.js';
 import reviewRoutes from './review.js';
@@ -18,6 +19,7 @@ const router = Router();
 router.use('/admin', adminRoutes);
 router.use('/auth', authRoutes);
 router.use('/aws', awsRoutes);
+router.use('/merchant', merchantRoutes);
 // Restaurant CRUD — Task 3.1 (PHASE 3 — Restaurant & Search)
 router.use('/restaurants', restaurantRoutes);
 router.use('/receipts', receiptRoutes);

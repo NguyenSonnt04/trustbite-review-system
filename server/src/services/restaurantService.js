@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { pool } from '../config/db.js';
+import { resolveRestaurantImageUrl } from './s3RestaurantImageStorageService.js';
 
 // ---------------------------------------------------------------------------
 // Domain errors
@@ -99,6 +100,18 @@ function normalizeVietnameseSearchText(value) {
     .toLowerCase();
 }
 
+const PRIMARY_IMAGE_URL_PROJECTION = `
+  (
+    SELECT ri.image_url
+    FROM restaurant_images ri
+    WHERE ri.restaurant_id = r.id
+      AND ri.branch_id IS NULL
+      AND ri.is_primary = TRUE
+    ORDER BY ri.created_at DESC, ri.id DESC
+    LIMIT 1
+  )
+`;
+
 /** Common SELECT projection for a restaurant and its aggregated category IDs. */
 const RESTAURANT_SELECT_PROJECTION = `
   SELECT
@@ -106,7 +119,8 @@ const RESTAURANT_SELECT_PROJECTION = `
     COALESCE(
       ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
       '{}'::integer[]
-    ) AS category_ids
+    ) AS category_ids,
+    ${PRIMARY_IMAGE_URL_PROJECTION} AS primary_image_url
   FROM restaurants r
   LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
 `;
@@ -119,7 +133,7 @@ const PUBLIC_RESTAURANT_CONDITION = `
 /**
  * Map a DB row to a camelCase public-facing object.
  */
-function toPublic(row) {
+async function toPublic(row) {
   return {
     id: row.id,
     name: row.name,
@@ -130,6 +144,7 @@ function toPublic(row) {
     latitude: row.latitude !== null ? parseFloat(row.latitude) : null,
     longitude: row.longitude !== null ? parseFloat(row.longitude) : null,
     status: row.status,
+    primaryImageUrl: await resolveRestaurantImageUrl(row.primary_image_url),
     trustScore: row.trust_score !== null ? parseFloat(row.trust_score) : null,
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
@@ -272,7 +287,8 @@ export async function listRestaurants({
         COALESCE(
           ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
           '{}'::integer[]
-        ) AS category_ids
+        ) AS category_ids,
+        ${PRIMARY_IMAGE_URL_PROJECTION} AS primary_image_url
         ${distanceProjection}
       FROM restaurants r
       LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
@@ -298,7 +314,7 @@ export async function listRestaurants({
   ]);
 
   return {
-    items: dataResult.rows.map(toPublic),
+    items: await Promise.all(dataResult.rows.map(toPublic)),
     page: safePage,
     pageSize: safeSize,
     total: parseInt(countResult.rows[0].total, 10),
@@ -362,7 +378,7 @@ export async function listNearbyRestaurants({
   ]);
 
   return {
-    items: dataResult.rows.map(toPublic),
+    items: await Promise.all(dataResult.rows.map(toPublic)),
     page: safePage,
     pageSize: safeSize,
     total: parseInt(countResult.rows[0].total, 10),
@@ -386,7 +402,7 @@ export async function getRestaurantById(restaurantId) {
     [restaurantId],
   );
 
-  return result.rows.length > 0 ? toPublic(result.rows[0]) : null;
+  return result.rows.length > 0 ? await toPublic(result.rows[0]) : null;
 }
 
 export async function publicRestaurantExists(restaurantId) {
@@ -610,7 +626,8 @@ export async function getRestaurantDetail(restaurantId) {
 
   if (restaurantResult.rows.length === 0) return null;
 
-  const [ratingResult, claimResult] = await Promise.all([
+  const [restaurant, ratingResult, claimResult] = await Promise.all([
+    toPublic(restaurantResult.rows[0]),
     pool.query(
       `
       SELECT
@@ -640,7 +657,6 @@ export async function getRestaurantDetail(restaurantId) {
     ),
   ]);
 
-  const restaurant = toPublic(restaurantResult.rows[0]);
   const rRow = ratingResult.rows[0];
   const ratingBreakdown = {
     avgFood: rRow.avg_food !== null ? parseFloat(rRow.avg_food) : null,

@@ -16,6 +16,11 @@
  */
 
 import * as restaurantService from '../services/restaurantService.js';
+import {
+  deleteRestaurantImage,
+  listRestaurantImages,
+  uploadRestaurantImage,
+} from '../services/restaurantImageService.js';
 import { listPublicReviewsByRestaurant } from '../services/reviewService.js';
 
 // ---------------------------------------------------------------------------
@@ -572,6 +577,76 @@ export const updateRestaurantHandler = async (req, res, next) => {
     }
 
     return res.status(200).json(restaurant);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/restaurants/:restaurantId/images
+// ---------------------------------------------------------------------------
+
+export const listRestaurantImagesHandler = async (req, res, next) => {
+  try {
+    const result = await listRestaurantImages({
+      userId: req.user.id,
+      roles: req.user.roles,
+      restaurantId: req.params.restaurantId,
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/restaurants/:restaurantId/images
+// ---------------------------------------------------------------------------
+
+export const uploadRestaurantImageHandler = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const requestId = buildRequestId(req);
+
+    if (!isValidUUID(restaurantId)) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.', requestId);
+    }
+
+    const result = await uploadRestaurantImage({
+      userId: req.user.id,
+      roles: req.user.roles,
+      restaurantId,
+      idempotencyKey: req.headers['idempotency-key'],
+      fields: req.body,
+      file: req.file,
+    });
+
+    if (result.replayed) {
+      res.set('Idempotency-Replayed', 'true');
+    }
+    return res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------------------------------------------------------------------
+// DELETE /api/v1/restaurants/:restaurantId/images/:imageId
+// ---------------------------------------------------------------------------
+
+export const deleteRestaurantImageHandler = async (req, res, next) => {
+  try {
+    const result = await deleteRestaurantImage({
+      userId: req.user.id,
+      roles: req.user.roles,
+      restaurantId: req.params.restaurantId,
+      imageId: req.params.imageId,
+      idempotencyKey: req.headers['idempotency-key'],
+    });
+    if (result.replayed) {
+      res.set('Idempotency-Replayed', 'true');
+    }
+    return res.status(result.statusCode).json(result.body);
   } catch (err) {
     next(err);
   }

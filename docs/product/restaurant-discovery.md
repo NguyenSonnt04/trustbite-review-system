@@ -11,9 +11,9 @@ stories and tests should prove before UI/mobile work depends on it.
 Restaurant discovery covers public restaurant list/search, map-bounds lookup,
 restaurant detail, and public verified/reference review listing.
 
-It does not cover the Phase 3 UI tasks, merchant portal ownership editing,
-review creation, OCR verification, external map provider integration, or trust
-score recalculation jobs.
+It does not cover review creation, OCR verification, external map provider
+integration, or trust score recalculation jobs. Restaurant image management and
+merchant claim evidence are covered by the media-management story.
 
 ## Source Documents
 
@@ -64,8 +64,13 @@ Response shape remains the current page envelope:
 }
 ```
 
-Each item includes the current public restaurant fields plus `distanceMeters`
-when location search or map-bounds lookup computes a distance.
+Each item includes the current public restaurant fields plus:
+
+- `primaryImageUrl`: nullable display-ready URL for the newest restaurant-level
+  image where `branch_id IS NULL` and `is_primary = TRUE`. Non-primary images,
+  branch images, and private receipt evidence are never selected.
+- `distanceMeters` when location search or map-bounds lookup computes a
+  distance.
 
 Invalid query combinations return the standard error envelope with HTTP `422`
 and `VALIDATION_ERROR`. Invalid numeric syntax such as `1abc` is rejected, not
@@ -115,6 +120,43 @@ Query parameters:
 The response must distinguish `VERIFIED` from `REFERENCE_ONLY` so clients can
 render trust badges without guessing. Public responses omit reviewer `userId`.
 
+### GET, POST `/api/v1/restaurants/:restaurantId/images`
+
+Purpose: protected listing and upload of restaurant profile images.
+
+- Allows authenticated TrustBite-local `ADMIN`/`SUPER_ADMIN`, or an active
+  merchant with an active `OWNER`/`MANAGER` assignment for the restaurant.
+- Requires a UUID v4 `Idempotency-Key`.
+- Accepts one multipart `restaurantImage` file: JPEG, PNG, or WebP, maximum
+  5 MB.
+- Optional `caption` is trimmed and limited to 255 characters.
+- Optional `isPrimary` accepts strict `true` or `false` and defaults to `true`.
+- The object is stored privately in the configured restaurant-image S3 bucket.
+  The persisted `image_url` is a stable `s3://` reference scoped to that bucket.
+  Upload, list, nearby, and detail responses convert owned references into
+  short-lived HTTPS presigned GET URLs. Legacy HTTPS rows remain displayable.
+- A primary upload clears existing restaurant-level primary flags and inserts
+  the new row in the same transaction.
+- Provider success followed by persistence failure triggers best-effort S3
+  deletion. Successful uploads write an audit row.
+- `STAFF`, inactive assignments, suspended merchants, and cross-restaurant
+  access are denied.
+
+### DELETE `/api/v1/restaurants/:restaurantId/images/:imageId`
+
+- Uses the same authorization policy and requires UUID v4 `Idempotency-Key`.
+- Deleting the primary image promotes the newest remaining restaurant-level
+  image by `created_at DESC, id DESC`.
+- Database deletion is transactional. S3 cleanup is durable and retryable
+  through idempotency state.
+
+### Merchant claim evidence
+
+- Merchant ownership/management evidence is stored privately under
+  `receipts/merchant-claims/`, never as customer receipt verification data.
+- Claims request `OWNER` or `MANAGER`. Admin approval activates the merchant,
+  ensures the local role, and provisions the active restaurant assignment.
+
 ## Data And Implementation Boundary
 
 - Use the existing `restaurants.geo` PostGIS `GEOGRAPHY(Point, 4326)` column
@@ -127,6 +169,10 @@ render trust badges without guessing. Public responses omit reviewer `userId`.
   story updates.
 - Controllers validate HTTP input before calling services. Services own SQL and
   transaction boundaries.
+- Restaurant image selection is deterministic when legacy data contains more
+  than one primary image: newest `created_at`, then highest image `id`.
+- Receipt evidence URLs are private verification data and must never be exposed
+  as restaurant profile images.
 
 ## Current Code Baseline
 
