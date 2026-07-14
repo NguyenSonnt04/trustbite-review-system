@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { adminCapabilities, adminService } from '@/services/admin.service';
 import { authService } from '@/services/auth.service';
 import AdminIcon from './AdminIcon';
+import AdminRestaurantsSection from './AdminRestaurantsSection';
+import AdminUsersSection from './AdminUsersSection';
 import styles from './AdminPortal.module.css';
 
 const navigationGroups = [
@@ -101,9 +103,9 @@ function Overview({ apiState, restaurants, restaurantTotal, onNavigate }) {
 
   const metrics = [
     {
-      label: 'Nhà hàng hoạt động',
+      label: 'Tổng số nhà hàng',
       value: apiState === 'online' ? restaurantTotal : '—',
-      context: 'Dữ liệu công khai',
+      context: 'Dữ liệu quản trị',
       trend: apiState === 'online' ? 'Đã đồng bộ' : 'Chưa kết nối',
       trendTone: apiState === 'online' ? 'positive' : 'negative',
       icon: 'store',
@@ -135,7 +137,7 @@ function Overview({ apiState, restaurants, restaurantTotal, onNavigate }) {
   ];
 
   return (
-    <>
+    <div className={styles.overviewSection}>
       <section className={styles.metricGrid} aria-label="Chỉ số hệ thống">
         {metrics.map((metric) => (
           <article className={styles.metricCard} key={metric.label}>
@@ -227,98 +229,7 @@ function Overview({ apiState, restaurants, restaurantTotal, onNavigate }) {
           </p>
         </aside>
       </div>
-    </>
-  );
-}
-
-function RestaurantSection({ loading, error, restaurants, total, search, onSearch, onReload }) {
-  const filtered = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase('vi');
-    if (!query) return restaurants;
-    return restaurants.filter((restaurant) => (
-      restaurant.name?.toLocaleLowerCase('vi').includes(query)
-      || restaurant.address?.toLocaleLowerCase('vi').includes(query)
-    ));
-  }, [restaurants, search]);
-
-  return (
-    <section className={styles.panel}>
-      <div className={styles.tableToolbar}>
-        <div className={styles.searchBox}>
-          <AdminIcon name="search" size={18} />
-          <input
-            aria-label="Tìm nhà hàng"
-            onChange={(event) => onSearch(event.target.value)}
-            placeholder="Tìm theo tên hoặc địa chỉ"
-            type="search"
-            value={search}
-          />
-        </div>
-        <div className={styles.toolbarActions}>
-          <StatusBadge tone="neutral">{total} nhà hàng</StatusBadge>
-          <button aria-label="Tải lại dữ liệu" className={styles.iconButton} onClick={onReload} type="button">
-            <AdminIcon name="refresh" size={18} />
-          </button>
-          <button className={styles.primaryButton} disabled title={adminCapabilities.restaurants.detail} type="button">
-            Thêm nhà hàng
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.boundaryNotice}>
-        <AdminIcon name="lock" size={18} />
-        <span>{adminCapabilities.restaurants.detail}</span>
-      </div>
-
-      {error && <div className={styles.errorBanner}>{error}</div>}
-      <div className={styles.tableScroll}>
-        <table className={styles.dataTable}>
-          <thead>
-            <tr>
-              <th>Nhà hàng</th>
-              <th>Địa điểm</th>
-              <th>Điểm tin cậy</th>
-              <th>Trạng thái</th>
-              <th aria-label="Thao tác" />
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan="5"><div className={styles.emptyInline}>Đang tải dữ liệu...</div></td></tr>
-            )}
-            {!loading && filtered.map((restaurant) => (
-              <tr key={restaurant.id}>
-                <td>
-                  <div className={styles.entityCell}>
-                    <span className={styles.entityAvatar}>{restaurant.name?.slice(0, 1).toUpperCase()}</span>
-                    <div><strong>{restaurant.name}</strong><span>{restaurant.slug || restaurant.id}</span></div>
-                  </div>
-                </td>
-                <td>{restaurant.address || 'Chưa cập nhật'}</td>
-                <td>
-                  {formatScore(restaurant.trustScore) === null
-                    ? 'Chưa có điểm'
-                    : <><strong>{formatScore(restaurant.trustScore)}</strong> / 5</>}
-                </td>
-                <td>
-                  <StatusBadge tone={formatRestaurantStatus(restaurant.status).tone}>
-                    {formatRestaurantStatus(restaurant.status).label}
-                  </StatusBadge>
-                </td>
-                <td>
-                  <button className={styles.smallButton} disabled title="Thao tác đang bị khóa tại ranh giới phân quyền" type="button">
-                    Chỉnh sửa
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan="5"><div className={styles.emptyInline}>Không tìm thấy nhà hàng phù hợp.</div></td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </section>
+    </div>
   );
 }
 
@@ -382,13 +293,15 @@ export default function AdminPortal() {
   const [restaurantTotal, setRestaurantTotal] = useState(0);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [restaurantError, setRestaurantError] = useState('');
-  const [search, setSearch] = useState('');
   const [adminSession, setAdminSession] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const dashboardRequestSequence = useRef(0);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
 
   const loadDashboard = useCallback(async () => {
+    const sequence = dashboardRequestSequence.current + 1;
+    dashboardRequestSequence.current = sequence;
     setApiState('loading');
     setLoadingRestaurants(true);
     setRestaurantError('');
@@ -397,6 +310,7 @@ export default function AdminPortal() {
       adminService.readHealth(),
       adminService.listRestaurants({ pageSize: 20 }),
     ]);
+    if (sequence !== dashboardRequestSequence.current) return;
 
     setApiState(
       healthResult.status === 'fulfilled' && healthResult.value?.status === 'ok'
@@ -431,12 +345,14 @@ export default function AdminPortal() {
 
   useEffect(() => {
     let active = true;
+    const sequence = dashboardRequestSequence.current + 1;
+    dashboardRequestSequence.current = sequence;
 
     Promise.allSettled([
       adminService.readHealth(),
       adminService.listRestaurants({ pageSize: 20 }),
     ]).then(([healthResult, restaurantResult]) => {
-      if (!active) return;
+      if (!active || sequence !== dashboardRequestSequence.current) return;
 
       setApiState(
         healthResult.status === 'fulfilled' && healthResult.value?.status === 'ok'
@@ -599,18 +515,15 @@ export default function AdminPortal() {
             />
           )}
           {activeSection === 'restaurants' && (
-            <RestaurantSection
-              error={restaurantError}
-              loading={loadingRestaurants}
-              onReload={loadDashboard}
-              onSearch={setSearch}
-              restaurants={restaurants}
-              search={search}
-              total={restaurantTotal}
-            />
+          <AdminRestaurantsSection />
           )}
           {activeSection === 'monitoring' && <MonitoringSection apiState={apiState} onReload={loadDashboard} />}
-          {activeSection === 'users' && <LockedState capability={adminCapabilities.users} title="Danh sách người dùng chưa khả dụng" />}
+          {activeSection === 'users' && (
+            <AdminUsersSection
+              adminRole={adminRole}
+              currentUserId={adminUser?.id}
+            />
+          )}
           {activeSection === 'reviews' && <LockedState capability={adminCapabilities.reviews} title="Khu vực kiểm duyệt chưa khả dụng" />}
           {activeSection === 'verifications' && <LockedState capability={adminCapabilities.verifications} title="Hàng đợi xác minh chưa khả dụng" />}
           {activeSection === 'audit' && <LockedState capability={adminCapabilities.audit} title="Nhật ký audit chưa khả dụng" />}

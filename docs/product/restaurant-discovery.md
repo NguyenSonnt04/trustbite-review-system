@@ -128,6 +128,23 @@ render trust badges without guessing. Public responses omit reviewer `userId`.
 - Controllers validate HTTP input before calling services. Services own SQL and
   transaction boundaries.
 
+## Admin Restaurant Management
+
+- `ADMIN` and `SUPER_ADMIN` use the opaque-session admin BFF to list all
+  non-deleted restaurants, including non-public statuses.
+- Admin detail may update the existing restaurant profile fields, coordinates,
+  categories, and status. Every update requires an administrative reason and
+  writes an audit record.
+- Restaurant media mutations are available only through admin-web routes.
+- Images accept one JPEG, PNG, or WebP file up to 5 MB after MIME, extension,
+  and file-signature validation.
+- PostgreSQL stores stable private `s3://` references. API responses return
+  short-lived signed image URLs.
+- Admins may upload, replace, caption, select a primary image, and remove
+  images. Removing a primary image promotes the newest remaining image.
+- TrustBite deletes only allowlisted owned objects under
+  `restaurant-images/<restaurantId>/`; external legacy URLs are never deleted.
+
 ## Current Code Baseline
 
 | Behavior | Current state | Required Phase 3 closeout |

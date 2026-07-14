@@ -176,6 +176,56 @@ describe('CognitoIdentityProvider', () => {
     });
   });
 
+  it('pre-provisions a confirmed email user for the existing custom-auth flow', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          return {
+            Username: 'provider-user-1',
+            User: {
+              Attributes: [
+                { Name: 'sub', Value: 'new-cognito-sub' },
+                { Name: 'email', Value: 'new.user@example.com' },
+              ],
+            },
+          };
+        }),
+      },
+    });
+
+    await expect(provider.createUser({
+      email: 'new.user@example.com',
+    })).resolves.toEqual({
+      username: 'provider-user-1',
+      subject: 'new-cognito-sub',
+    });
+
+    expect(sentCommands).toHaveLength(2);
+    expect(sentCommands[0].constructor.name).toBe('AdminCreateUserCommand');
+    expect(sentCommands[0].input).toEqual({
+      UserPoolId: 'pool-1',
+      Username: 'new.user@example.com',
+      MessageAction: 'SUPPRESS',
+      UserAttributes: [
+        { Name: 'email', Value: 'new.user@example.com' },
+        { Name: 'email_verified', Value: 'true' },
+      ],
+    });
+    expect(sentCommands[1].constructor.name).toBe('AdminSetUserPasswordCommand');
+    expect(sentCommands[1].input).toMatchObject({
+      UserPoolId: 'pool-1',
+      Username: 'provider-user-1',
+      Password: expect.any(String),
+      Permanent: true,
+    });
+    expect(sentCommands[1].input.Password.length).toBeGreaterThanOrEqual(20);
+  });
+
   it('keeps valid authentication available when refresh-token revocation fails', async () => {
     const sentCommands = [];
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -3,10 +3,10 @@
 | Thông tin tài liệu | Chi tiết |
 |---|---|
 | Loại tài liệu | Role permission matrix |
-| Phiên bản | v2.6.0 |
+| Phiên bản | v2.7.0 |
 | Trạng thái | Đang rà soát |
 | Chủ sở hữu | BA / Security |
-| Ngày cập nhật | 2026-06-07 |
+| Ngày cập nhật | 2026-07-15 |
 
 ---
 
@@ -21,11 +21,17 @@
 | Báo cáo đánh giá | Không | Có | Có | Có | Có | Có |
 | Gửi yêu cầu claim quán | Không | Không | Có | Không | Có | Có |
 | Cập nhật thông tin quán | Không | Không | Chỉ quán có claim đã duyệt | Không | Có | Có |
+| Xem chi tiết quản trị quán không public | Không | Không | Không | Không | Có | Có |
+| Quản lý ảnh quán | Không | Không | Chỉ quán có claim đã duyệt | Không | Có | Có |
 | Phản hồi đánh giá | Không | Không | Chỉ quán của mình | Không | Có | Có |
 | Duyệt quán | Không | Không | Không | Không | Có | Có |
 | Duyệt hóa đơn/đánh giá nghi vấn | Không | Không | Không | Không | Có | Có |
 | Xử lý báo cáo kiểm duyệt | Không | Không | Không | Không | Có | Có |
+| Xem danh sách/chi tiết người dùng | Không | Không | Không | Không | Có | Có |
+| Tạo tài khoản người dùng thường | Không | Không | Không | Không | Có | Có |
+| Cập nhật hồ sơ người dùng | Không | Không | Không | Không | Có, trừ SUPER_ADMIN | Có |
 | Khóa tài khoản người dùng | Không | Không | Không | Không | Có | Có |
+| Gán/gỡ vai trò quản trị | Không | Không | Không | Không | Không | Có |
 | Quản lý quản trị viên | Không | Không | Không | Không | Không | Có |
 | Xem audit log | Không | Không | Không | Không | Có giới hạn | Có |
 | Override quyết định | Không | Không | Không | Không | Không | Có |
@@ -41,4 +47,6 @@
 - Quản trị viên không tham gia đánh giá công khai để tránh xung đột lợi ích.
 - FOODGOD thuộc game hóa nâng cao/tương lai; MVP chỉ cần hỗ trợ mã cấp hạng nếu có.
 - Quản trị viên không được xóa dữ liệu cá nhân tùy tiện ngoài quy trình account deletion/data request đã được audit.
+- Admin portal không cung cấp nút xóa người dùng. Tạo tài khoản phải đi qua Cognito và hồ sơ cục bộ được map theo `cognito_sub`.
+- Chỉ `SUPER_ADMIN` được đổi vai trò `ADMIN`/`SUPER_ADMIN`; không được tự đổi vai trò và luôn phải còn ít nhất một `SUPER_ADMIN` hoạt động.
 - Quyền chặn người dùng áp dụng cho tương tác cộng đồng trong TrustBite; không được dùng để che giấu review hợp lệ hoặc thao túng điểm tin cậy.

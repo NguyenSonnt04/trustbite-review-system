@@ -1,7 +1,13 @@
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import awsConfig from '../config/aws.js';
 
-const DEFAULT_ALLOWED_PREFIXES = ['avatars/', 'receipts/', 'review-media/', 'merchant-claims/'];
+const DEFAULT_ALLOWED_PREFIXES = [
+  'avatars/',
+  'receipts/',
+  'review-media/',
+  'merchant-claims/',
+  'restaurant-images/',
+];
 
 const normalizeHost = (value) => value.toLowerCase();
 

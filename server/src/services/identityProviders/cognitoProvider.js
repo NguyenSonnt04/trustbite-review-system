@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import {
+  AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
   InitiateAuthCommand,
@@ -325,6 +327,59 @@ export class CognitoIdentityProvider {
       identity,
       accessTokenExpiresAt: new Date(identity.claims.exp * 1000),
     };
+  }
+
+  async createUser({ email }) {
+    let response;
+    const client = this.getAdminClient();
+    try {
+      response = await client.send(new AdminCreateUserCommand({
+        UserPoolId: this.userPoolId,
+        Username: email,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'email_verified', Value: 'true' },
+        ],
+      }));
+    } catch (err) {
+      if (err?.name === 'UsernameExistsException') {
+        throw createHttpError(409, 'EMAIL_IN_USE', 'Email is already in use');
+      }
+      if (err?.name === 'InvalidParameterException') {
+        throw createHttpError(422, 'VALIDATION_ERROR', 'Email cannot be provisioned');
+      }
+      if (err?.name === 'TooManyRequestsException') {
+        throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Identity provider is temporarily rate limited');
+      }
+      throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Identity provider is unavailable');
+    }
+
+    const subject = response.User?.Attributes?.find(({ Name }) => Name === 'sub')?.Value;
+    const username = response.User?.Username || response.Username || email;
+    if (!subject || !username) {
+      if (username) {
+        await this.deleteUser({ username }).catch(() => undefined);
+      }
+      throw createHttpError(503, 'PROVIDER_INVALID_RESPONSE', 'Identity provider returned an invalid user');
+    }
+
+    try {
+      await client.send(new AdminSetUserPasswordCommand({
+        UserPoolId: this.userPoolId,
+        Username: username,
+        Password: `${crypto.randomBytes(32).toString('base64url')}Aa1!`,
+        Permanent: true,
+      }));
+    } catch (err) {
+      await this.deleteUser({ username }).catch(() => undefined);
+      if (err?.name === 'TooManyRequestsException') {
+        throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Identity provider is temporarily rate limited');
+      }
+      throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Identity provider could not confirm the user');
+    }
+
+    return { username, subject };
   }
 
   async deleteUser({ username }) {

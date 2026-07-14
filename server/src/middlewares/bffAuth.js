@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import appConfig from '../config/app.js';
+import { adminWebAuthService } from '../services/adminWebAuth.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const safeEqual = (left, right) => {
@@ -23,4 +24,16 @@ export const requireAdminBff = (req, res, next) => {
   }
 
   next();
+};
+
+export const requireAdminWebSession = async (req, res, next) => {
+  try {
+    const sessionToken = req.header('x-trustbite-admin-session') || '';
+    const session = await adminWebAuthService.validate(sessionToken);
+    req.user = session.user;
+    req.adminSessionExpiresAt = session.expiresAt;
+    next();
+  } catch (err) {
+    next(err);
+  }
 };

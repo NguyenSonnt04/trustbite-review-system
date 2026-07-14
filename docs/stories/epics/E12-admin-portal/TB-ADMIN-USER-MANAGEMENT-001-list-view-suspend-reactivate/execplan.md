@@ -2,25 +2,28 @@
 
 ## Goal
 
-Complete the Phase 2 Web Admin user-management slice for listing/viewing users and suspending/reactivating accounts through existing audited backend APIs.
+Deliver secure administration of TrustBite users from the existing Next.js admin portal, including Cognito-backed creation, paginated list/detail reads, profile updates, audited suspension/reactivation, and role management.
 
 ## Scope
 
 In scope:
 
-- Confirm admin web app boundary in this repo.
-- Admin user list and user detail UI with masked data.
-- Status/search/filter/pagination UI if backend supports it; otherwise define backend dependency before UI implementation.
-- Suspend/reactivate actions with required reason, confirmation, side-effect preview, loading/error/success states.
-- Auth/authorization error handling for admin actors.
-- Client build/lint and route/component tests where practical.
+- Server-side admin BFF proxy authenticated by the opaque admin session.
+- Cognito-backed confirmed-user provisioning and transactional PostgreSQL mapping.
+- User list, search, status/role filters, deterministic pagination, and masked contact data.
+- User detail and profile editing for display name, date of birth, and phone number.
+- Suspend/reactivate actions with required reason, confirmation, session invalidation, and audit evidence.
+- Role assignment for `USER`, `ADMIN`, and `SUPER_ADMIN`, restricted by the accepted role matrix.
+- Protection against self role changes, `ADMIN` targeting `SUPER_ADMIN`, and removal of the final active `SUPER_ADMIN`.
+- Responsive loading, empty, error, retry, form validation, and success states.
 
 Out of scope:
 
-- Backend suspend/reactivate rule changes unless a blocker is found.
-- New role/permission model.
-- Admin dashboard, receipt queue, moderation queue, claim queue, or audit viewer beyond user status context.
-- Account deletion processor or privacy support workflows.
+- Hard deletion or an admin delete button, as confirmed by the human.
+- Changing the account-deletion processor or retention policy.
+- Browser exposure of Cognito tokens, the BFF secret, or the opaque session marker.
+- Email editing after Cognito provisioning.
+- Admin dashboard, receipt queue, moderation queue, claim queue, or audit viewer.
 
 ## Risk Classification
 
@@ -28,34 +31,35 @@ Risk flags:
 
 - Auth.
 - Authorization.
+- Data model and canonical role seed data.
 - Audit/security.
-- Public/admin UI behavior.
-- Existing backend behavior.
-- Weak proof if admin list/detail API is missing.
+- External Cognito provider behavior.
+- Public/internal API contracts.
+- Existing suspension behavior.
+- Cross-boundary Next.js, Express, PostgreSQL, Redis, and Cognito flow.
 
 Hard gates:
 
 - Auth.
 - Authorization.
 - Audit/security.
-- Removing or weakening validation requirements.
+- External provider behavior.
 
 ## Work Phases
 
-1. Confirm whether `client/` is the admin portal target or whether a separate admin Next.js app must be created first.
-2. Discover existing admin user list/detail APIs. If absent, stop and create/link a backend API story for admin user listing/detail instead of mocking production UI.
-3. Add tests for API client/admin action mapping and UI validation where practical.
-4. Implement admin user list/detail screen(s), reason forms, error mapping, and action refresh.
-5. Prove backend suspend/reactivate integration remains covered or rerun targeted backend tests if code touched shared contracts.
-6. Run client build/lint and any added tests.
-7. Update Harness matrix/story evidence and trace.
+1. Record the high-risk story and the server-side BFF proxy decision.
+2. Add failing unit and integration contracts for session validation, list/detail, provider-backed create, profile update, role guards, and existing status actions.
+3. Add canonical role seed migration and provider adapter operations with compensation on local persistence failure.
+4. Implement internal Express admin-web routes and Next.js same-origin BFF routes.
+5. Replace the locked user state with the responsive user-management UI.
+6. Run migrations, unit/integration tests, server syntax, client lint/build, rollback proof, and browser verification.
+7. Update product/API docs, Harness evidence, and trace.
 
 ## Stop Conditions
 
 Pause for human confirmation if:
 
-- Admin portal app boundary is ambiguous.
-- No backend user list/detail endpoint exists and implementing one would expand scope.
-- UI needs to display sensitive identifiers not allowed by product/security docs.
-- Authorization behavior differs from decisions `0009` or `0012`.
-- Implementation would weaken reason/audit requirements.
+- Implementation would require hard deletion or bypass the privacy deletion workflow.
+- Cognito cannot provide a stable `sub` for a created identity.
+- Role changes would weaken the accepted local `user_roles` source of truth.
+- Validation or audit requirements would need to be reduced.
