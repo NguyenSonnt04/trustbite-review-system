@@ -17,22 +17,21 @@ const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCE
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   }
   : undefined;
+const endpointUrl = process.env.AWS_ENDPOINT_URL || process.env.LOCALSTACK_ENDPOINT_URL;
 
 // AWS credentials are loaded strictly from env (never hardcode secrets).
 export default {
   region: process.env.AWS_REGION,
-  endpointUrl: process.env.AWS_ENDPOINT_URL || process.env.LOCALSTACK_ENDPOINT_URL,
+  endpointUrl,
   accessKeyId: process.env.AWS_ACCESS_KEY_ID,
   secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   credentials,
   s3: {
     bucketName: process.env.AWS_S3_BUCKET_NAME,
-    endpoint: process.env.AWS_ENDPOINT_URL,
+    endpoint: endpointUrl,
     allowedHosts: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_HOSTS),
     allowedPrefixes: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_PREFIXES),
-    forcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, Boolean(
-      process.env.AWS_ENDPOINT_URL || process.env.LOCALSTACK_ENDPOINT_URL,
-    )),
+    forcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, Boolean(endpointUrl)),
   },
   cognito: {
     userPoolId: process.env.AWS_COGNITO_USER_POOL_ID,

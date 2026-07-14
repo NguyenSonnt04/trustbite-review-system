@@ -6,6 +6,10 @@ and validation work.
 Active/planned story packets:
 
 - `docs/stories/epics/E03-mobile/US-001-mobile-api-integration-contract.md`
+- `docs/stories/epics/E08-aws-infrastructure/TB-INFRA-001-real-aws-mvp-infra/`
+- `docs/stories/epics/E02-local-development/TB-AWS-001-localstack-provider-boundaries/`
+- `docs/stories/epics/E02-local-development/TB-APP-001-install-dev-smoke.md`
+- `docs/stories/epics/E04-auth-identity/TB-USER-AVATAR-UPLOAD-001-avatar-upload-url/`
 
 ## Normal Story
 

@@ -70,4 +70,4 @@ Redis stores no email, password, access token, ID token, or refresh token.
 
 ## Alternatives Considered
 
-See `docs/decisions/0019-admin-web-session-wrapper.md`.
+See `docs/decisions/0022-admin-web-session-wrapper.md`.

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../config/db.js';
+import { PENDING_ADMIN_REVIEW_PUBLIC_REASON } from '../config/receiptStatus.js';
 import { createHttpError } from '../utils/httpErrors.js';
 import {
   buildReceiptObjectKey,
@@ -7,6 +8,7 @@ import {
   uploadReceiptObject,
 } from './s3ReceiptStorageService.js';
 import { enqueueReceiptOcr } from './queue/receiptOcrQueue.js';
+import { normalizeIpAddress } from '../utils/net.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -19,7 +21,6 @@ const RECEIPT_CAPTURE_MAX_AGE_HOURS = 48;
 const DUPLICATE_RECEIPT_HASH_INDEX = 'idx_receipts_hash_uniq';
 const IDEMPOTENCY_UNIQUE_CONSTRAINT = 'idempotency_keys_user_id_endpoint_idempotency_key_key';
 const DUPLICATE_RECEIPT_HASH_RISK_SCORE = 80;
-const OCR_ENQUEUE_FAILURE_PUBLIC_REASON = 'OCR enqueue failed; pending manual review.';
 const ALLOWED_CONTENT_TYPES = new Set(['image/jpeg', 'image/png', 'image/heic', 'image/heif']);
 const ALLOWED_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'heic', 'heif']);
 
@@ -500,7 +501,11 @@ async function findReceiptByHashOutsideTransaction(fileHash) {
   }
 }
 
-export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file }) {
+export async function uploadReceiptForReview({ userId, idempotencyKey, fields, file, requestIp = null }) {
+  // Normalize at the single write point so IPv4-mapped IPv6 (::ffff:x) and plain
+  // IPv4 forms of the same client store identically and stay comparable for the
+  // same-device anti-fraud signal across direct-socket and proxy deployments.
+  const normalizedRequestIp = normalizeIpAddress(requestIp);
   validateIdempotencyKey(idempotencyKey);
   const data = validateReceiptFields(fields);
   validateFile(file);
@@ -626,9 +631,10 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
          gps_latitude,
          gps_longitude,
          gps_accuracy_meters,
-         captured_at
+         captured_at,
+         request_ip
        )
-       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10)
+       VALUES ($1, $2, $3, $4, $5, $6, 'UPLOADED', $7, $8, $9, $10, $11)
        RETURNING id, status`,
       [
         data.reviewId,
@@ -641,6 +647,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
         data.longitude,
         data.gpsAccuracyMeters,
         data.capturedAt,
+        normalizedRequestIp,
       ],
     );
 
@@ -684,7 +691,7 @@ export async function uploadReceiptForReview({ userId, idempotencyKey, fields, f
       userId,
       idempotencyKey,
       responseBody,
-      reason: OCR_ENQUEUE_FAILURE_PUBLIC_REASON,
+      reason: PENDING_ADMIN_REVIEW_PUBLIC_REASON,
     });
   }
 

@@ -23,6 +23,14 @@ const FRAUD_RULES = Object.freeze({
   receiptFreshHours: 48,
   receiptStaleHours: 168,
 
+  // Behavioral / velocity signal windows (§4.1, §9).
+  // These bound the persisted-data lookups the orchestrator runs to derive the
+  // account/velocity/device signals; the point values live under `points`.
+  newAccountWindowMs: 24 * 60 * 60 * 1000, // account age < 24h → "new account"
+  rejectedReceiptWindowMs: 7 * 24 * 60 * 60 * 1000, // trailing 7-day window
+  rejectedReceiptThreshold: 3, // >= 3 rejected receipts in the window
+  sameIpWindowMs: 24 * 60 * 60 * 1000, // multi-account same-IP window (24h)
+
   // Signal points (§4.1)
   points: Object.freeze({
     gpsFarNear: 40, // >200m, submitted at venue within 1h

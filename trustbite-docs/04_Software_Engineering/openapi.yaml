@@ -196,7 +196,7 @@ paths:
       tags:
       - Users
       summary: Create avatar upload URL
-      description: Requires authentication. Returns a short-lived upload URL for a TrustBite-owned media object; avatarUrl on PATCH /users/me must reference the returned public media URL after upload completion.
+      description: Requires authentication. Returns a short-lived upload URL for a TrustBite-owned media object and binds the requested fileSizeBytes as the signed S3 Content-Length; avatarUrl on PATCH /users/me must reference the returned public media URL after upload completion. For custom CDN or path-style S3 hosts, the returned avatarUrl path includes the bucket before avatars/... so account deletion can clean up the owned object.
       operationId: createAvatarUploadUrl
       requestBody:
         required: true
@@ -206,6 +206,7 @@ paths:
               type: object
               required:
               - contentType
+              - fileSizeBytes
               properties:
                 contentType:
                   type: string
@@ -236,7 +237,7 @@ paths:
                   avatarUrl:
                     type: string
                     format: uri
-                    description: TrustBite-owned allowlisted media URL accepted by PATCH /users/me after upload.
+                    description: TrustBite-owned allowlisted media URL accepted by PATCH /users/me after upload; custom CDN and path-style S3 hosts include /<bucket>/avatars/... for deletion cleanup compatibility.
                   expiresAt:
                     type: string
                     format: date-time

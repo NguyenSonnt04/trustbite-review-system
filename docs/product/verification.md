@@ -26,6 +26,27 @@ Receipt `capturedAt` is optional client-supplied capture metadata. When supplied
 
 Receipt image SHA-256 hashes are unique for receipt verification records whose status is not `OCR_FAILED`. A matching non-failed hash is rejected as `DUPLICATE_RECEIPT_HASH` and creates a fraud flag for review.
 
+## Behavioral, Velocity, and Device Signals
+
+Accepted rules for `TB-FRAUD-005` (Anti-Fraud §4.1, §9). The backend derives these signals from persisted data during the receipt verification decision and adds them to the fraud risk score:
+
+- **New account + first review**: when the reviewer account was created less than 24 hours ago and this is their first review, add `+15`.
+- **Rejected-receipt velocity**: when the reviewer already has 3 or more `REJECTED` receipts in the trailing 7 days, add `+40`.
+- **Multi-account same IP**: when another account uploaded a receipt from the same request IP for the same restaurant within the last 24 hours, add `+50`. This is the MVP IP-based device signal. The caller IP is captured server-side into `receipt_verifications.request_ip` (an optional, nullable `INET` column) and is treated as PII (never returned in API responses). A full client/mobile device-fingerprint SDK remains out of scope until a legal-basis/consent/retention decision exists. Deployments behind a reverse proxy / load balancer must set `TRUST_PROXY` so `req.ip` resolves to the real client IP rather than the proxy IP; otherwise this signal produces false positives (all users share the proxy IP). The default `TRUST_PROXY=false` is correct only for direct/no-proxy setups.
+
+These signals feed the same §4.2 decision buckets as the GPS/merchant/timestamp signals; a total score of `100+` still rejects and raises a fraud flag on the dominant signal. Daily hard rate limits (BR-RATE-003/004) are tracked separately and are not part of this rule set.
+
+## Restaurant Trust Score
+
+Accepted rule for `TB-TRUST-001` (Anti-Fraud §10, Status_Mapping §2). `restaurants.trust_score` (`1.00–5.00`) is a backend-computed weighted average of the restaurant's review ratings; the client never computes it.
+
+- Each review contributes by its `trust_weight_bucket`: `HIGH` (verified) is weighted by the reviewer's rank (Newbie 0.5, Apprentice 0.8, Foodie 1.0, Trusted Foodie 1.5; unknown rank falls back to 0.5), `LOW` (reference) is weighted 0.1, and `NONE` (hidden/rejected/deleted/pending) is excluded.
+- `trust_score = sum(rating_i * weight_i) / sum(weight_i)`, clamped to `1.00–5.00` and rounded to 2 decimals, where `rating_i` is the review's `average_rating`.
+- A restaurant with no qualifying (HIGH/LOW) reviews resets to the neutral default `5.00`.
+- The same pass recomputes `verified_review_count` (HIGH) and `reference_review_count` (LOW).
+
+This is the restaurant trust score. TrustBite has no per-user trust score; user reputation is `exp_points`/`rank_code`. Auto-recompute triggers (verification decision, admin moderation, deletion) are a tracked follow-up.
+
 ## Vietnam Receipt Parsing
 
 Textract `AnalyzeExpense` field names remain provider-defined, but mapped receipt

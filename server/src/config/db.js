@@ -1,7 +1,9 @@
 import pg from 'pg';
+import { getDatabaseSslConfig } from './dbSsl.js';
 
-const { Pool } = pg;
-pg.types.setTypeParser(1082, (value) => value);
+const { Pool, types } = pg;
+
+types.setTypeParser(1082, (value) => value);
 
 const pool = new Pool({
   host: process.env.DATABASE_HOST,
@@ -9,6 +11,7 @@ const pool = new Pool({
   user: process.env.DATABASE_USER,
   password: process.env.DATABASE_PASSWORD,
   database: process.env.DATABASE_NAME,
+  ssl: getDatabaseSslConfig(),
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000

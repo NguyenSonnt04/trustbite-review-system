@@ -24,6 +24,7 @@ export class ReceiptVerificationModel {
     this.gps_accuracy_meters = data.gps_accuracy_meters != null ? parseFloat(data.gps_accuracy_meters) : null;
     this.gps_distance_meters = data.gps_distance_meters != null ? parseFloat(data.gps_distance_meters) : null;
     this.captured_at = data.captured_at ? new Date(data.captured_at) : null;
+    this.request_ip = data.request_ip ?? null; // INET; excluded from toJSON because it is PII
     this.fraud_risk_score = data.fraud_risk_score != null ? parseInt(data.fraud_risk_score, 10) : 0;
     this.decision = data.decision ?? null; // 'VERIFIED' | 'REJECTED' | 'REFERENCE_ONLY'
     this.redacted_file_url = data.redacted_file_url ?? null; // S3 path ẩn thông tin PII

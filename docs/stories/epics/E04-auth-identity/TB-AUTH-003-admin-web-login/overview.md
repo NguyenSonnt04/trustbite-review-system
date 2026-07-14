@@ -21,7 +21,7 @@ The implementation fails closed until an authorized operator provisions and conf
 - `docs/decisions/0010-cognito-first-auth-boundary.md`
 - `docs/decisions/0011-auth-provider-adapter-boundary.md`
 - `docs/decisions/0012-admin-roles-source-of-truth.md`
-- `docs/decisions/0019-admin-web-session-wrapper.md`
+- `docs/decisions/0022-admin-web-session-wrapper.md`
 
 ## Non-Goals
 

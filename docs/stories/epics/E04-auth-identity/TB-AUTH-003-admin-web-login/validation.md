@@ -42,9 +42,9 @@ npm run harness -- story verify TB-AUTH-003-admin-web-login
 
 Recorded on 2026-07-14:
 
-- `npm run server:build`: passed, 105 server files parsed successfully.
-- `npm run server:test:unit`: passed, 22 files and 248 tests.
-- `npm run server:test:integration`: passed, 14 files and 105 tests; the provider-cleanup LocalStack file remains intentionally skipped.
+- `npm run server:build`: passed after merging current `main`, 124 server files parsed successfully.
+- `npm run server:test:unit`: passed, 37 files and 368 tests.
+- `npm run server:test:integration`: passed, 17 files and 131 tests; 4 provider-dependent tests remain intentionally skipped.
 - `npm run lint --prefix client`: passed.
 - `npm run client:build`: passed with the protected-route proxy registered as `Proxy (Middleware)`.
 - Browser smoke proved anonymous and forged sessions redirect before admin rendering, a temporary database-backed administrator with a real Redis opaque marker reaches `/admin`, and logout revokes the marker and clears the cookie. Temporary smoke records were removed.

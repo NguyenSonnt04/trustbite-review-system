@@ -3,10 +3,15 @@ import crypto from 'node:crypto';
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
 
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
-process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'cdn.trustbite.test';
+process.env.TRUSTBITE_AVATAR_ALLOWED_HOSTS = 'localhost:4566,cdn.trustbite.test';
+process.env.AWS_S3_BUCKET_NAME = 'trustbite-test-media';
 
 const { default: appConfig } = await import('../../src/config/app.js');
 const { cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js');
+const {
+  resetAvatarUploadSignerForTests,
+  setAvatarUploadSignerForTests,
+} = await import('../../src/services/avatarStorageService.js');
 const { createUser } = await import('../helpers/factories/index.js');
 const { closeDbPool, query } = await import('../helpers/db.js');
 const { requestApp } = await import('../helpers/http.js');
@@ -80,6 +85,7 @@ describe('current user profile API', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    resetAvatarUploadSignerForTests();
   });
 
   afterAll(async () => {
@@ -363,6 +369,101 @@ describe('current user profile API', () => {
 
       const persisted = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
       expect(persisted.rows[0].avatar_url).toBeNull();
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('creates an avatar upload URL that can be persisted through profile PATCH', async () => {
+    const user = await createUser({ displayName: 'Avatar Upload User' });
+    const signer = vi.fn().mockResolvedValue('https://upload.trustbite.test/avatar-put-url');
+    setAvatarUploadSignerForTests(signer);
+
+    try {
+      const response = await requestApp()
+        .post('/api/v1/users/me/avatar-upload-url')
+        .set(authHeaders(user.id))
+        .send({
+          contentType: 'image/webp',
+          fileSizeBytes: 2048,
+        })
+        .expect(200);
+
+      expect(response.body).toMatchObject({
+        uploadUrl: 'https://upload.trustbite.test/avatar-put-url',
+      });
+      expect(response.body.avatarUrl).toMatch(
+        new RegExp(`^https://localhost:4566/trustbite-test-media/avatars/${user.id}/[0-9a-f-]+\\.webp$`),
+      );
+      expect(new Date(response.body.expiresAt).getTime()).toBeGreaterThan(Date.now());
+      expect(signer).toHaveBeenCalledWith(expect.objectContaining({
+        command: expect.objectContaining({
+          input: expect.objectContaining({
+            Bucket: 'trustbite-test-media',
+            ContentType: 'image/webp',
+            ContentLength: 2048,
+            Key: expect.stringMatching(new RegExp(`^avatars/${user.id}/[0-9a-f-]+\\.webp$`)),
+          }),
+        }),
+        expiresIn: 900,
+      }));
+
+      const persisted = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
+      expect(persisted.rows[0].avatar_url).toBeNull();
+
+      const patchResponse = await requestApp()
+        .patch('/api/v1/users/me')
+        .set(authHeaders(user.id))
+        .send({ avatarUrl: response.body.avatarUrl })
+        .expect(200);
+
+      expect(patchResponse.body.avatarUrl).toBe(response.body.avatarUrl);
+
+      const updated = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
+      expect(updated.rows[0].avatar_url).toBe(response.body.avatarUrl);
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('rejects unsupported avatar upload content types before signing', async () => {
+    const user = await createUser({ displayName: 'Invalid Avatar Upload User' });
+    const signer = vi.fn();
+    setAvatarUploadSignerForTests(signer);
+
+    try {
+      const response = await requestApp()
+        .post('/api/v1/users/me/avatar-upload-url')
+        .set(authHeaders(user.id))
+        .send({
+          contentType: 'image/gif',
+          fileSizeBytes: 2048,
+        })
+        .expect(422);
+
+      expect(response.body.error.code).toBe('AVATAR_CONTENT_TYPE_UNSUPPORTED');
+      expect(signer).not.toHaveBeenCalled();
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('rejects avatar upload requests without a signed content length before signing', async () => {
+    const user = await createUser({ displayName: 'Missing Avatar Size User' });
+    const signer = vi.fn();
+    setAvatarUploadSignerForTests(signer);
+
+    try {
+      const response = await requestApp()
+        .post('/api/v1/users/me/avatar-upload-url')
+        .set(authHeaders(user.id))
+        .send({
+          contentType: 'image/webp',
+        })
+        .expect(422);
+
+      expect(response.body.error.code).toBe('AVATAR_FILE_SIZE_INVALID');
+      expect(signer).not.toHaveBeenCalled();
     } finally {
       await cleanupUser(user.id);
     }

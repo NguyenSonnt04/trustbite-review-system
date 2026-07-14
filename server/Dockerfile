@@ -16,6 +16,8 @@ RUN apk add --no-cache wget && \
     adduser --system --uid 1001 appuser -G appgroup
 COPY --from=deps --chown=appuser:appgroup /app/node_modules ./node_modules
 COPY --chown=appuser:appgroup package.json ./
+COPY --chown=appuser:appgroup migrations ./migrations
+COPY --chown=appuser:appgroup scripts ./scripts
 COPY --chown=appuser:appgroup src ./src
 USER appuser
 EXPOSE 5000

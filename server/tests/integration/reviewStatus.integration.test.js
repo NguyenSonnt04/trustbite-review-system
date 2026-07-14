@@ -158,6 +158,31 @@ describe('review verification status API', () => {
     });
   });
 
+  it('replaces pending-admin provider failure detail with a fixed public reason', async () => {
+    const owner = await createUser({ displayName: 'Pending Review Owner' });
+    created.users.push(owner.id);
+    const { review } = await seedReviewStatus({
+      ownerId: owner.id,
+      reviewStatus: 'PENDING_ADMIN_REVIEW',
+      verificationStatus: 'PENDING_ADMIN_REVIEW',
+      trustLabel: 'PENDING_ADMIN_REVIEW',
+      publicVisibility: 'PRIVATE',
+      trustWeightBucket: 'NONE',
+      receiptStatus: 'PENDING_ADMIN_REVIEW',
+      decisionReason: 'OCR enqueue failed; pending manual review.',
+    });
+
+    const response = await requestApp()
+      .get(`/api/v1/reviews/${review.id}/status`)
+      .set(authHeaders(owner.id))
+      .expect(200);
+
+    expect(response.body.receipt.decisionReason).toBe(
+      'Receipt verification requires manual review.',
+    );
+    expect(JSON.stringify(response.body)).not.toContain('OCR enqueue failed');
+  });
+
   it('returns not found for a review owned by another user', async () => {
     const owner = await createUser({ displayName: 'Review Owner' });
     const otherUser = await createUser({ displayName: 'Other Viewer' });

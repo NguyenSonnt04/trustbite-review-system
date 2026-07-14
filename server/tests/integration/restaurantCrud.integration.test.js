@@ -322,6 +322,54 @@ describe('restaurant CRUD API', () => {
         .get(`/api/v1/restaurants/${restaurantId}`)
         .expect(404);
       expect(detailResponse.body.error.code).toBe('RESTAURANT_NOT_FOUND');
+
+      const repeatedDelete = await requestApp()
+        .delete(`/api/v1/restaurants/${restaurantId}`)
+        .set(authHeaders(user.id))
+        .expect(404);
+      expect(repeatedDelete.body.error.code).toBe('RESTAURANT_NOT_FOUND');
+
+      const patchDeleted = await requestApp()
+        .patch(`/api/v1/restaurants/${restaurantId}`)
+        .set(authHeaders(user.id))
+        .send({ description: 'Should not update a soft-deleted restaurant' })
+        .expect(404);
+      expect(patchDeleted.body.error.code).toBe('RESTAURANT_NOT_FOUND');
+    } finally {
+      await cleanupRestaurants(restaurantId ? [restaurantId] : []);
+      await cleanupUsers([user.id]);
+    }
+  });
+
+  it('keeps CLOSED business status distinct from soft deletion', async () => {
+    const user = await createUser({ displayName: 'Restaurant Closure Operator' });
+    let restaurantId;
+
+    try {
+      const created = await requestApp()
+        .post('/api/v1/restaurants')
+        .set(authHeaders(user.id))
+        .send({ name: 'Closed But Retained' })
+        .expect(201);
+      restaurantId = created.body.id;
+
+      const closed = await requestApp()
+        .patch(`/api/v1/restaurants/${restaurantId}`)
+        .set(authHeaders(user.id))
+        .send({ status: 'CLOSED' })
+        .expect(200);
+
+      expect(closed.body).toMatchObject({
+        id: restaurantId,
+        status: 'CLOSED',
+      });
+
+      const persisted = await readRestaurantGeo(restaurantId);
+      expect(persisted).toMatchObject({
+        status: 'CLOSED',
+        is_deleted: false,
+        deleted_at: null,
+      });
     } finally {
       await cleanupRestaurants(restaurantId ? [restaurantId] : []);
       await cleanupUsers([user.id]);

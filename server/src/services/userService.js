@@ -171,7 +171,7 @@ const normalizeAvatarUrl = (value) => {
     throw createHttpError(422, 'AVATAR_ORIGIN_NOT_ALLOWED', 'Avatar URL must use HTTPS');
   }
 
-  if (!appConfig.avatarAllowedHosts.includes(parsed.hostname.toLowerCase())) {
+  if (!appConfig.avatarAllowedHosts.includes(parsed.host.toLowerCase())) {
     throw createHttpError(422, 'AVATAR_ORIGIN_NOT_ALLOWED', 'Avatar URL origin is not allowed');
   }
 

@@ -69,7 +69,7 @@ The backend must not issue production access/refresh tokens for TrustBite users 
 ## Admin Web Session Boundary
 
 The administration website uses the BFF wrapper defined by
-`docs/decisions/0019-admin-web-session-wrapper.md`:
+`docs/decisions/0022-admin-web-session-wrapper.md`:
 
 - Express authenticates administrator credentials through a dedicated Cognito
   app client and verifies the returned Cognito access token.
@@ -145,6 +145,18 @@ Standard auth errors should distinguish at least:
 - unmapped identity,
 - suspended/deleted account,
 - insufficient permission.
+
+## Profile Avatar Upload
+
+Authenticated users may request a short-lived avatar upload URL through the Express backend after Cognito/local account checks pass. The backend issues a TrustBite-owned S3 object key under `avatars/<userId>/...`, returns an allowlisted public `avatarUrl`, and does not mutate `users.avatar_url` until the client explicitly calls `PATCH /users/me` with the returned URL. Returned `avatarUrl` values must remain compatible with account-deletion object cleanup: non-virtual-hosted hosts such as custom CDN or LocalStack hosts include `/<bucket>/avatars/...` in the path, while virtual-hosted S3 hosts use `/avatars/...`.
+
+Avatar upload URL requests:
+
+- require the same protected `/users/me` auth boundary as profile updates,
+- accept only `image/jpeg`, `image/png`, or `image/webp`,
+- require `fileSizeBytes` as an integer in `1..5242880` and bind it into the signed S3 upload request,
+- fail closed when S3 bucket configuration, avatar media allowlist configuration, or account-deletion cleanup allowlist compatibility is missing,
+- must not accept or return arbitrary external avatar origins.
 
 ## Local Development And Testing
 

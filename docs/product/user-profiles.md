@@ -16,6 +16,9 @@ Mobile users must complete these fields before entering the signed-in product:
 TrustBite stores date of birth rather than numeric age because age changes over
 time. `profileComplete` is derived by Express from the three required fields
 and is not persisted as a second source of truth. Avatar remains optional.
+PostgreSQL `DATE` values remain calendar-date strings in `YYYY-MM-DD` form at
+the server database boundary and must not undergo timezone-sensitive JavaScript
+`Date` conversion.
 
 ## API Contract
 
