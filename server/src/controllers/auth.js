@@ -103,7 +103,7 @@ export const createLocalDevelopmentUser = async (req, res, next) => {
 const getAdminSessionToken = (req) => req.header('x-trustbite-admin-session') || '';
 const getAdminLoginAddress = (req) => {
   const forwardedAddress = req.header('x-trustbite-client-address')?.trim() || '';
-  return isIP(forwardedAddress) > 0 ? forwardedAddress : req.ip;
+  return isIP(forwardedAddress) > 0 ? forwardedAddress : '';
 };
 
 export const createAdminWebSession = async (req, res, next) => {

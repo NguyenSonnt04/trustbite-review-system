@@ -2,9 +2,10 @@ import { authService } from './auth.js';
 import { cognitoIdentityProvider } from './identityProviders/cognitoProvider.js';
 import { getAdminWebSessionStore } from './adminWebSessionStore.js';
 import appConfig from '../config/app.js';
-import { createHttpError } from '../utils/httpErrors.js';
+import { createHttpError, HttpError } from '../utils/httpErrors.js';
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
+const SESSION_INVALIDATING_STATUS_CODES = new Set([401, 403, 409]);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
 
 const normalizeRoles = (roles = []) => [...new Set(
@@ -148,7 +149,12 @@ export class AdminWebAuthService {
         user: mapSessionUser(user),
       };
     } catch (err) {
-      await sessionStore.revoke(token).catch(() => {});
+      if (
+        err instanceof HttpError
+        && SESSION_INVALIDATING_STATUS_CODES.has(err.statusCode)
+      ) {
+        await sessionStore.revoke(token).catch(() => {});
+      }
       throw err;
     }
   }

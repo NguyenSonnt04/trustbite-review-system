@@ -11,6 +11,7 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store',
 };
 const MAX_LOGIN_BODY_BYTES = 4096;
+const HEADER_NAME_PATTERN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/u;
 const CREDENTIAL_REJECTION_CODES = new Set([
   'ACCOUNT_DELETED',
   'ACCOUNT_SUSPENDED',
@@ -22,12 +23,12 @@ const CREDENTIAL_REJECTION_CODES = new Set([
 ]);
 
 const getClientAddress = (request) => {
-  const candidates = [
-    request.headers.get('cf-connecting-ip'),
-    request.headers.get('x-real-ip'),
-    request.headers.get('x-forwarded-for')?.split(',')[0],
-  ];
-  return candidates.map((value) => value?.trim()).find((value) => isIP(value || '') > 0) || '';
+  const trustedHeader = process.env.ADMIN_WEB_TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (!trustedHeader || !HEADER_NAME_PATTERN.test(trustedHeader)) {
+    return '';
+  }
+  const value = request.headers.get(trustedHeader)?.split(',')[0]?.trim() || '';
+  return isIP(value) > 0 ? value : '';
 };
 
 const readBoundedJson = async (request) => {

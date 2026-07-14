@@ -88,6 +88,30 @@ describe('admin web BFF routes', () => {
     });
   });
 
+  it('does not substitute the shared BFF address when no client address is forwarded', async () => {
+    mocks.login.mockResolvedValue({
+      sessionToken: 'opaque-session-token',
+      expiresAt: '2026-07-14T21:00:00.000Z',
+      user: {
+        id: '11111111-1111-4111-8111-111111111111',
+        displayName: 'Admin User',
+        roles: ['ADMIN'],
+      },
+    });
+
+    await request(app)
+      .post('/api/v1/auth/admin/web-session')
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .send({ email: 'admin@example.com', password: 'password' })
+      .expect(201);
+
+    expect(mocks.login).toHaveBeenCalledWith({
+      email: 'admin@example.com',
+      password: 'password',
+      ipAddress: '',
+    });
+  });
+
   it('validates and revokes the provided opaque marker', async () => {
     mocks.validate.mockResolvedValue({
       expiresAt: '2026-07-14T21:00:00.000Z',

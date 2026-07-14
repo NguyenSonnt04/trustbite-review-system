@@ -199,10 +199,10 @@ describe('AdminWebAuthService', () => {
     expect(sessionStore.revoke).toHaveBeenCalledWith('opaque-session-token');
   });
 
-  it('revokes an existing session when local validation fails closed', async () => {
+  it('preserves an existing session when local validation fails on infrastructure', async () => {
     authService.mapIdentityToUser.mockRejectedValue(new Error('database unavailable'));
 
     await expect(service.validate('opaque-session-token')).rejects.toThrow('database unavailable');
-    expect(sessionStore.revoke).toHaveBeenCalledWith('opaque-session-token');
+    expect(sessionStore.revoke).not.toHaveBeenCalled();
   });
 });

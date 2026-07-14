@@ -174,11 +174,13 @@ export class AdminWebSessionStore {
         return { allowed: count <= limit, retryAfterSeconds };
       };
 
-      const addressAttempt = await consume(
-        'address',
-        this.digest(`${email}\n${ipAddress || 'unknown'}`),
-        maxAttempts,
-      );
+      const addressAttempt = ipAddress
+        ? await consume(
+          'address',
+          this.digest(`${email}\n${ipAddress}`),
+          maxAttempts,
+        )
+        : { allowed: true, retryAfterSeconds: 0 };
       const emailAttempt = await consume('email', this.digest(email), emailMaxAttempts);
       return {
         allowed: addressAttempt.allowed && emailAttempt.allowed,

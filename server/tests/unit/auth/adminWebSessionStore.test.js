@@ -145,4 +145,22 @@ describe('AdminWebSessionStore', () => {
     expect(emailKey).not.toContain('admin@example.com');
     expect(emailKey).not.toContain('203.0.113.10');
   });
+
+  it('uses only the email-wide limit when no trusted client address is available', async () => {
+    redis.eval.mockResolvedValue([1, 120]);
+
+    await expect(store.consumeLoginAttempt({
+      email: 'admin@example.com',
+      ipAddress: '',
+      maxAttempts: 5,
+      emailMaxAttempts: 20,
+      windowSeconds: 300,
+    })).resolves.toEqual({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
+
+    expect(redis.eval).toHaveBeenCalledTimes(1);
+    expect(redis.eval.mock.calls[0][2]).toContain(':email:');
+  });
 });
