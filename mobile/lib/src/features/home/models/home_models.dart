@@ -63,19 +63,3 @@ class HomeReviewSnippet {
   final List<String> badges;
   final String timeAgo;
 }
-
-class HomeNotification {
-  const HomeNotification({
-    required this.title,
-    required this.body,
-    required this.timeAgo,
-    required this.icon,
-    required this.unread,
-  });
-
-  final String title;
-  final String body;
-  final String timeAgo;
-  final String icon;
-  final bool unread;
-}

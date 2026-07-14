@@ -16,6 +16,8 @@ class DiscoverPage extends StatelessWidget {
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
+    required this.notificationCount,
+    required this.onNotificationsPressed,
   });
 
   final int activeServiceIndex;
@@ -23,6 +25,8 @@ class DiscoverPage extends StatelessWidget {
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
   final VoidCallback onLogin;
+  final int notificationCount;
+  final VoidCallback onNotificationsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +38,8 @@ class DiscoverPage extends StatelessWidget {
           isSignedIn: isSignedIn,
           currentUser: currentUser,
           onLogin: onLogin,
+          notificationCount: notificationCount,
+          onNotificationsPressed: onNotificationsPressed,
         ),
         const _TitleAndSearch(),
         const SizedBox(height: 6),
@@ -60,12 +66,7 @@ class _TitleAndSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: 3,
-      ),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -95,10 +96,7 @@ class _TitleAndSearch extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFE8E8E8),
-                width: 1.1,
-              ),
+              border: Border.all(color: const Color(0xFFE8E8E8), width: 1.1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.09),
@@ -219,10 +217,7 @@ class _ServicesSection extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: SeeAllChip(),
-              ),
+              Padding(padding: EdgeInsets.only(left: 12), child: SeeAllChip()),
             ],
           ),
           const SizedBox(height: 16),
@@ -543,8 +538,10 @@ class _TrustedTodayCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(14),

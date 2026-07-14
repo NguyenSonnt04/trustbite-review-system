@@ -1,29 +1,5 @@
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 
-const homeNotifications = [
-  HomeNotification(
-    title: 'Bill đã được xác thực',
-    body: 'Bill tại Phở Thìn Bờ Hồ đã khớp thông tin quán và thời gian.',
-    timeAgo: '5 phút trước',
-    icon: 'receipt',
-    unread: true,
-  ),
-  HomeNotification(
-    title: 'Có ưu đãi gần bạn',
-    body: 'Quán Nướng Sài Gòn đang có ưu đãi cho thành viên TrustBite.',
-    timeAgo: '24 phút trước',
-    icon: 'offer',
-    unread: true,
-  ),
-  HomeNotification(
-    title: 'Review được quan tâm',
-    body: 'Review Phở bò tái chín của bạn vừa nhận thêm 8 lượt hữu ích.',
-    timeAgo: '1 giờ trước',
-    icon: 'review',
-    unread: true,
-  ),
-];
-
 const homeRestaurants = [
   HomeRestaurant(
     name: 'Phở Thìn Bờ Hồ',

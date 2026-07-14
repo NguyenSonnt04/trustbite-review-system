@@ -61,6 +61,12 @@ export default {
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   avatarAllowedHosts,
   trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
+  notifications: {
+    enabled: parseBoolean(
+      process.env.TRUSTBITE_NOTIFICATIONS_ENABLED,
+      env !== 'production',
+    ),
+  },
   auth: {
     provider: 'cognito',
     phoneFallbackEnabled: parseBoolean(process.env.AUTH_PHONE_FALLBACK_ENABLED, phoneFallbackDefault),

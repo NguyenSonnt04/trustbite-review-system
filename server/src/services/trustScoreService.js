@@ -80,6 +80,13 @@ export async function recomputeRestaurantTrustScore(restaurantId, { client } = {
   try {
     if (ownsTransaction) await db.query('BEGIN');
 
+    await db.query(
+      `SELECT id
+       FROM restaurants
+       WHERE id = $1
+       FOR UPDATE`,
+      [restaurantId],
+    );
     const reviewsResult = await db.query(LOAD_REVIEWS_SQL, [restaurantId]);
     const result = computeTrustScore(reviewsResult.rows, rules);
 
