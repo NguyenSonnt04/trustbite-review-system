@@ -43,11 +43,11 @@ npm run harness -- story verify TB-AUTH-003-admin-web-login
 Recorded on 2026-07-14:
 
 - `npm run server:build`: passed after merging current `main`, 124 server files parsed successfully.
-- `npm run server:test:unit`: passed, 37 files and 368 tests.
+- `npm run server:test:unit`: passed, 37 files and 369 tests.
 - `npm run server:test:integration`: passed, 17 files and 131 tests; 4 provider-dependent tests remain intentionally skipped.
 - `npm run lint --prefix client`: passed.
 - `npm run client:build`: passed with the protected-route proxy registered as `Proxy (Middleware)`.
 - Browser smoke proved anonymous and forged sessions redirect before admin rendering, a temporary database-backed administrator with a real Redis opaque marker reaches `/admin`, and logout revokes the marker and clears the cookie. Temporary smoke records were removed.
 - BFF abuse smoke returned `403` for missing and foreign origins, `415` for unsupported content type, and `413` for an oversized chunked request.
-- Repeated read-only security reviews found and verified fixes for confidential-client enforcement, refresh-token cleanup, streamed body limits, paginated app-client discovery, provisioning rollback, public error masking, client-address lockout behavior, and spoof-resistant email-wide throttling.
+- Repeated read-only security reviews found and verified fixes for confidential-client enforcement, refresh-token cleanup, streamed body limits, paginated app-client discovery, provisioning rollback, public error masking, client-address lockout behavior, spoof-resistant email-wide throttling, fixed-length BFF-secret comparison, and atomic Redis counter expiry.
 - The local AWS principal was denied `cognito-idp:ListUserPoolClients`, so real provider credential smoke remains blocked. Local dedicated-client values are intentionally empty and login fails closed until an authorized operator runs `CONFIRM_CREATE_ADMIN_COGNITO_CLIENT=true npm run cognito:configure-admin-web --prefix server`.

@@ -1,6 +1,7 @@
 import { authService } from './auth.js';
 import { cognitoIdentityProvider } from './identityProviders/cognitoProvider.js';
 import { getAdminWebSessionStore } from './adminWebSessionStore.js';
+import appConfig from '../config/app.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
@@ -54,19 +55,7 @@ export class AdminWebAuthService {
     identityProvider = cognitoIdentityProvider,
     authService: localAuthService = authService,
     sessionStore = null,
-    config = {
-      cognitoClientId: process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_ID || '',
-      cognitoClientSecret: process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET || '',
-      loginRateLimitMax: Number.parseInt(process.env.ADMIN_LOGIN_RATE_LIMIT_MAX || '5', 10),
-      loginEmailRateLimitMax: Number.parseInt(
-        process.env.ADMIN_LOGIN_EMAIL_RATE_LIMIT_MAX || '20',
-        10,
-      ),
-      loginRateLimitWindowSeconds: Number.parseInt(
-        process.env.ADMIN_LOGIN_RATE_LIMIT_WINDOW_SECONDS || '300',
-        10,
-      ),
-    },
+    config = appConfig.auth.adminWeb,
   } = {}) {
     this.identityProvider = identityProvider;
     this.authService = localAuthService;

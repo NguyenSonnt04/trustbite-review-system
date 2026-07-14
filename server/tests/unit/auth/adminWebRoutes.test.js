@@ -13,17 +13,20 @@ vi.mock('../../../src/services/adminWebAuth.js', () => ({
 }));
 
 const originalBffSecret = process.env.ADMIN_WEB_BFF_SECRET;
+let appConfig;
 let app;
 
 describe('admin web BFF routes', () => {
   beforeAll(async () => {
     process.env.ADMIN_WEB_BFF_SECRET = 'test-bff-secret';
+    ({ default: appConfig } = await import('../../../src/config/app.js'));
     ({ default: app } = await import('../../../src/app.js'));
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.ADMIN_WEB_BFF_SECRET = 'test-bff-secret';
+    appConfig.auth.adminWeb.bffSecret = 'test-bff-secret';
   });
 
   afterAll(() => {
@@ -46,7 +49,7 @@ describe('admin web BFF routes', () => {
   });
 
   it('fails closed when the BFF credential is not configured', async () => {
-    delete process.env.ADMIN_WEB_BFF_SECRET;
+    appConfig.auth.adminWeb.bffSecret = '';
 
     const response = await request(app)
       .get('/api/v1/auth/admin/web-session')

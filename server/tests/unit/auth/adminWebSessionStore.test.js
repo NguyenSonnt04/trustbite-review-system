@@ -12,9 +12,7 @@ describe('AdminWebSessionStore', () => {
       set: vi.fn().mockResolvedValue('OK'),
       get: vi.fn(),
       del: vi.fn().mockResolvedValue(1),
-      incr: vi.fn().mockResolvedValue(1),
-      expire: vi.fn().mockResolvedValue(1),
-      ttl: vi.fn().mockResolvedValue(300),
+      eval: vi.fn().mockResolvedValue([1, 300]),
     };
     const { AdminWebSessionStore } = await import(
       '../../../src/services/adminWebSessionStore.js'
@@ -88,7 +86,7 @@ describe('AdminWebSessionStore', () => {
       expiresAt: new Date(Date.now() + 60_000),
     })],
     ['revoke', 'del', async () => store.revoke(validToken)],
-    ['throttle', 'incr', async () => store.consumeLoginAttempt({
+    ['throttle', 'eval', async () => store.consumeLoginAttempt({
       email: 'admin@example.com',
       ipAddress: '127.0.0.1',
       maxAttempts: 5,
@@ -103,8 +101,7 @@ describe('AdminWebSessionStore', () => {
   });
 
   it('throttles login keys without storing raw email addresses', async () => {
-    redis.incr.mockResolvedValue(6);
-    redis.ttl.mockResolvedValue(120);
+    redis.eval.mockResolvedValue([6, 120]);
 
     await expect(store.consumeLoginAttempt({
       email: 'admin@example.com',
@@ -116,16 +113,21 @@ describe('AdminWebSessionStore', () => {
       retryAfterSeconds: 120,
     });
 
-    const key = redis.incr.mock.calls[0][0];
+    const key = redis.eval.mock.calls[0][2];
+    expect(redis.eval).toHaveBeenCalledWith(
+      expect.stringContaining("redis.call('EXPIRE'"),
+      1,
+      key,
+      300,
+    );
     expect(key).not.toContain('admin@example.com');
     expect(key).not.toContain('127.0.0.1');
   });
 
   it('enforces an email-wide limit even when the client address changes', async () => {
-    redis.incr
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(21);
-    redis.ttl.mockResolvedValue(120);
+    redis.eval
+      .mockResolvedValueOnce([1, 120])
+      .mockResolvedValueOnce([21, 120]);
 
     await expect(store.consumeLoginAttempt({
       email: 'admin@example.com',
@@ -138,7 +140,7 @@ describe('AdminWebSessionStore', () => {
       retryAfterSeconds: 120,
     });
 
-    const emailKey = redis.incr.mock.calls[1][0];
+    const emailKey = redis.eval.mock.calls[1][2];
     expect(emailKey).toContain(':email:');
     expect(emailKey).not.toContain('admin@example.com');
     expect(emailKey).not.toContain('203.0.113.10');

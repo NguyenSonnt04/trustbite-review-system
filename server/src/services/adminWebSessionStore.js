@@ -1,12 +1,22 @@
 import crypto from 'node:crypto';
 import IORedis from 'ioredis';
 import { getRedisConnection } from '../config/ocr.js';
+import appConfig from '../config/app.js';
 import { HttpError, createHttpError } from '../utils/httpErrors.js';
 
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,128}$/u;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SESSION_PREFIX = 'trustbite:admin-web-session:';
 const RATE_LIMIT_PREFIX = 'trustbite:admin-login-attempt:';
+const CONSUME_RATE_LIMIT_SCRIPT = `
+local count = redis.call('INCR', KEYS[1])
+local ttl = redis.call('TTL', KEYS[1])
+if count == 1 or ttl < 0 then
+  redis.call('EXPIRE', KEYS[1], ARGV[1])
+  ttl = tonumber(ARGV[1])
+end
+return { count, ttl }
+`;
 
 const createStoreUnavailableError = () => createHttpError(
   503,
@@ -155,15 +165,12 @@ export class AdminWebSessionStore {
     return runRedisOperation(async () => {
       const consume = async (scope, fingerprint, limit) => {
         const key = `${RATE_LIMIT_PREFIX}${scope}:${fingerprint}`;
-        const count = await this.redis.incr(key);
-        if (count === 1) {
-          await this.redis.expire(key, windowSeconds);
-        }
-        let retryAfterSeconds = await this.redis.ttl(key);
-        if (retryAfterSeconds < 0) {
-          await this.redis.expire(key, windowSeconds);
-          retryAfterSeconds = windowSeconds;
-        }
+        const [count, retryAfterSeconds] = await this.redis.eval(
+          CONSUME_RATE_LIMIT_SCRIPT,
+          1,
+          key,
+          windowSeconds,
+        );
         return { allowed: count <= limit, retryAfterSeconds };
       };
 
@@ -202,11 +209,8 @@ export const getAdminWebSessionStore = () => {
   if (!adminWebSessionStore) {
     adminWebSessionStore = new AdminWebSessionStore({
       redis: getRedis(),
-      maxLifetimeSeconds: Number.parseInt(
-        process.env.ADMIN_WEB_SESSION_MAX_SECONDS || '900',
-        10,
-      ),
-      keySecret: process.env.ADMIN_WEB_SESSION_KEY_SECRET || '',
+      maxLifetimeSeconds: appConfig.auth.adminWeb.sessionMaxSeconds,
+      keySecret: appConfig.auth.adminWeb.sessionKeySecret,
     });
   }
   return adminWebSessionStore;
