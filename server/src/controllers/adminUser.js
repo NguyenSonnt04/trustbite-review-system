@@ -12,6 +12,21 @@ const getValidatedUserIdParam = (req) => {
   return userId;
 };
 
+export const getAdminSession = async (req, res, next) => {
+  try {
+    sendSuccess(res, {
+      user: {
+        id: req.user.id,
+        displayName: req.user.displayName,
+        status: req.user.status,
+        roles: req.user.roles,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const suspendUser = async (req, res, next) => {
   try {
     const result = await userService.suspendUser(req.user, getValidatedUserIdParam(req), req.body?.reason);

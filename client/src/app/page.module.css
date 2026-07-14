@@ -312,6 +312,11 @@
   text-underline-offset: 3px;
 }
 
+.preview strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
 .securityCopy {
   margin-top: 22px;
   border-top: 1px solid var(--line);
