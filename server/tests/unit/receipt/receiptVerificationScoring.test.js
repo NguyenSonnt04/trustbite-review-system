@@ -280,15 +280,15 @@ describe('decideFromScore — Anti-Fraud §4.2 buckets', () => {
     expect(decideFromScore(60, RULES).reviewStatus).toBe('PENDING_ADMIN_REVIEW');
   });
 
-  it('61 → REFERENCE_ONLY (lower boundary)', () => {
+  it('61 → private REFERENCE_ONLY (lower boundary)', () => {
     expect(decideFromScore(61, RULES)).toMatchObject({
       decision: 'REFERENCE_ONLY',
       reviewStatus: 'REFERENCE_ONLY',
       verificationStatus: 'REFERENCE_ONLY',
       receiptStatus: 'REFERENCE_ONLY',
       trustLabel: 'REFERENCE_ONLY',
-      publicVisibility: 'PUBLIC',
-      trustWeightBucket: 'LOW',
+      publicVisibility: 'PRIVATE',
+      trustWeightBucket: 'NONE',
     });
   });
 

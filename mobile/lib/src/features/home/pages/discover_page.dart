@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
+import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
 import 'package:trustbite_mobile/src/features/home/data/home_mock_data.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/home_header.dart';
-import 'package:trustbite_mobile/src/features/home/widgets/restaurant_card.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/see_all_chip.dart';
+import 'package:trustbite_mobile/src/features/reviews/data/review_service.dart';
+import 'package:trustbite_mobile/src/features/reviews/write_review_screen.dart';
 
 class DiscoverPage extends StatelessWidget {
   const DiscoverPage({
@@ -16,6 +19,7 @@ class DiscoverPage extends StatelessWidget {
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
+    required this.ensureSignedIn,
   });
 
   final int activeServiceIndex;
@@ -23,6 +27,7 @@ class DiscoverPage extends StatelessWidget {
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
   final VoidCallback onLogin;
+  final Future<bool> Function() ensureSignedIn;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +42,7 @@ class DiscoverPage extends StatelessWidget {
         ),
         const _TitleAndSearch(),
         const SizedBox(height: 6),
-        const _NearbySection(),
+        _NearbySection(ensureSignedIn: ensureSignedIn),
         const SizedBox(height: 20),
         _ServicesSection(
           activeServiceIndex: activeServiceIndex,
@@ -60,12 +65,7 @@ class _TitleAndSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: 3,
-      ),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -95,10 +95,7 @@ class _TitleAndSearch extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFE8E8E8),
-                width: 1.1,
-              ),
+              border: Border.all(color: const Color(0xFFE8E8E8), width: 1.1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.09),
@@ -130,8 +127,36 @@ class _TitleAndSearch extends StatelessWidget {
   }
 }
 
-class _NearbySection extends StatelessWidget {
-  const _NearbySection();
+class _NearbySection extends StatefulWidget {
+  const _NearbySection({required this.ensureSignedIn});
+
+  final Future<bool> Function() ensureSignedIn;
+
+  @override
+  State<_NearbySection> createState() => _NearbySectionState();
+}
+
+class _NearbySectionState extends State<_NearbySection> {
+  late Future<List<RestaurantSummary>> _restaurants;
+
+  @override
+  void initState() {
+    super.initState();
+    _restaurants = appReviewService.listRestaurants();
+  }
+
+  void _retry() {
+    setState(() => _restaurants = appReviewService.listRestaurants());
+  }
+
+  Future<void> _openReview(RestaurantSummary restaurant) async {
+    if (!await widget.ensureSignedIn() || !mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => WriteReviewScreen(restaurant: restaurant),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -174,17 +199,163 @@ class _NearbySection extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         SizedBox(
-          height: 160,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: homeRestaurants.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemBuilder: (context, index) =>
-                RestaurantCard(restaurant: homeRestaurants[index]),
+          height: 174,
+          child: FutureBuilder<List<RestaurantSummary>>(
+            future: _restaurants,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(color: HomeColors.brand),
+                );
+              }
+              if (snapshot.hasError) {
+                final message = snapshot.error is ApiException
+                    ? (snapshot.error! as ApiException).message
+                    : 'Không thể tải danh sách quán.';
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(message, textAlign: TextAlign.center),
+                        TextButton.icon(
+                          onPressed: _retry,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Thử lại'),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              final restaurants = snapshot.data ?? const [];
+              if (restaurants.isEmpty) {
+                return const Center(
+                  child: Text('Chưa có quán đang hoạt động để đánh giá.'),
+                );
+              }
+              return ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: restaurants.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final restaurant = restaurants[index];
+                  return _ReviewRestaurantCard(
+                    restaurant: restaurant,
+                    onReview: () => _openReview(restaurant),
+                  );
+                },
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ReviewRestaurantCard extends StatelessWidget {
+  const _ReviewRestaurantCard({
+    required this.restaurant,
+    required this.onReview,
+  });
+
+  final RestaurantSummary restaurant;
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 260,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF23100B),
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: HomeColors.brand.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(13),
+                ),
+                child: const Icon(
+                  Icons.restaurant_rounded,
+                  color: Color(0xFFFFB08F),
+                ),
+              ),
+              const Spacer(),
+              const Icon(
+                Icons.verified_user_outlined,
+                color: Color(0xFFFFB08F),
+                size: 19,
+              ),
+              const SizedBox(width: 5),
+              Text(
+                restaurant.trustScore?.toStringAsFixed(1) ?? 'Mới',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            restaurant.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            restaurant.address,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: Color(0xFFD8C4BC), fontSize: 12),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              key: ValueKey('review-restaurant-${restaurant.id}'),
+              onPressed: restaurant.canVerifyLocation ? onReview : null,
+              style: FilledButton.styleFrom(
+                backgroundColor: HomeColors.brand,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(13),
+                ),
+              ),
+              icon: const Icon(Icons.rate_review_outlined, size: 18),
+              label: Text(
+                restaurant.canVerifyLocation
+                    ? 'Đánh giá quán'
+                    : 'Chưa có vị trí',
+                style: const TextStyle(fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -219,10 +390,7 @@ class _ServicesSection extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: SeeAllChip(),
-              ),
+              Padding(padding: EdgeInsets.only(left: 12), child: SeeAllChip()),
             ],
           ),
           const SizedBox(height: 16),
@@ -543,8 +711,10 @@ class _TrustedTodayCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(14),

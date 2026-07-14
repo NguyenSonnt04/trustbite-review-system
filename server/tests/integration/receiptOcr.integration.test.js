@@ -150,7 +150,10 @@ describe('processReceiptOcr — pipeline + downstream decision (mock provider)',
 
     const rec = await receiptRow(receipt.id);
     expect(rec.status).toBe('REFERENCE_ONLY');
-    expect((await reviewRow(review.id)).status).toBe('REFERENCE_ONLY');
+    const reviewed = await reviewRow(review.id);
+    expect(reviewed.status).toBe('REFERENCE_ONLY');
+    expect(reviewed.public_visibility).toBe('PRIVATE');
+    expect(reviewed.trust_weight_bucket).toBe('NONE');
   });
 
   it('persists line items to receipt_line_items', async () => {

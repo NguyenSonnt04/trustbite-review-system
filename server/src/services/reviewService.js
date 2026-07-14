@@ -365,13 +365,9 @@ export async function listPublicReviewsByRestaurant(restaurantId, { status = 'AL
   const offset = (safePage - 1) * safeSize;
 
   const params = [restaurantId];
-  let statusCondition = "r.status IN ('VERIFIED', 'REFERENCE_ONLY')";
-
-  if (status === 'VERIFIED') {
-    statusCondition = "r.status = 'VERIFIED'";
-  } else if (status === 'REFERENCE_ONLY') {
-    statusCondition = "r.status = 'REFERENCE_ONLY'";
-  }
+  const statusCondition = status === 'REFERENCE_ONLY'
+    ? '1 = 0'
+    : "r.status = 'VERIFIED'";
 
   // HIDDEN, REJECTED, and DELETED are excluded
   // Only public visibility reviews should be listed

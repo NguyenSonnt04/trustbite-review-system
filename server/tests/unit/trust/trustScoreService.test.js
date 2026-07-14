@@ -49,16 +49,18 @@ describe('recomputeRestaurantTrustScore', () => {
   it('opens its own transaction, persists the computed score/counts, and commits', async () => {
     mockReviewsThenUpdate([
       { averageRating: '5.00', trustWeightBucket: 'HIGH', rankCode: 'FOODIE' },
-      { averageRating: '1.00', trustWeightBucket: 'LOW', rankCode: 'NEWBIE' },
     ]);
 
     const result = await recomputeRestaurantTrustScore(RESTAURANT_ID);
 
-    // (5*1.0 + 1*0.1) / 1.1 = 4.636… → 4.64
-    expect(result).toEqual({ trustScore: 4.64, verifiedReviewCount: 1, referenceReviewCount: 1 });
+    expect(result).toEqual({ trustScore: 5, verifiedReviewCount: 1, referenceReviewCount: 0 });
 
     const upd = updateCall();
-    expect(upd[1]).toEqual([RESTAURANT_ID, 4.64, 1, 1]);
+    expect(upd[1]).toEqual([RESTAURANT_ID, 5, 1, 0]);
+
+    const loadSql = client.query.mock.calls.find((c) => /FROM\s+reviews/i.test(String(c[0])))[0];
+    expect(loadSql).toContain("r.trust_weight_bucket = 'HIGH'");
+    expect(loadSql).not.toContain("'LOW'");
 
     const texts = client.query.mock.calls.map((c) => String(c[0]));
     expect(texts.some((t) => /^\s*BEGIN/i.test(t))).toBe(true);

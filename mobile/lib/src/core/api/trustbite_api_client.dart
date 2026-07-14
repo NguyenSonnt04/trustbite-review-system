@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session_store.dart';
 import 'package:trustbite_mobile/src/core/auth/cognito_session_provider.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
@@ -76,15 +78,18 @@ class TrustBiteApiClient {
     required AuthSessionStore sessionStore,
     CognitoSessionProvider? cognitoSessionProvider,
     ApiTransport? transport,
+    http.Client? multipartClient,
   }) : _config = config,
        _sessionStore = sessionStore,
        _cognitoSessionProvider = cognitoSessionProvider,
-       _transport = transport ?? HttpApiTransport();
+       _transport = transport ?? HttpApiTransport(),
+       _multipartClient = multipartClient ?? http.Client();
 
   final MobileRuntimeConfig _config;
   final AuthSessionStore _sessionStore;
   final CognitoSessionProvider? _cognitoSessionProvider;
   final ApiTransport _transport;
+  final http.Client _multipartClient;
 
   Future<Map<String, dynamic>> getJson(
     String path, [
@@ -109,6 +114,64 @@ class TrustBiteApiClient {
     Map<String, dynamic> body,
   ) {
     return _requestJson(method: 'PATCH', path: path, body: jsonEncode(body));
+  }
+
+  Future<Map<String, dynamic>> postMultipart({
+    required String path,
+    required Map<String, String> fields,
+    required String fileField,
+    required String filePath,
+    required String idempotencyKey,
+  }) async {
+    final request = http.MultipartRequest('POST', _config.apiUri(path))
+      ..headers.addAll(await _buildHeaders(includeContentType: false))
+      ..headers['Idempotency-Key'] = idempotencyKey
+      ..fields.addAll(fields)
+      ..files.add(
+        await http.MultipartFile.fromPath(
+          fileField,
+          filePath,
+          contentType: _receiptMediaType(filePath),
+        ),
+      );
+
+    late final http.StreamedResponse streamed;
+    try {
+      streamed = await _multipartClient.send(request);
+    } on SocketException {
+      throw const ApiException(
+        HttpStatus.serviceUnavailable,
+        'Không thể kết nối máy chủ TrustBite. Vui lòng bật backend rồi thử lại.',
+      );
+    } on HttpException {
+      throw const ApiException(
+        HttpStatus.serviceUnavailable,
+        'Máy chủ TrustBite không phản hồi. Vui lòng thử lại.',
+      );
+    }
+
+    final response = ApiTransportResponse(
+      statusCode: streamed.statusCode,
+      body: await streamed.stream.bytesToString(),
+    );
+    if (response.statusCode == HttpStatus.unauthorized) {
+      await _clearRejectedSession();
+      throw AuthRequiredException(
+        response.statusCode,
+        _readErrorMessage(response),
+      );
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw ApiException(response.statusCode, _readErrorMessage(response));
+    }
+
+    if (response.body.trim().isEmpty) return <String, dynamic>{};
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw const ApiException(
+      HttpStatus.internalServerError,
+      'Backend returned an unexpected response shape.',
+    );
   }
 
   Future<Map<String, dynamic>> _requestJson({
@@ -140,13 +203,7 @@ class TrustBiteApiClient {
     }
 
     if (response.statusCode == HttpStatus.unauthorized) {
-      await _sessionStore.clear();
-      try {
-        await _cognitoSessionProvider?.signOut();
-      } on Exception {
-        // The backend rejection remains authoritative even if provider
-        // cleanup is temporarily unavailable.
-      }
+      await _clearRejectedSession();
       throw AuthRequiredException(
         response.statusCode,
         _readErrorMessage(response),
@@ -173,11 +230,11 @@ class TrustBiteApiClient {
     );
   }
 
-  Future<Map<String, String>> _buildHeaders() async {
-    final headers = <String, String>{
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    };
+  Future<Map<String, String>> _buildHeaders({
+    bool includeContentType = true,
+  }) async {
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (includeContentType) headers['Content-Type'] = 'application/json';
 
     final session = await _sessionStore.read();
     final trustedLocalUserId = session?.trustedLocalUserId?.trim();
@@ -204,6 +261,15 @@ class TrustBiteApiClient {
     return headers;
   }
 
+  Future<void> _clearRejectedSession() async {
+    await _sessionStore.clear();
+    try {
+      await _cognitoSessionProvider?.signOut();
+    } on Exception {
+      // Backend rejection remains authoritative if provider cleanup fails.
+    }
+  }
+
   String _readErrorMessage(ApiTransportResponse response) {
     final fallback = 'HTTP error! status: ${response.statusCode}';
 
@@ -224,5 +290,19 @@ class TrustBiteApiClient {
     }
 
     return fallback;
+  }
+
+  MediaType _receiptMediaType(String path) {
+    final extension = path.toLowerCase().split('.').last;
+    return switch (extension) {
+      'jpg' || 'jpeg' => MediaType('image', 'jpeg'),
+      'png' => MediaType('image', 'png'),
+      'heic' => MediaType('image', 'heic'),
+      'heif' => MediaType('image', 'heif'),
+      _ => throw const ApiException(
+        HttpStatus.unsupportedMediaType,
+        'Hóa đơn phải là ảnh JPG, PNG, HEIC hoặc HEIF.',
+      ),
+    };
   }
 }

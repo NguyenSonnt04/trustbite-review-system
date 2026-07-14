@@ -44,6 +44,9 @@ function validFields(overrides = {}) {
   return {
     reviewId: REVIEW_ID,
     restaurantId: RESTAURANT_ID,
+    latitude: '10.7769',
+    longitude: '106.7009',
+    gpsAccuracyMeters: '20',
     ...overrides,
   };
 }
@@ -66,6 +69,8 @@ function reviewRow() {
       verification_status: 'UNVERIFIED',
       restaurant_status: 'ACTIVE',
       restaurant_is_deleted: false,
+      venue_latitude: '10.7769',
+      venue_longitude: '106.7009',
     }],
     rowCount: 1,
   };
@@ -139,6 +144,56 @@ describe('uploadReceiptForReview', () => {
     expect(pool.connect).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [{ latitude: undefined }, 'latitude'],
+    [{ longitude: undefined }, 'longitude'],
+    [{ gpsAccuracyMeters: undefined }, 'gpsAccuracyMeters'],
+    [{ gpsAccuracyMeters: '0' }, 'gpsAccuracyMeters'],
+  ])('rejects missing or invalid required GPS evidence before opening a transaction', async (overrides, field) => {
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(overrides),
+      file: validFile(),
+    })).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+      details: expect.arrayContaining([expect.objectContaining({ field })]),
+    });
+
+    expect(pool.connect).not.toHaveBeenCalled();
+    expect(uploadReceiptObject).not.toHaveBeenCalled();
+  });
+
+  it('rejects receipt upload when the restaurant has no verifiable location', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        ...reviewRow(),
+        rows: [{
+          ...reviewRow().rows[0],
+          venue_latitude: null,
+          venue_longitude: null,
+        }],
+      });
+
+    await expect(uploadReceiptForReview({
+      userId: USER_ID,
+      idempotencyKey: IDEMPOTENCY_KEY,
+      fields: validFields(),
+      file: validFile(),
+    })).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'RESTAURANT_LOCATION_UNAVAILABLE',
+    });
+
+    expect(uploadReceiptObject).not.toHaveBeenCalled();
+  });
+
   it('uploads a receipt, records capturedAt, enqueues OCR, and returns a 202 response body', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
@@ -175,9 +230,9 @@ describe('uploadReceiptForReview', () => {
       null,
       TEST_RECEIPT_FILE_URL,
       expect.any(String),
-      null,
-      null,
-      null,
+      10.7769,
+      106.7009,
+      20,
       capturedAt,
       null,
     ]);
@@ -509,9 +564,9 @@ describe('uploadReceiptForReview', () => {
           endpoint: 'POST /api/v1/receipts',
           reviewId: REVIEW_ID,
           restaurantId: RESTAURANT_ID,
-          latitude: null,
-          longitude: null,
-          gpsAccuracyMeters: null,
+          latitude: 10.7769,
+          longitude: 106.7009,
+          gpsAccuracyMeters: 20,
           capturedAt: null,
           fileHash,
         })).digest('hex');
@@ -572,9 +627,9 @@ describe('uploadReceiptForReview', () => {
           endpoint: 'POST /api/v1/receipts',
           reviewId: REVIEW_ID,
           restaurantId: RESTAURANT_ID,
-          latitude: null,
-          longitude: null,
-          gpsAccuracyMeters: null,
+          latitude: 10.7769,
+          longitude: 106.7009,
+          gpsAccuracyMeters: 20,
           capturedAt: null,
           fileHash,
         })).digest('hex');

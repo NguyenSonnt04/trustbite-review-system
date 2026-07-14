@@ -217,8 +217,8 @@ export function decideFromScore(score, rules) {
       verificationStatus: 'REFERENCE_ONLY',
       receiptStatus: 'REFERENCE_ONLY',
       trustLabel: 'REFERENCE_ONLY',
-      publicVisibility: 'PUBLIC',
-      trustWeightBucket: 'LOW',
+      publicVisibility: 'PRIVATE',
+      trustWeightBucket: 'NONE',
     };
   }
   return {

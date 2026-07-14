@@ -112,7 +112,7 @@ describe('review verification status API', () => {
   it.each([
     ['verified', 'VERIFIED', 'VERIFIED', 'TRUSTED', 'PUBLIC', 'HIGH', 'VERIFIED', 'VERIFIED'],
     ['rejected', 'REJECTED', 'REJECTED', 'REJECTED', 'PRIVATE', 'NONE', 'REJECTED', 'REJECTED'],
-    ['reference', 'REFERENCE_ONLY', 'REFERENCE_ONLY', 'REFERENCE_ONLY', 'PUBLIC', 'LOW', 'REFERENCE_ONLY', 'REFERENCE_ONLY'],
+    ['reference', 'REFERENCE_ONLY', 'REFERENCE_ONLY', 'REFERENCE_ONLY', 'PRIVATE', 'NONE', 'REFERENCE_ONLY', 'REFERENCE_ONLY'],
     ['admin-review', 'PENDING_ADMIN_REVIEW', 'PENDING_ADMIN_REVIEW', 'PENDING_ADMIN_REVIEW', 'PRIVATE', 'NONE', 'PENDING_ADMIN_REVIEW', null],
   ])('returns %s lifecycle state', async (
     _label,

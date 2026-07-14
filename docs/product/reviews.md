@@ -43,8 +43,11 @@ Rules:
   derive it from `reviewId` only.
 - Supported receipt files are JPG/JPEG, PNG, HEIC, and HEIF within the backend
   size limit.
-- Optional GPS coordinates and `capturedAt` metadata are validated before
-  persistence and become verification evidence.
+- Latitude, longitude, and positive GPS accuracy are required together.
+  `capturedAt` remains optional metadata. Invalid or incomplete GPS evidence is
+  rejected before storage or persistence.
+- The selected restaurant or branch must have backend coordinates available;
+  otherwise receipt upload fails closed because proximity cannot be verified.
 - S3 object handling stays behind `server/src/services/s3ReceiptStorageService.js`.
   The API persists private `s3://...` object references, never public URLs or
   public ACLs.
@@ -73,7 +76,7 @@ by the backend:
 | Pending receipt/OCR | `SUBMITTED` | `PROCESSING` | `PRIVATE_UNTIL_DECISION` | `NONE` |
 | Verified | `VERIFIED` | `VERIFIED` | `PUBLIC` | high/full bucket from verification |
 | Rejected | `REJECTED` | `REJECTED` or `DUPLICATE_REJECTED` | `PRIVATE` | `NONE` |
-| Reference only | `REFERENCE_ONLY` | `REFERENCE_ONLY` | `PUBLIC` | low/reference bucket from verification |
+| Reference only | `REFERENCE_ONLY` | `REFERENCE_ONLY` | `PRIVATE` | `NONE` |
 | Admin review | `PENDING_ADMIN_REVIEW` | `PENDING_ADMIN_REVIEW` | `PRIVATE` | `NONE` |
 
 ## Status API
@@ -89,3 +92,6 @@ The response omits private storage details such as receipt file URLs and hashes.
 Phase 4 backend closeout does not implement review UI, mobile review flows,
 admin moderation UI, or public polling UX. Those remain separate UI/mobile/admin
 stories.
+
+`TB-MOBILE-REVIEW-001` adds the mobile review flow. Only `VERIFIED` reviews may
+be public or affect restaurant ratings; every other outcome remains private.

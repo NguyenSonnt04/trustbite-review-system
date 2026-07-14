@@ -46,7 +46,7 @@ describe('listPublicReviewsByRestaurant', () => {
     vi.clearAllMocks();
   });
 
-  it('filters ALL public reviews to verified and reference-only statuses', async () => {
+  it('filters ALL public reviews to verified status only', async () => {
     mockQueryResults();
 
     await listPublicReviewsByRestaurant(RESTAURANT_ID, { status: 'ALL', page: 1, pageSize: 20 });
@@ -54,8 +54,8 @@ describe('listPublicReviewsByRestaurant', () => {
     const dataSql = pool.query.mock.calls[0][0];
     const countSql = pool.query.mock.calls[1][0];
 
-    expect(dataSql).toContain("r.status IN ('VERIFIED', 'REFERENCE_ONLY')");
-    expect(countSql).toContain("r.status IN ('VERIFIED', 'REFERENCE_ONLY')");
+    expect(dataSql).toContain("r.status = 'VERIFIED'");
+    expect(countSql).toContain("r.status = 'VERIFIED'");
     expect(dataSql).toContain("r.public_visibility = 'PUBLIC'");
     expect(countSql).toContain("r.public_visibility = 'PUBLIC'");
   });
@@ -70,13 +70,14 @@ describe('listPublicReviewsByRestaurant', () => {
     expect(dataSql).toContain("r.public_visibility = 'PUBLIC'");
   });
 
-  it('filters REFERENCE_ONLY public reviews distinctly', async () => {
-    mockQueryResults([mockReviewRow({ status: 'REFERENCE_ONLY' })]);
+  it('never exposes reference-only reviews through the public filter', async () => {
+    mockQueryResults([]);
 
     await listPublicReviewsByRestaurant(RESTAURANT_ID, { status: 'REFERENCE_ONLY' });
 
     const dataSql = pool.query.mock.calls[0][0];
-    expect(dataSql).toContain("r.status = 'REFERENCE_ONLY'");
+    expect(dataSql).toContain('1 = 0');
+    expect(dataSql).not.toContain("r.status = 'REFERENCE_ONLY'");
     expect(dataSql).toContain("r.public_visibility = 'PUBLIC'");
   });
 

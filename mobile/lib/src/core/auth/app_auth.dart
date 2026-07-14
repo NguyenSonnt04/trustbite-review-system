@@ -3,6 +3,7 @@ import 'package:trustbite_mobile/src/core/auth/auth_session_store.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
+import 'package:trustbite_mobile/src/features/reviews/data/review_service.dart';
 
 final appAuthSessionStore = InMemoryAuthSessionStore();
 
@@ -23,3 +24,5 @@ final appMobileAuthService = MobileAuthService(
   sessionStore: appAuthSessionStore,
   cognitoSessionProvider: appCognitoAuthGateway,
 );
+
+final appReviewService = ReviewService(apiClient: appApiClient);

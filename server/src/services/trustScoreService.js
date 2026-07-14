@@ -37,8 +37,8 @@ export class ValidationError extends Error {
   }
 }
 
-// Only HIGH/LOW buckets contribute; NONE (hidden/rejected/deleted/pending) is
-// excluded at the query level so hidden/deleted reviews never affect the score.
+// Only backend-verified HIGH reviews contribute. Reference, hidden, rejected,
+// deleted, and pending reviews never affect the score.
 const LOAD_REVIEWS_SQL = `
   SELECT r.average_rating AS "averageRating",
          r.trust_weight_bucket AS "trustWeightBucket",
@@ -46,7 +46,7 @@ const LOAD_REVIEWS_SQL = `
   FROM reviews r
   JOIN users u ON u.id = r.user_id
   WHERE r.restaurant_id = $1
-    AND r.trust_weight_bucket IN ('HIGH', 'LOW')
+    AND r.trust_weight_bucket = 'HIGH'
 `;
 
 const UPDATE_RESTAURANT_SQL = `

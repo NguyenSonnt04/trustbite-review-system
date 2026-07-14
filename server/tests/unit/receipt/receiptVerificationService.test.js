@@ -237,7 +237,7 @@ describe('verifyReceipt orchestrator', () => {
     expect(rev.params).toEqual(expect.arrayContaining(['PENDING_ADMIN_REVIEW', 'PRIVATE_UNTIL_DECISION', 'NONE']));
   });
 
-  it('risk 61-99 → REFERENCE_ONLY', async () => {
+  it('risk 61-99 → private REFERENCE_ONLY', async () => {
     // merchant <60 (+60) + new-account is not available; use far GPS late + stale receipt.
     // unreadable merchant (+50) + receipt >168h (+70) = 120 → reject. Need 61-99.
     // merchant <60 (+60) + receipt 49-168h would be 100. Use merchant <60 (+60) + accuracy>100 (+15) = 75.
@@ -248,7 +248,7 @@ describe('verifyReceipt orchestrator', () => {
 
     expect(result.reviewStatus).toBe('REFERENCE_ONLY');
     const rev = reviewUpdate(calls);
-    expect(rev.params).toEqual(expect.arrayContaining(['REFERENCE_ONLY', 'PUBLIC', 'LOW']));
+    expect(rev.params).toEqual(expect.arrayContaining(['REFERENCE_ONLY', 'PRIVATE', 'NONE']));
   });
 
   it('risk >=100 → REJECTED + fraud flag created', async () => {

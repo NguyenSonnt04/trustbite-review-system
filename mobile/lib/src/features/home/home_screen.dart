@@ -122,6 +122,12 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadAuthState();
   }
 
+  Future<bool> _ensureSignedIn() async {
+    if (_isSignedIn) return true;
+    await _openLogin();
+    return mounted && _isSignedIn;
+  }
+
   Future<void> _logout() async {
     await (widget.authService ?? appMobileAuthService).signOut();
     if (!mounted) return;
@@ -219,6 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isSignedIn: _isSignedIn,
         currentUser: _currentUser,
         onLogin: _openLogin,
+        ensureSignedIn: _ensureSignedIn,
       ),
       1 => const MapScreen(),
       2 => const FavoritesPage(),

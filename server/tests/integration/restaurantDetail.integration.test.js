@@ -176,12 +176,12 @@ describe('restaurant detail and public reviews API', () => {
         name: restaurant.name,
         ownerClaimStatus: 'UNDER_REVIEW',
         ratingBreakdown: {
-          avgFood: 4,
-          avgPrice: 3.5,
+          avgFood: 5,
+          avgPrice: 4,
           avgService: 3,
-          avgAmbience: 2.5,
-          avgOverall: 3.25,
-          reviewCount: 2,
+          avgAmbience: 2,
+          avgOverall: 3.5,
+          reviewCount: 1,
         },
       });
     } finally {
@@ -195,7 +195,7 @@ describe('restaurant detail and public reviews API', () => {
     }
   });
 
-  it('lists only public verified and reference-only reviews while omitting reviewer userId', async () => {
+  it('lists only public verified reviews while omitting reviewer userId', async () => {
     const restaurant = await createDetailRestaurant({ name: `Public Reviews ${Date.now()}` });
     const reviewer = await createUser({ displayName: 'Public Review Reader' });
     const reviewIds = [];
@@ -235,10 +235,10 @@ describe('restaurant detail and public reviews API', () => {
         .get(`/api/v1/restaurants/${restaurant.id}/reviews`)
         .expect(200);
       const allIds = allResponse.body.items.map((item) => item.id);
-      expect(allIds).toEqual(expect.arrayContaining([verified.id, referenceOnly.id]));
-      expect(allIds).not.toEqual(expect.arrayContaining([rejected.id, privateReview.id]));
+      expect(allIds).toEqual([verified.id]);
+      expect(allIds).not.toEqual(expect.arrayContaining([referenceOnly.id, rejected.id, privateReview.id]));
       expect(allResponse.body.items.every((item) => !Object.prototype.hasOwnProperty.call(item, 'userId'))).toBe(true);
-      expect(allResponse.body.total).toBe(2);
+      expect(allResponse.body.total).toBe(1);
 
       const verifiedResponse = await requestApp()
         .get(`/api/v1/restaurants/${restaurant.id}/reviews`)
@@ -250,7 +250,8 @@ describe('restaurant detail and public reviews API', () => {
         .get(`/api/v1/restaurants/${restaurant.id}/reviews`)
         .query({ status: 'REFERENCE_ONLY' })
         .expect(200);
-      expect(referenceResponse.body.items.map((item) => item.id)).toEqual([referenceOnly.id]);
+      expect(referenceResponse.body.items).toEqual([]);
+      expect(referenceResponse.body.total).toBe(0);
     } finally {
       await cleanup({
         reviewIds,

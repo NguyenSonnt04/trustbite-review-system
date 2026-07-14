@@ -24,6 +24,12 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>TrustBite cần camera để chụp hóa đơn xác minh đánh giá.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TrustBite cần truy cập ảnh để chọn hóa đơn xác minh đánh giá.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>TrustBite cần vị trí hiện tại để xác minh bạn đã đến quán.</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>

@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session.dart';
 import 'package:trustbite_mobile/src/core/auth/auth_session_store.dart';
@@ -212,7 +214,66 @@ void main() {
         expect(transport.lastHeaders['Authorization'], 'Bearer access-token');
       },
     );
+
+    test('sends authenticated multipart receipt evidence', () async {
+      final tempDirectory = await Directory.systemTemp.createTemp(
+        'trustbite-receipt-test',
+      );
+      final receipt = File('${tempDirectory.path}/receipt.jpg');
+      await receipt.writeAsBytes([0xff, 0xd8, 0xff, 0xe0]);
+      final multipartClient = _RecordingMultipartClient();
+      final client = TrustBiteApiClient(
+        config: config,
+        multipartClient: multipartClient,
+        sessionStore: InMemoryAuthSessionStore(),
+        cognitoSessionProvider: _FakeCognitoSessionProvider('access-token'),
+      );
+
+      try {
+        final result = await client.postMultipart(
+          path: '/receipts',
+          fields: {
+            'reviewId': 'review-1',
+            'restaurantId': 'restaurant-1',
+            'latitude': '10.7769',
+            'longitude': '106.7009',
+            'gpsAccuracyMeters': '12',
+          },
+          fileField: 'receiptImage',
+          filePath: receipt.path,
+          idempotencyKey: '11111111-1111-4111-8111-111111111111',
+        );
+
+        expect(result['status'], 'UPLOADED');
+        final request = multipartClient.lastRequest!;
+        expect(request.url.path, '/api/v1/receipts');
+        expect(request.headers['Authorization'], 'Bearer access-token');
+        expect(
+          request.headers['Idempotency-Key'],
+          '11111111-1111-4111-8111-111111111111',
+        );
+        expect(request.fields['gpsAccuracyMeters'], '12');
+        expect(request.files.single.field, 'receiptImage');
+        expect(request.files.single.contentType.toString(), 'image/jpeg');
+      } finally {
+        await tempDirectory.delete(recursive: true);
+      }
+    });
   });
+}
+
+class _RecordingMultipartClient extends http.BaseClient {
+  http.MultipartRequest? lastRequest;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    lastRequest = request as http.MultipartRequest;
+    return http.StreamedResponse(
+      Stream.value(utf8.encode('{"status":"UPLOADED"}')),
+      202,
+      headers: {'content-type': 'application/json'},
+    );
+  }
 }
 
 class _ThrowingApiTransport implements ApiTransport {

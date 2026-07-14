@@ -8,6 +8,9 @@ GPS proximity checks compare the device-reported review location with the restau
 
 Accepted rule for `TB-FRAUD-002`:
 
+- Receipt-backed review verification requires latitude, longitude, and positive
+  GPS accuracy. Missing or partial GPS evidence is rejected before receipt
+  storage or verification.
 - Distance is computed in meters between two latitude/longitude coordinate pairs.
 - The default GPS proximity threshold is **200 meters** and is read from server anti-fraud configuration (`GPS_PROXIMITY_THRESHOLD_METERS`) so environments can tune it without changing service code.
 - A proximity result passes when `distance_meters <= threshold_meters`.
@@ -40,10 +43,14 @@ These signals feed the same §4.2 decision buckets as the GPS/merchant/timestamp
 
 Accepted rule for `TB-TRUST-001` (Anti-Fraud §10, Status_Mapping §2). `restaurants.trust_score` (`1.00–5.00`) is a backend-computed weighted average of the restaurant's review ratings; the client never computes it.
 
-- Each review contributes by its `trust_weight_bucket`: `HIGH` (verified) is weighted by the reviewer's rank (Newbie 0.5, Apprentice 0.8, Foodie 1.0, Trusted Foodie 1.5; unknown rank falls back to 0.5), `LOW` (reference) is weighted 0.1, and `NONE` (hidden/rejected/deleted/pending) is excluded.
+- Each public review contributes only when backend verification assigns
+  `HIGH`. Verified reviews are weighted by the reviewer's rank (Newbie 0.5,
+  Apprentice 0.8, Foodie 1.0, Trusted Foodie 1.5; unknown rank falls back to
+  0.5). Reference, hidden, rejected, deleted, and pending reviews use `NONE`
+  and are excluded.
 - `trust_score = sum(rating_i * weight_i) / sum(weight_i)`, clamped to `1.00–5.00` and rounded to 2 decimals, where `rating_i` is the review's `average_rating`.
 - A restaurant with no qualifying (HIGH/LOW) reviews resets to the neutral default `5.00`.
-- The same pass recomputes `verified_review_count` (HIGH) and `reference_review_count` (LOW).
+- The same pass recomputes `verified_review_count` (HIGH).
 
 This is the restaurant trust score. TrustBite has no per-user trust score; user reputation is `exp_points`/`rank_code`. Auto-recompute triggers (verification decision, admin moderation, deletion) are a tracked follow-up.
 

@@ -131,6 +131,15 @@ function validateReceiptFields(fields = {}) {
   const gpsAccuracyMeters = parseOptionalNumber(fields.gpsAccuracyMeters, 'gpsAccuracyMeters', details);
   const capturedAt = parseCapturedAt(fields.capturedAt, details);
 
+  if (latitude === null) {
+    details.push(validationDetail('latitude', 'REQUIRED', 'latitude is required.'));
+  }
+  if (longitude === null) {
+    details.push(validationDetail('longitude', 'REQUIRED', 'longitude is required.'));
+  }
+  if (gpsAccuracyMeters === null) {
+    details.push(validationDetail('gpsAccuracyMeters', 'REQUIRED', 'gpsAccuracyMeters is required.'));
+  }
   if (latitude !== null && (latitude < -90 || latitude > 90)) {
     details.push(validationDetail('latitude', 'RANGE', 'latitude must be between -90 and 90.'));
   }
@@ -374,9 +383,14 @@ async function getReviewForUpload(client, userId, reviewId, restaurantId) {
             r.status,
             r.verification_status,
             rest.status AS restaurant_status,
-            rest.is_deleted AS restaurant_is_deleted
+            rest.is_deleted AS restaurant_is_deleted,
+            CASE WHEN r.branch_id IS NULL THEN rest.latitude ELSE branch.latitude END AS venue_latitude,
+            CASE WHEN r.branch_id IS NULL THEN rest.longitude ELSE branch.longitude END AS venue_longitude
      FROM reviews r
      JOIN restaurants rest ON rest.id = r.restaurant_id
+     LEFT JOIN restaurant_branches branch
+       ON branch.id = r.branch_id
+      AND branch.parent_restaurant_id = r.restaurant_id
      WHERE r.id = $1
      FOR UPDATE OF r`,
     [reviewId],
@@ -397,6 +411,13 @@ async function getReviewForUpload(client, userId, reviewId, restaurantId) {
   }
   if (review.restaurant_status !== 'ACTIVE' || review.restaurant_is_deleted === true) {
     throw createHttpError(422, 'RESTAURANT_NOT_ACTIVE', 'Restaurant is not active.');
+  }
+  if (review.venue_latitude === null || review.venue_longitude === null) {
+    throw createHttpError(
+      422,
+      'RESTAURANT_LOCATION_UNAVAILABLE',
+      'Restaurant location is unavailable for GPS verification.',
+    );
   }
   if (review.status !== 'SUBMITTED' || review.verification_status !== 'UNVERIFIED') {
     throw createHttpError(422, 'REVIEW_NOT_EDITABLE', 'Review cannot accept a receipt upload.');
