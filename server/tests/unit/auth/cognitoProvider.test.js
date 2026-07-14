@@ -118,6 +118,143 @@ describe('CognitoIdentityProvider', () => {
     });
   });
 
+  it('authenticates an admin password with the dedicated client and revokes the refresh token', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: signAccessToken({
+                  client_id: 'admin-web-client',
+                  exp: Math.floor(Date.now() / 1000) + 600,
+                }),
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).resolves.toMatchObject({
+      identity: {
+        provider: 'cognito',
+        subject: 'cognito-sub-1',
+        tokenUse: 'access',
+      },
+      accessTokenExpiresAt: expect.any(Date),
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+    expect(sentCommands[0].input).toMatchObject({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: 'admin-web-client',
+      AuthParameters: {
+        USERNAME: 'admin@example.com',
+        PASSWORD: 'correct-password',
+        SECRET_HASH: expect.any(String),
+      },
+    });
+    expect(sentCommands[1].input).toEqual({
+      Token: 'provider-refresh-token',
+      ClientId: 'admin-web-client',
+      ClientSecret: 'client-secret',
+    });
+  });
+
+  it('maps password failures to a generic credential error', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockRejectedValue(Object.assign(new Error('user does not exist'), {
+          name: 'UserNotFoundException',
+        })),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'unknown@example.com',
+      password: 'wrong-password',
+      clientId: 'admin-web-client',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_CREDENTIALS',
+    });
+  });
+
+  it('rejects unresolved Cognito challenges without creating a web session', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockResolvedValue({
+          ChallengeName: 'SOFTWARE_TOKEN_MFA',
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AUTH_CHALLENGE_REQUIRED',
+    });
+  });
+
+  it('revokes a returned refresh token when access-token verification fails', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: 'malformed-access-token',
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+  });
+
   it.each([
     ['issuer', { iss: 'https://invalid.example.test/pool' }, 'INVALID_TOKEN'],
     ['client id', { client_id: 'wrong-client' }, 'INVALID_TOKEN'],

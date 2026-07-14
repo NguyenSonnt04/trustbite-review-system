@@ -4,6 +4,7 @@ import appConfig from './config/app.js';
 import { connectDB, disconnectDB } from './config/db.js';
 import { createReceiptOcrWorker } from './services/queue/receiptOcrWorker.js';
 import { closeReceiptOcrQueue } from './services/queue/receiptOcrQueue.js';
+import { closeAdminWebSessionStore } from './services/adminWebSessionStore.js';
 
 const PORT = appConfig.port;
 
@@ -50,6 +51,7 @@ const shutdown = async (signal) => {
   console.log(`\n[Server] ${signal} received — shutting down`);
   if (ocrWorker) await ocrWorker.close().catch(() => {});
   await closeReceiptOcrQueue().catch(() => {});
+  await closeAdminWebSessionStore().catch(() => {});
   await disconnectDB();
   process.exit(0);
 };

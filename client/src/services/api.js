@@ -1,5 +1,4 @@
 import config from '@/config/config';
-import { authService } from './auth.service';
 
 const API_PREFIX = '/api/v1';
 
@@ -24,15 +23,10 @@ class ApiClient {
       throw new Error('API path must start with /');
     }
 
-    const token = authService.getToken();
     const headers = {
       'Content-Type': 'application/json',
       ...options.headers
     };
-
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
 
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...options,
@@ -40,8 +34,7 @@ class ApiClient {
     });
 
     if (response.status === 401) {
-      authService.logout();
-      throw new Error('Authentication required. Please sign in again.');
+      throw new Error('Yêu cầu xác thực không hợp lệ.');
     }
 
     if (!response.ok) {

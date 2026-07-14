@@ -1,6 +1,8 @@
+import { isIP } from 'node:net';
 import { createHttpError } from '../utils/httpErrors.js';
 import { pool } from '../config/db.js';
 import appConfig from '../config/app.js';
+import { adminWebAuthService } from '../services/adminWebAuth.js';
 
 const createCognitoFlowNotImplementedError = (message) =>
   createHttpError(501, 'COGNITO_FLOW_NOT_IMPLEMENTED', message);
@@ -93,6 +95,43 @@ export const createLocalDevelopmentUser = async (req, res, next) => {
         phoneNumber: user.phone_number,
       },
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getAdminSessionToken = (req) => req.header('x-trustbite-admin-session') || '';
+const getAdminLoginAddress = (req) => {
+  const forwardedAddress = req.header('x-trustbite-client-address')?.trim() || '';
+  return isIP(forwardedAddress) > 0 ? forwardedAddress : req.ip;
+};
+
+export const createAdminWebSession = async (req, res, next) => {
+  try {
+    const result = await adminWebAuthService.login({
+      email: req.body?.email,
+      password: req.body?.password,
+      ipAddress: getAdminLoginAddress(req),
+    });
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const getAdminWebSession = async (req, res, next) => {
+  try {
+    const result = await adminWebAuthService.validate(getAdminSessionToken(req));
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const deleteAdminWebSession = async (req, res, next) => {
+  try {
+    await adminWebAuthService.logout(getAdminSessionToken(req));
+    res.status(204).end();
   } catch (err) {
     next(err);
   }

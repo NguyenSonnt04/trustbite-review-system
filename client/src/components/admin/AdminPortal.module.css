@@ -291,6 +291,11 @@
   transform: translateY(0);
 }
 
+.iconButton:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .profile {
   display: flex;
   align-items: center;

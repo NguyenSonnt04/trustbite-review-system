@@ -66,6 +66,26 @@ Client authenticates with Cognito
 
 The backend must not issue production access/refresh tokens for TrustBite users unless a later accepted decision explicitly replaces Cognito as the authentication source of truth.
 
+## Admin Web Session Boundary
+
+The administration website uses the BFF wrapper defined by
+`docs/decisions/0019-admin-web-session-wrapper.md`:
+
+- Express authenticates administrator credentials through a dedicated Cognito
+  app client and verifies the returned Cognito access token.
+- PostgreSQL remains authoritative for active account state and the current
+  `ADMIN` or `SUPER_ADMIN` role.
+- Express immediately revokes any returned Cognito refresh token and creates a
+  fixed-lifetime opaque Redis marker that cannot outlive the verified access
+  token.
+- Redis stores no Cognito token, password, or email. The browser receives only
+  the opaque marker in an HttpOnly, SameSite Strict cookie set by Next.js.
+- Every protected admin navigation revalidates the marker, local account state,
+  active deletion state, and local role through Express.
+- The marker is not accepted as a bearer token for Express business APIs.
+  Those routes continue to require the Cognito bearer-token boundary unless a
+  later accepted decision defines a specific server-side admin BFF proxy.
+
 The current production identity provider adapter is Cognito. `docs/decisions/0011-auth-provider-adapter-boundary.md` documents the adapter boundary so profile and account services do not parse Cognito claims directly.
 
 ## JWT Verification Requirements

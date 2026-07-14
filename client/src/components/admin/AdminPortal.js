@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminCapabilities, adminService } from '@/services/admin.service';
+import { authService } from '@/services/auth.service';
 import AdminIcon from './AdminIcon';
 import styles from './AdminPortal.module.css';
 
@@ -356,7 +357,7 @@ function MonitoringSection({ apiState, onReload }) {
           <h2>Server luôn là nguồn sự thật.</h2>
           <p>Client không tự cấp quyền, không lưu secret và không mô phỏng dữ liệu vận hành nhạy cảm.</p>
           <div className={styles.securityChecklist}>
-            <span>Bearer token cho protected API</span>
+            <span>Phiên quản trị được server xác minh</span>
             <span>RBAC được server thực thi</span>
             <span>Không lộ provider credentials</span>
           </div>
@@ -382,6 +383,8 @@ export default function AdminPortal() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [restaurantError, setRestaurantError] = useState('');
   const [search, setSearch] = useState('');
+  const [adminSession, setAdminSession] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
 
@@ -410,6 +413,20 @@ export default function AdminPortal() {
       setRestaurantError('Không thể tải danh sách nhà hàng từ server.');
     }
     setLoadingRestaurants(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    authService.getSession()
+      .then((session) => {
+        if (active) setAdminSession(session);
+      })
+      .catch(() => {
+        if (active) window.location.replace('/?reason=session_expired');
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -462,13 +479,26 @@ export default function AdminPortal() {
   };
 
   const [title, subtitle] = sectionCopy[activeSection];
+  const adminUser = adminSession?.user;
+  const adminRole = adminUser?.roles?.includes('SUPER_ADMIN') ? 'SUPER_ADMIN' : 'ADMIN';
+  const adminInitial = adminUser?.displayName?.trim()?.slice(0, 1).toUpperCase() || 'A';
+
+  const handleLogout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await authService.logout();
+    } finally {
+      window.location.replace('/');
+    }
+  };
 
   return (
     <div className={styles.appShell}>
       <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`} id="admin-navigation">
         <div className={styles.brand}>
           <span className={styles.brandMark}>T</span>
-          <div><strong>TrustBite</strong><span>Bản xem quản trị</span></div>
+          <div><strong>TrustBite</strong><span>Quản trị vận hành</span></div>
           <button
             aria-label="Đóng menu"
             className={styles.mobileClose}
@@ -508,8 +538,8 @@ export default function AdminPortal() {
           <div className={styles.accessCard}>
             <span className={styles.accessIcon}><AdminIcon name="lock" size={18} /></span>
             <div>
-              <strong>Chế độ chỉ đọc</strong>
-              <span>Không có quyền quản trị cục bộ</span>
+              <strong>Phiên đã xác minh</strong>
+              <span>{adminUser ? adminRole : 'Đang kiểm tra quyền'}</span>
             </div>
           </div>
           <p>Tin cậy trong từng trải nghiệm.</p>
@@ -532,7 +562,7 @@ export default function AdminPortal() {
             <AdminIcon name="menu" />
           </button>
           <div className={styles.pageTitle}>
-            <span className={styles.mobileBrand}>Bản xem TrustBite</span>
+            <span className={styles.mobileBrand}>Quản trị TrustBite</span>
             <h1>{title}</h1>
           </div>
           <div className={styles.topbarActions}>
@@ -540,9 +570,22 @@ export default function AdminPortal() {
               <span className={`${styles.liveDot} ${apiState === 'online' ? styles.liveDotOnline : ''}`} />
             </div>
             <div className={styles.profile}>
-              <span>X</span>
-              <div><strong>Khách xem</strong><small>Không có phiên quản trị</small></div>
+              <span>{adminInitial}</span>
+              <div>
+                <strong>{adminUser?.displayName || 'Đang xác minh'}</strong>
+                <small>{adminUser ? adminRole : 'Phiên quản trị'}</small>
+              </div>
             </div>
+            <button
+              aria-label="Đăng xuất"
+              className={styles.iconButton}
+              disabled={loggingOut}
+              onClick={handleLogout}
+              title="Đăng xuất"
+              type="button"
+            >
+              <AdminIcon name="logout" size={17} />
+            </button>
           </div>
         </header>
 

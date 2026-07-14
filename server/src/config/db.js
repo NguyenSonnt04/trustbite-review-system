@@ -1,6 +1,7 @@
 import pg from 'pg';
 
 const { Pool } = pg;
+pg.types.setTypeParser(1082, (value) => value);
 
 const pool = new Pool({
   host: process.env.DATABASE_HOST,
