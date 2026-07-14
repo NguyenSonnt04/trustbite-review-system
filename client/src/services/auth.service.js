@@ -10,8 +10,12 @@ const getBrowserStorage = () => {
 };
 
 class AuthService {
-  async login() {
-    throw new Error('Cognito client login is not implemented in this web slice');
+  async login({ email, password } = {}) {
+    if (!email || !password) {
+      throw new Error('Vui lòng nhập email và mật khẩu quản trị.');
+    }
+
+    throw new Error('Đăng nhập quản trị bằng Cognito chưa được kết nối trong bản web này.');
   }
 
   async register() {
@@ -43,6 +47,13 @@ class AuthService {
 
   getToken() {
     return getBrowserStorage()?.getItem(AUTH_TOKEN_KEY) ?? null;
+  }
+
+  hasAdminSession() {
+    const token = this.getToken();
+    const user = this.getCurrentUser();
+    const roles = Array.isArray(user?.roles) ? user.roles : [];
+    return Boolean(token) && roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase()));
   }
 }
 
