@@ -21,6 +21,10 @@ const getValidatedAdminReason = (body = {}) => {
   }
 
   const normalized = reason.trim();
+  if (normalized.length === 0) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'reason must not be empty');
+  }
+
   if (normalized.length > ADMIN_REASON_MAX_LENGTH) {
     throw createHttpError(422, 'VALIDATION_ERROR', 'reason must be at most 500 characters');
   }
