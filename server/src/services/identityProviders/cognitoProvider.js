@@ -315,7 +315,11 @@ export class CognitoIdentityProvider {
       await revokeRefreshToken().catch(() => undefined);
       throw err;
     }
-    await revokeRefreshToken();
+    await revokeRefreshToken().catch(() => {
+      console.warn(
+        '[Auth] Cognito refresh-token revocation failed after access-token verification',
+      );
+    });
 
     return {
       identity,

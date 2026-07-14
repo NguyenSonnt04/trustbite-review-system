@@ -176,6 +176,63 @@ describe('CognitoIdentityProvider', () => {
     });
   });
 
+  it('keeps valid authentication available when refresh-token revocation fails', async () => {
+    const sentCommands = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: signAccessToken({
+                  client_id: 'admin-web-client',
+                  exp: Math.floor(Date.now() / 1000) + 600,
+                }),
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          throw new Error('sensitive provider failure');
+        }),
+      },
+    });
+
+    try {
+      const result = await provider.authenticatePassword({
+        username: 'admin@example.com',
+        password: 'correct-password',
+        clientId: 'admin-web-client',
+        clientSecret: 'client-secret',
+      });
+
+      expect(result).toMatchObject({
+        identity: {
+          provider: 'cognito',
+          subject: 'cognito-sub-1',
+          tokenUse: 'access',
+        },
+        accessTokenExpiresAt: expect.any(Date),
+      });
+      expect(result).not.toHaveProperty('accessToken');
+      expect(result).not.toHaveProperty('refreshToken');
+      expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+        'InitiateAuthCommand',
+        'RevokeTokenCommand',
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        '[Auth] Cognito refresh-token revocation failed after access-token verification',
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('provider-refresh-token');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('sensitive provider failure');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('maps password failures to a generic credential error', async () => {
     const provider = new (await import(
       '../../../src/services/identityProviders/cognitoProvider.js'
