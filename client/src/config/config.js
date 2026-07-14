@@ -5,8 +5,11 @@ const config = {
     cognito: {
       userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '',
       clientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
+      domain: process.env.NEXT_PUBLIC_COGNITO_DOMAIN || '',
+      redirectUri: process.env.NEXT_PUBLIC_COGNITO_REDIRECT_URI || '',
     },
   },
+  trustedDevelopmentUserId: process.env.NEXT_PUBLIC_TRUSTBITE_DEV_USER_ID || '',
   mapApiKey: process.env.NEXT_PUBLIC_MAP_API_KEY || '',
 };
 

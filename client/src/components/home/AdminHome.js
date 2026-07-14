@@ -41,35 +41,19 @@ export default function AdminHome() {
           </div>
 
           <div className={styles.form}>
-            <label>
-              Email quản trị
-              <span className={styles.inputShell}>
-                <AdminIcon name="mail" size={16} />
-                <input disabled name="email" placeholder="Đăng nhập chưa khả dụng" type="email" />
-              </span>
-            </label>
-            <label>
-              Mật khẩu
-              <span className={styles.inputShell}>
-                <AdminIcon name="key" size={16} />
-                <input
-                  disabled
-                  name="password"
-                  placeholder="Đăng nhập chưa khả dụng"
-                  type="password"
-                />
-              </span>
-            </label>
-
             <div className={styles.formNotice} role="status">
               <AdminIcon name="info" size={17} />
-              <p>Đăng nhập web chưa sẵn sàng. Các trường bên dưới được khóa để không thu thập thông tin đăng nhập khi chưa có luồng xác thực an toàn.</p>
+              <p>Đăng nhập được chuyển đến Cognito Hosted UI bằng Authorization Code + PKCE. TrustBite không thu thập mật khẩu trên trang này.</p>
             </div>
 
-            <button className={styles.loginButton} disabled type="button">
-              <span>Đăng nhập chưa khả dụng</span>
+            <Link className={styles.loginButton} href="/admin">
+              <span>Mở cổng quản trị</span>
               <AdminIcon name="arrow" size={16} />
-            </button>
+            </Link>
+            <Link className={styles.merchantButton} href="/merchant">
+              <span>Mở cổng nhà hàng</span>
+              <AdminIcon name="store" size={16} />
+            </Link>
           </div>
 
           <div className={styles.preview}>
@@ -78,8 +62,8 @@ export default function AdminHome() {
           </div>
 
           <p className={styles.securityCopy}>
-            Không có đường xem công khai vào workspace quản trị. Khi đăng nhập được triển khai,
-            cookie phiên phải do server đặt với HttpOnly và mọi quyền vẫn phải được server xác minh.
+            Không có đường xem công khai vào workspace quản trị. Cognito xác thực danh tính,
+            còn mọi quyền ADMIN, OWNER và MANAGER vẫn được server TrustBite xác minh.
           </p>
         </aside>
       </section>

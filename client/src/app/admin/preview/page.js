@@ -9,5 +9,5 @@ export const metadata = {
 };
 
 export default function AdminPreviewPage() {
-  return <AdminPortal />;
+  return <AdminPortal preview />;
 }

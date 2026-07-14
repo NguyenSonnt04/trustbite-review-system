@@ -25,13 +25,16 @@ class ApiClient {
     }
 
     const token = authService.getToken();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers
-    };
+    const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+    const headers = { ...options.headers };
+    if (!isFormData && options.body !== undefined) {
+      headers['Content-Type'] ??= 'application/json';
+    }
 
     if (token) {
       headers.Authorization = `Bearer ${token}`;
+    } else if (config.trustedDevelopmentUserId) {
+      headers['x-trustbite-user-id'] = config.trustedDevelopmentUserId;
     }
 
     const response = await fetch(`${this.baseUrl}${path}`, {
@@ -60,10 +63,11 @@ class ApiClient {
   }
 
   post(path, body, options = {}) {
+    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData;
     return this.request(path, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(body)
+      body: isFormData ? body : JSON.stringify(body)
     });
   }
 

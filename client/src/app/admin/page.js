@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import AdminPortal from '@/components/admin/AdminPortal';
 
 export default function AdminPage() {
-  redirect('/');
+  return <AdminPortal />;
 }

@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { adminCapabilities, adminService } from '@/services/admin.service';
+import { authService } from '@/services/auth.service';
+import RestaurantMediaManager from '@/components/restaurant-media/RestaurantMediaManager';
 import AdminIcon from './AdminIcon';
+import AdminClaimsSection from './AdminClaimsSection';
 import styles from './AdminPortal.module.css';
 
 const navigationGroups = [
@@ -230,7 +233,18 @@ function Overview({ apiState, restaurants, restaurantTotal, onNavigate }) {
   );
 }
 
-function RestaurantSection({ loading, error, restaurants, total, search, onSearch, onReload }) {
+function RestaurantSection({
+  canManage,
+  loading,
+  error,
+  restaurants,
+  total,
+  search,
+  selectedRestaurant,
+  onSearch,
+  onReload,
+  onSelectRestaurant,
+}) {
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('vi');
     if (!query) return restaurants;
@@ -264,10 +278,12 @@ function RestaurantSection({ loading, error, restaurants, total, search, onSearc
         </div>
       </div>
 
-      <div className={styles.boundaryNotice}>
-        <AdminIcon name="lock" size={18} />
-        <span>{adminCapabilities.restaurants.detail}</span>
-      </div>
+      {!canManage && (
+        <div className={styles.boundaryNotice}>
+          <AdminIcon name="lock" size={18} />
+          <span>Bản xem chỉ đọc không gửi yêu cầu quản trị.</span>
+        </div>
+      )}
 
       {error && <div className={styles.errorBanner}>{error}</div>}
       <div className={styles.tableScroll}>
@@ -305,8 +321,14 @@ function RestaurantSection({ loading, error, restaurants, total, search, onSearc
                   </StatusBadge>
                 </td>
                 <td>
-                  <button className={styles.smallButton} disabled title="Thao tác đang bị khóa tại ranh giới phân quyền" type="button">
-                    Chỉnh sửa
+                  <button
+                    className={styles.smallButton}
+                    disabled={!canManage}
+                    onClick={() => onSelectRestaurant(restaurant)}
+                    title={canManage ? 'Quản lý thư viện ảnh' : 'Cần phiên ADMIN hoặc SUPER_ADMIN'}
+                    type="button"
+                  >
+                    Quản lý ảnh
                   </button>
                 </td>
               </tr>
@@ -317,6 +339,12 @@ function RestaurantSection({ loading, error, restaurants, total, search, onSearc
           </tbody>
         </table>
       </div>
+      {canManage && selectedRestaurant && (
+        <RestaurantMediaManager
+          onClose={() => onSelectRestaurant(null)}
+          restaurant={selectedRestaurant}
+        />
+      )}
     </section>
   );
 }
@@ -373,7 +401,7 @@ function MonitoringSection({ apiState, onReload }) {
   );
 }
 
-export default function AdminPortal() {
+export default function AdminPortal({ preview = false }) {
   const [activeSection, setActiveSection] = useState('overview');
   const [menuOpen, setMenuOpen] = useState(false);
   const [apiState, setApiState] = useState('loading');
@@ -382,6 +410,9 @@ export default function AdminPortal() {
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
   const [restaurantError, setRestaurantError] = useState('');
   const [search, setSearch] = useState('');
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState(preview ? 'preview' : 'loading');
+  const [currentUser, setCurrentUser] = useState(null);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
 
@@ -392,7 +423,9 @@ export default function AdminPortal() {
 
     const [healthResult, restaurantResult] = await Promise.allSettled([
       adminService.readHealth(),
-      adminService.listRestaurants({ pageSize: 20 }),
+      preview
+        ? adminService.listRestaurants({ pageSize: 20 })
+        : adminService.listAdminRestaurants({ pageSize: 50 }),
     ]);
 
     setApiState(
@@ -410,9 +443,10 @@ export default function AdminPortal() {
       setRestaurantError('Không thể tải danh sách nhà hàng từ server.');
     }
     setLoadingRestaurants(false);
-  }, []);
+  }, [preview]);
 
   useEffect(() => {
+    if (!preview) return undefined;
     let active = true;
 
     Promise.allSettled([
@@ -439,7 +473,30 @@ export default function AdminPortal() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [preview]);
+
+  useEffect(() => {
+    if (preview) return;
+    let active = true;
+    adminService.getCurrentUser()
+      .then((user) => {
+        if (!active) return;
+        const roles = (user?.roles ?? []).map((role) => String(role).toUpperCase());
+        if (!roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN')) {
+          setSessionStatus('forbidden');
+          return;
+        }
+        setCurrentUser(user);
+        setSessionStatus('ready');
+        loadDashboard();
+      })
+      .catch(() => {
+        if (active) setSessionStatus('signed-out');
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadDashboard, preview]);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -462,13 +519,45 @@ export default function AdminPortal() {
   };
 
   const [title, subtitle] = sectionCopy[activeSection];
+  const canManage = sessionStatus === 'ready';
+
+  if (!preview && sessionStatus !== 'ready') {
+    const signedOut = sessionStatus === 'signed-out';
+    const forbidden = sessionStatus === 'forbidden';
+    return (
+      <main className={styles.accessGate}>
+        <span className={styles.brandMark}>T</span>
+        <h1>
+          {sessionStatus === 'loading'
+            ? 'Đang xác minh phiên quản trị'
+            : forbidden
+              ? 'Tài khoản không có quyền quản trị'
+              : 'Đăng nhập để mở cổng quản trị'}
+        </h1>
+        <p>
+          {forbidden
+            ? 'Server không trả về vai trò ADMIN hoặc SUPER_ADMIN cho tài khoản này.'
+            : 'Cognito xác thực danh tính, sau đó server kiểm tra vai trò TrustBite trước khi mở thao tác.'}
+        </p>
+        {signedOut && (
+          <button
+            className={styles.primaryButton}
+            onClick={() => authService.login('/admin').catch(() => setSessionStatus('signed-out'))}
+            type="button"
+          >
+            Đăng nhập với Cognito
+          </button>
+        )}
+      </main>
+    );
+  }
 
   return (
     <div className={styles.appShell}>
       <aside className={`${styles.sidebar} ${menuOpen ? styles.sidebarOpen : ''}`} id="admin-navigation">
         <div className={styles.brand}>
           <span className={styles.brandMark}>T</span>
-          <div><strong>TrustBite</strong><span>Bản xem quản trị</span></div>
+          <div><strong>TrustBite</strong><span>{preview ? 'Bản xem quản trị' : 'Cổng quản trị'}</span></div>
           <button
             aria-label="Đóng menu"
             className={styles.mobileClose}
@@ -508,8 +597,8 @@ export default function AdminPortal() {
           <div className={styles.accessCard}>
             <span className={styles.accessIcon}><AdminIcon name="lock" size={18} /></span>
             <div>
-              <strong>Chế độ chỉ đọc</strong>
-              <span>Không có quyền quản trị cục bộ</span>
+              <strong>{canManage ? 'Phiên đã xác minh' : 'Chế độ chỉ đọc'}</strong>
+              <span>{canManage ? 'ADMIN / SUPER_ADMIN' : 'Không có quyền quản trị cục bộ'}</span>
             </div>
           </div>
           <p>Tin cậy trong từng trải nghiệm.</p>
@@ -540,8 +629,11 @@ export default function AdminPortal() {
               <span className={`${styles.liveDot} ${apiState === 'online' ? styles.liveDotOnline : ''}`} />
             </div>
             <div className={styles.profile}>
-              <span>X</span>
-              <div><strong>Khách xem</strong><small>Không có phiên quản trị</small></div>
+              <span>{currentUser?.displayName?.slice(0, 1).toUpperCase() || (preview ? 'X' : 'A')}</span>
+              <div>
+                <strong>{currentUser?.displayName || (preview ? 'Khách xem' : 'Quản trị viên')}</strong>
+                <small>{canManage ? currentUser.roles.join(', ') : 'Không có phiên quản trị'}</small>
+              </div>
             </div>
           </div>
         </header>
@@ -558,18 +650,25 @@ export default function AdminPortal() {
           {activeSection === 'restaurants' && (
             <RestaurantSection
               error={restaurantError}
+              canManage={canManage}
               loading={loadingRestaurants}
               onReload={loadDashboard}
               onSearch={setSearch}
+              onSelectRestaurant={setSelectedRestaurant}
               restaurants={restaurants}
               search={search}
+              selectedRestaurant={selectedRestaurant}
               total={restaurantTotal}
             />
           )}
           {activeSection === 'monitoring' && <MonitoringSection apiState={apiState} onReload={loadDashboard} />}
           {activeSection === 'users' && <LockedState capability={adminCapabilities.users} title="Danh sách người dùng chưa khả dụng" />}
           {activeSection === 'reviews' && <LockedState capability={adminCapabilities.reviews} title="Khu vực kiểm duyệt chưa khả dụng" />}
-          {activeSection === 'verifications' && <LockedState capability={adminCapabilities.verifications} title="Hàng đợi xác minh chưa khả dụng" />}
+          {activeSection === 'verifications' && (
+            canManage
+              ? <AdminClaimsSection />
+              : <LockedState capability={adminCapabilities.verifications} title="Cần phiên quản trị để mở hàng đợi" />
+          )}
           {activeSection === 'audit' && <LockedState capability={adminCapabilities.audit} title="Nhật ký audit chưa khả dụng" />}
         </div>
       </main>
