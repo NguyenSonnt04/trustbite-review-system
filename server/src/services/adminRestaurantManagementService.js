@@ -379,8 +379,8 @@ export class AdminRestaurantManagementService {
            )
            VALUES (
              $1, $2, $3, $4, 'IN_PROGRESS',
-             NOW() + ($5 || ' minutes')::interval,
-             NOW() + ($6 || ' hours')::interval
+             NOW() + $5 * INTERVAL '1 minute',
+             NOW() + $6 * INTERVAL '1 hour'
            )
            ON CONFLICT (user_id, endpoint, idempotency_key) DO NOTHING
            RETURNING request_hash, status, response_status_code, response_body,
@@ -426,8 +426,8 @@ export class AdminRestaurantManagementService {
                response_body = NULL,
                resource_type = NULL,
                resource_id = NULL,
-               locked_until = NOW() + ($5 || ' minutes')::interval,
-               expires_at = NOW() + ($6 || ' hours')::interval,
+               locked_until = NOW() + $5 * INTERVAL '1 minute',
+               expires_at = NOW() + $6 * INTERVAL '1 hour',
                updated_at = NOW()
            WHERE user_id = $1
              AND endpoint = $2
@@ -475,7 +475,7 @@ export class AdminRestaurantManagementService {
            previous_status, new_status, reason, metadata
          )
          SELECT $1, $2, 'RESTAURANT_DELETE', 'RESTAURANT',
-                deleted.id, deleted.status, deleted.status, $3, $4::jsonb
+                deleted.id, deleted.status, NULL, $3, $4::jsonb
          FROM unnest($5::uuid[], $6::varchar[]) AS deleted(id, status)`,
         [
           actor.id,

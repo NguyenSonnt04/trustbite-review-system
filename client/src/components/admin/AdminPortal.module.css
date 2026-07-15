@@ -1567,6 +1567,86 @@
   padding: 24px;
 }
 
+.confirmationBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  background: oklch(0.12 0.006 285 / 0.62);
+  padding: 24px;
+}
+
+.confirmationDialog {
+  width: min(460px, 100%);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 28px 80px oklch(0.12 0.006 285 / 0.28);
+  padding: 24px;
+}
+
+.confirmationIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 16px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.confirmationDialog h2 {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.confirmationDialog p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.confirmationReason {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 18px;
+  border-radius: 8px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.confirmationReason span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.confirmationReason strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.confirmationActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.confirmationActions .secondaryButton,
+.confirmationActions .dangerButton {
+  min-height: 42px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+
 .modal {
   width: min(720px, 100%);
   max-height: calc(100vh - 48px);
@@ -2290,6 +2370,26 @@
 
   .restaurantBulkButtons {
     flex-direction: column;
+  }
+
+  .confirmationBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .confirmationDialog {
+    width: 100%;
+    border-radius: 14px 14px 0 0;
+    padding: 20px 16px;
+  }
+
+  .confirmationActions,
+  .confirmationActions button {
+    width: 100%;
+  }
+
+  .confirmationActions {
+    flex-direction: column-reverse;
   }
 
   .restaurantDetailModal .modalHeader {

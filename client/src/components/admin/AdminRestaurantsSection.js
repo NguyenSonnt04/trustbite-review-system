@@ -87,6 +87,107 @@ function SelectionCheckbox({ indeterminate = false, ...props }) {
   return <input {...props} ref={inputRef} type="checkbox" />;
 }
 
+function BulkDeleteConfirmationModal({
+  count,
+  deleting,
+  onCancel,
+  onConfirm,
+  reason,
+}) {
+  const dialogRef = useRef(null);
+  const cancelButtonRef = useRef(null);
+  const onCancelRef = useRef(onCancel);
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    cancelButtonRef.current?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !deleting) {
+        event.preventDefault();
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...(dialogRef.current?.querySelectorAll(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      ) || [])];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [deleting]);
+
+  return (
+    <div
+      className={styles.confirmationBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !deleting) onCancel();
+      }}
+    >
+      <section
+        aria-describedby="bulk-delete-description"
+        aria-labelledby="bulk-delete-title"
+        aria-modal="true"
+        className={styles.confirmationDialog}
+        ref={dialogRef}
+        role="dialog"
+      >
+        <div className={styles.confirmationIcon}>
+          <AdminIcon name="trash" size={22} />
+        </div>
+        <div>
+          <h2 id="bulk-delete-title">Xóa {count} nhà hàng?</h2>
+          <p id="bulk-delete-description">
+            Các nhà hàng sẽ bị ẩn khỏi hệ thống. Dữ liệu liên quan vẫn được giữ lại để có thể khôi phục.
+          </p>
+        </div>
+        <div className={styles.confirmationReason}>
+          <span>Lý do xóa</span>
+          <strong>{reason}</strong>
+        </div>
+        <div className={styles.confirmationActions}>
+          <button
+            className={styles.secondaryButton}
+            disabled={deleting}
+            onClick={onCancel}
+            ref={cancelButtonRef}
+            type="button"
+          >
+            Hủy
+          </button>
+          <button
+            className={styles.dangerButton}
+            disabled={deleting}
+            onClick={onConfirm}
+            type="button"
+          >
+            <AdminIcon name="trash" size={16} />
+            {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
   const [restaurant, setRestaurant] = useState(null);
   const [form, setForm] = useState(null);
@@ -751,6 +852,7 @@ export default function AdminRestaurantsSection() {
   const [deleting, setDeleting] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteAttempted, setDeleteAttempted] = useState(false);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
   const [deleteSuccess, setDeleteSuccess] = useState('');
   const [error, setError] = useState('');
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -830,7 +932,7 @@ export default function AdminRestaurantsSection() {
     setSelectedRestaurantIds(next);
   };
 
-  const deleteSelectedRestaurants = async () => {
+  const openDeleteConfirmation = () => {
     const restaurantIds = [...selectedRestaurantIds].sort();
     if (restaurantIds.length === 0) return;
     const normalizedReason = deleteReason.trim();
@@ -839,10 +941,12 @@ export default function AdminRestaurantsSection() {
       deleteReasonRef.current?.focus();
       return;
     }
-    if (!window.confirm(
-      `Xóa mềm ${restaurantIds.length} nhà hàng đã chọn? Các nhà hàng sẽ bị ẩn khỏi hệ thống nhưng dữ liệu vẫn được giữ lại.`,
-    )) return;
+    setDeleteConfirmationOpen(true);
+  };
 
+  const deleteSelectedRestaurants = async () => {
+    const restaurantIds = [...selectedRestaurantIds].sort();
+    const normalizedReason = deleteReason.trim();
     const fingerprint = `${restaurantIds.join('|')}:${normalizedReason}`;
     if (!bulkDeleteKeys.current.has(fingerprint)) {
       bulkDeleteKeys.current.clear();
@@ -860,6 +964,7 @@ export default function AdminRestaurantsSection() {
       setSelectedRestaurantIds(new Set());
       setDeleteReason('');
       setDeleteAttempted(false);
+      setDeleteConfirmationOpen(false);
       if (selectedRestaurantId && restaurantIds.includes(selectedRestaurantId)) {
         setSelectedRestaurantId(null);
       }
@@ -879,6 +984,7 @@ export default function AdminRestaurantsSection() {
       ) {
         bulkDeleteKeys.current.delete(fingerprint);
       }
+      setDeleteConfirmationOpen(false);
       setError(requestError.message);
     } finally {
       setDeleting(false);
@@ -894,6 +1000,7 @@ export default function AdminRestaurantsSection() {
             <input
               aria-label="Tìm nhà hàng"
               onChange={(event) => {
+                setDeleteSuccess('');
                 setLoading(true);
                 setSearch(event.target.value);
                 setPage(1);
@@ -958,7 +1065,7 @@ export default function AdminRestaurantsSection() {
               <button
                 className={styles.dangerButton}
                 disabled={deleting}
-                onClick={deleteSelectedRestaurants}
+                onClick={openDeleteConfirmation}
                 type="button"
               >
                 <AdminIcon name="trash" size={16} />
@@ -1092,6 +1199,16 @@ export default function AdminRestaurantsSection() {
           onClose={() => setSelectedRestaurantId(null)}
           onUpdated={reload}
           restaurantId={selectedRestaurantId}
+        />
+      )}
+
+      {deleteConfirmationOpen && (
+        <BulkDeleteConfirmationModal
+          count={selectedRestaurantIds.size}
+          deleting={deleting}
+          onCancel={() => setDeleteConfirmationOpen(false)}
+          onConfirm={deleteSelectedRestaurants}
+          reason={deleteReason.trim()}
         />
       )}
     </>

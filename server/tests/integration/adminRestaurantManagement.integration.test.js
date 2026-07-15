@@ -280,7 +280,7 @@ describe('admin restaurant management', () => {
       expect(rows.rows.every((row) => row.deleted_at)).toBe(true);
 
       const audits = await query(
-        `SELECT entity_id, action, reason, metadata
+        `SELECT entity_id, action, previous_status, new_status, reason, metadata
          FROM audit_logs
          WHERE actor_id = $1
          ORDER BY entity_id`,
@@ -290,6 +290,8 @@ describe('admin restaurant management', () => {
       expect(audits.rows).toEqual(expect.arrayContaining([
         expect.objectContaining({
           action: 'RESTAURANT_DELETE',
+          previous_status: 'ACTIVE',
+          new_status: null,
           reason: request.reason,
           metadata: expect.objectContaining({ bulkSize: 2 }),
         }),
