@@ -225,6 +225,10 @@ function UserDetailModal({ adminRole, currentUserId, userId, onClose, onUpdated 
   };
 
   const changeStatus = async () => {
+    const actionLabel = user.status === 'SUSPENDED' ? 'mở khóa' : 'khóa';
+    if (!window.confirm(`Xác nhận ${actionLabel} tài khoản ${user.displayName || user.id}?`)) {
+      return;
+    }
     setError('');
     setSubmitting(true);
     try {

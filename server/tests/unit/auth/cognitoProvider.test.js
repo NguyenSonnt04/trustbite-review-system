@@ -226,6 +226,40 @@ describe('CognitoIdentityProvider', () => {
     expect(sentCommands[1].input.Password.length).toBeGreaterThanOrEqual(20);
   });
 
+  it('surfaces a failed rollback when Cognito password confirmation fails', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          if (command.constructor.name === 'AdminCreateUserCommand') {
+            return {
+              Username: 'provider-user-1',
+              User: {
+                Attributes: [{ Name: 'sub', Value: 'new-cognito-sub' }],
+              },
+            };
+          }
+          if (command.constructor.name === 'AdminSetUserPasswordCommand') {
+            throw new Error('password confirmation failed');
+          }
+          if (command.constructor.name === 'AdminDeleteUserCommand') {
+            throw new Error('compensation failed');
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.createUser({
+      email: 'new.user@example.com',
+    })).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'PROVIDER_COMPENSATION_FAILED',
+    });
+  });
+
   it('keeps valid authentication available when refresh-token revocation fails', async () => {
     const sentCommands = [];
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -622,6 +656,22 @@ describe('CognitoIdentityProvider', () => {
       UserPoolId: 'pool-1',
       Username: 'local-sub-1',
     });
+  });
+
+  it('fails closed when global sign-out fails during normal account deletion', async () => {
+    const { CognitoIdentityProvider: ProviderClass } = await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    );
+    const send = vi.fn().mockRejectedValue(new Error('sign-out failed'));
+    const provider = new ProviderClass({
+      userPoolId: 'pool-1',
+      adminClient: { send },
+    });
+
+    await expect(provider.deleteUser({ username: 'local-sub-1' })).rejects.toThrow(
+      'sign-out failed',
+    );
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('treats an already-missing Cognito user as idempotent cleanup', async () => {

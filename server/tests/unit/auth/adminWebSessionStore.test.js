@@ -148,6 +148,7 @@ describe('AdminWebSessionStore', () => {
 
   it('uses only the email-wide limit when no trusted client address is available', async () => {
     redis.eval.mockResolvedValue([1, 120]);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(store.consumeLoginAttempt({
       email: 'admin@example.com',
@@ -162,5 +163,8 @@ describe('AdminWebSessionStore', () => {
 
     expect(redis.eval).toHaveBeenCalledTimes(1);
     expect(redis.eval.mock.calls[0][2]).toContain(':email:');
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('Trusted client IP is unavailable'));
+    warning.mockRestore();
   });
 });

@@ -1078,6 +1078,23 @@ export async function updateRestaurantImage({
   fields = {},
 }) {
   validateDeleteIdentifiers(restaurantId, imageId);
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) {
+    throw validationError('Restaurant image payload is invalid.', [{
+      field: 'body',
+      code: 'INVALID_TYPE',
+      message: 'Request body must be an object.',
+    }]);
+  }
+  const unknownField = Object.keys(fields).find(
+    (field) => field !== 'caption' && field !== 'isPrimary',
+  );
+  if (unknownField) {
+    throw validationError('Restaurant image payload is invalid.', [{
+      field: unknownField,
+      code: 'UNSUPPORTED_FIELD',
+      message: `${unknownField} is not supported.`,
+    }]);
+  }
   const hasCaption = Object.prototype.hasOwnProperty.call(fields, 'caption');
   const hasPrimary = Object.prototype.hasOwnProperty.call(fields, 'isPrimary');
   if (!hasCaption && !hasPrimary) {
@@ -1191,6 +1208,16 @@ async function findCompletedUpload(userId, endpoint, idempotencyKey) {
   return result.rows[0] ?? null;
 }
 
+async function deleteReplacedImage(input) {
+  try {
+    await deleteRestaurantImage(input);
+  } catch (err) {
+    if (err?.code !== 'RESTAURANT_IMAGE_NOT_FOUND') {
+      throw err;
+    }
+  }
+}
+
 export async function replaceRestaurantImage({
   userId,
   roles,
@@ -1240,7 +1267,7 @@ export async function replaceRestaurantImage({
       idempotencyEndpoint: endpoint,
       operationContext,
     });
-    await deleteRestaurantImage({
+    await deleteReplacedImage({
       userId,
       roles,
       restaurantId,
@@ -1300,7 +1327,7 @@ export async function replaceRestaurantImage({
     operationContext,
   });
 
-  await deleteRestaurantImage({
+  await deleteReplacedImage({
     userId,
     roles,
     restaurantId,

@@ -28,9 +28,13 @@ class AuthService {
   }
 
   async logout() {
-    await fetch('/api/admin-auth/logout', {
+    const response = await fetch('/api/admin-auth/logout', {
       method: 'DELETE',
     });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(body?.error?.message || 'Không thể đăng xuất an toàn.');
+    }
   }
 }
 

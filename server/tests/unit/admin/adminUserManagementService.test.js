@@ -1,4 +1,5 @@
 import '../../helpers/env.js';
+import crypto from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../../src/config/db.js', () => ({
@@ -28,6 +29,35 @@ const input = {
 describe('AdminUserManagementService provisioning compensation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('rejects unknown create and update fields before persistence', async () => {
+    const identityProvider = {
+      createUser: vi.fn(),
+      deleteUser: vi.fn(),
+    };
+    const service = new AdminUserManagementService({ identityProvider });
+
+    await expect(service.createUser(actor, {
+      ...input,
+      unexpected: true,
+    })).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+    await expect(service.updateUser(actor, crypto.randomUUID(), {
+      displayName: 'Updated User',
+      unexpected: true,
+    })).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+    await expect(service.updateUser(actor, crypto.randomUUID(), null)).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+    expect(identityProvider.createUser).not.toHaveBeenCalled();
+    expect(pool.connect).not.toHaveBeenCalled();
   });
 
   it('deletes the Cognito identity when a database connection cannot be opened', async () => {
@@ -75,6 +105,78 @@ describe('AdminUserManagementService provisioning compensation', () => {
     expect(identityProvider.deleteUser).toHaveBeenCalledWith({
       username: input.email,
     });
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  it('preserves the Cognito identity when a committed user is found after a commit error', async () => {
+    const insertedUser = {
+      id: '22222222-2222-4222-8222-222222222222',
+      cognito_sub: 'new-user-sub',
+      display_name: input.displayName,
+      phone_number: '+84912345678',
+      date_of_birth: input.dateOfBirth,
+      status: 'ACTIVE',
+      roles: ['USER'],
+    };
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ rows: [insertedUser] })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('commit response lost'))
+        .mockResolvedValueOnce(undefined),
+      release: vi.fn(),
+    };
+    pool.connect.mockResolvedValue(client);
+    pool.query.mockResolvedValue({ rowCount: 1, rows: [insertedUser] });
+    const identityProvider = {
+      createUser: vi.fn().mockResolvedValue({
+        username: input.email,
+        subject: 'new-user-sub',
+      }),
+      deleteUser: vi.fn(),
+    };
+    const service = new AdminUserManagementService({ identityProvider });
+
+    await expect(service.createUser(actor, input)).resolves.toMatchObject({
+      id: insertedUser.id,
+      roles: ['USER'],
+    });
+    expect(identityProvider.deleteUser).not.toHaveBeenCalled();
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  it('does not delete the Cognito identity when commit outcome verification fails', async () => {
+    const insertedUser = {
+      id: '22222222-2222-4222-8222-222222222222',
+    };
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce({ rows: [insertedUser] })
+        .mockResolvedValueOnce(undefined)
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('commit response lost'))
+        .mockResolvedValueOnce(undefined),
+      release: vi.fn(),
+    };
+    pool.connect.mockResolvedValue(client);
+    pool.query.mockRejectedValue(new Error('verification unavailable'));
+    const identityProvider = {
+      createUser: vi.fn().mockResolvedValue({
+        username: input.email,
+        subject: 'new-user-sub',
+      }),
+      deleteUser: vi.fn(),
+    };
+    const service = new AdminUserManagementService({ identityProvider });
+
+    await expect(service.createUser(actor, input)).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'USER_PROVISIONING_OUTCOME_UNKNOWN',
+    });
+    expect(identityProvider.deleteUser).not.toHaveBeenCalled();
     expect(client.release).toHaveBeenCalled();
   });
 });

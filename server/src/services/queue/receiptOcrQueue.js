@@ -8,7 +8,8 @@
 
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
-import { getOcrConfig, getRedisConnection } from '../../config/ocr.js';
+import { getOcrConfig } from '../../config/ocr.js';
+import { getRedisConnection } from '../../config/redis.js';
 
 let connection = null;
 let queue = null;

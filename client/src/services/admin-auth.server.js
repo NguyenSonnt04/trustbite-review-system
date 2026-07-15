@@ -8,14 +8,13 @@ const normalizeApiBaseUrl = (apiUrl) => {
   return pathname === '/api/v1' ? baseUrl : `${baseUrl}/api/v1`;
 };
 
-const getConfiguration = () => ({
-  apiBaseUrl: normalizeApiBaseUrl(
-    process.env.TRUSTBITE_SERVER_API_URL
-      || process.env.NEXT_PUBLIC_API_URL
-      || 'http://localhost:5000',
-  ),
-  bffSecret: process.env.ADMIN_WEB_BFF_SECRET || '',
-});
+const getConfiguration = () => {
+  const serverApiUrl = process.env.TRUSTBITE_SERVER_API_URL?.trim() || '';
+  return {
+    apiBaseUrl: serverApiUrl ? normalizeApiBaseUrl(serverApiUrl) : '',
+    bffSecret: process.env.ADMIN_WEB_BFF_SECRET || '',
+  };
+};
 
 export const getSessionCookieOptions = (expiresAt) => ({
   httpOnly: true,
@@ -58,7 +57,7 @@ export const requestAdminAuthApi = async (path, {
   extraHeaders = {},
 } = {}) => {
   const { apiBaseUrl, bffSecret } = getConfiguration();
-  if (!bffSecret) {
+  if (!apiBaseUrl || !bffSecret) {
     return {
       ok: false,
       status: 503,
@@ -99,7 +98,7 @@ export const requestAdminAuthApi = async (path, {
           ? undefined
           : JSON.stringify(body),
       cache: 'no-store',
-      signal: AbortSignal.timeout(rawBody !== undefined ? 15000 : 5000),
+      signal: AbortSignal.timeout(method === 'GET' ? 5000 : 30000),
     });
   } catch {
     return {

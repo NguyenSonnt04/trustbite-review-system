@@ -105,6 +105,23 @@ describe('admin user management service', () => {
     expect(emptyPage.total).toBeGreaterThanOrEqual(1);
   });
 
+  it('allows ADMIN actors to inspect SUPER_ADMIN details', async () => {
+    const actor = await createUser({ displayName: 'Detail Admin' });
+    const target = await createUser({ displayName: 'Detail Super Admin' });
+    createdUserIds.push(actor.id, target.id);
+    await assignRole(actor.id, 'ADMIN');
+    await assignRole(target.id, 'SUPER_ADMIN');
+
+    const service = new AdminUserManagementService();
+    await expect(service.getUser(
+      { id: actor.id, roles: ['ADMIN'] },
+      target.id,
+    )).resolves.toMatchObject({
+      id: target.id,
+      roles: expect.arrayContaining(['SUPER_ADMIN']),
+    });
+  });
+
   it('creates a confirmed Cognito identity, local profile, USER role, and audit evidence', async () => {
     const actor = await createUser({ displayName: 'Create Admin' });
     createdUserIds.push(actor.id);

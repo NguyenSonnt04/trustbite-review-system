@@ -2,6 +2,9 @@ locals {
   task_secret_arns = compact([
     var.rds_master_user_secret_arn,
     var.redis_auth_token_secret_arn,
+    var.cognito_admin_web_client_secret_arn,
+    var.admin_web_bff_secret_arn,
+    var.admin_web_session_key_secret_arn,
   ])
 
   contract = {
@@ -16,7 +19,7 @@ locals {
     receipt_object_prefix = var.receipt_object_prefix
     secret_arn_count      = length(local.task_secret_arns)
     secret_policy_gate    = "create_live_resources_and_task_secret_policy_enabled"
-    s3_policy_scope       = "receipt-bucket-prefix-only"
+    s3_policy_scope       = "receipt-avatar-and-restaurant-image-prefixes"
     textract_policy_scope = "AnalyzeExpense requires provider-level wildcard"
     task_roles            = ["api-task-role", "worker-task-role", "execution-role"]
   }
@@ -56,6 +59,33 @@ data "aws_iam_policy_document" "api_task" {
     effect    = "Allow"
     resources = ["${var.receipt_bucket_arn}/avatars/*"]
     sid       = "AvatarObjectUpload"
+  }
+
+  statement {
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+    ]
+    effect    = "Allow"
+    resources = ["${var.receipt_bucket_arn}/restaurant-images/*"]
+    sid       = "RestaurantImageObjectAccess"
+  }
+
+  dynamic "statement" {
+    for_each = var.cognito_user_pool_arn == null ? [] : [var.cognito_user_pool_arn]
+
+    content {
+      actions = [
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminSetUserPassword",
+        "cognito-idp:AdminUserGlobalSignOut",
+        "cognito-idp:AdminDeleteUser",
+      ]
+      effect    = "Allow"
+      resources = [statement.value]
+      sid       = "AdminIdentityManagement"
+    }
   }
 
   statement {

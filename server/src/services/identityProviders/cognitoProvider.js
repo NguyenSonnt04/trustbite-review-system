@@ -332,6 +332,17 @@ export class CognitoIdentityProvider {
   async createUser({ email }) {
     let response;
     const client = this.getAdminClient();
+    const compensateCreatedUser = async (username) => {
+      try {
+        await this.deleteUser({ username, deleteAfterSignOutFailure: true });
+      } catch {
+        throw createHttpError(
+          503,
+          'PROVIDER_COMPENSATION_FAILED',
+          'Identity provider user creation could not be rolled back safely',
+        );
+      }
+    };
     try {
       response = await client.send(new AdminCreateUserCommand({
         UserPoolId: this.userPoolId,
@@ -359,7 +370,7 @@ export class CognitoIdentityProvider {
     const username = response.User?.Username || response.Username || email;
     if (!subject || !username) {
       if (username) {
-        await this.deleteUser({ username }).catch(() => undefined);
+        await compensateCreatedUser(username);
       }
       throw createHttpError(503, 'PROVIDER_INVALID_RESPONSE', 'Identity provider returned an invalid user');
     }
@@ -372,7 +383,7 @@ export class CognitoIdentityProvider {
         Permanent: true,
       }));
     } catch (err) {
-      await this.deleteUser({ username }).catch(() => undefined);
+      await compensateCreatedUser(username);
       if (err?.name === 'TooManyRequestsException') {
         throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Identity provider is temporarily rate limited');
       }
@@ -382,7 +393,7 @@ export class CognitoIdentityProvider {
     return { username, subject };
   }
 
-  async deleteUser({ username }) {
+  async deleteUser({ username, deleteAfterSignOutFailure = false }) {
     if (!username) {
       throw Object.assign(
         new Error('Cognito username is required before account deletion can complete'),
@@ -404,7 +415,7 @@ export class CognitoIdentityProvider {
       await client.send(new AdminUserGlobalSignOutCommand(input));
       signedOut = true;
     } catch (err) {
-      if (!isUserNotFoundError(err)) {
+      if (!isUserNotFoundError(err) && !deleteAfterSignOutFailure) {
         throw err;
       }
     }

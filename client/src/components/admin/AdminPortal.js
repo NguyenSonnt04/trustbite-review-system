@@ -295,6 +295,7 @@ export default function AdminPortal() {
   const [restaurantError, setRestaurantError] = useState('');
   const [adminSession, setAdminSession] = useState(null);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [logoutError, setLogoutError] = useState('');
   const dashboardRequestSequence = useRef(0);
   const menuButtonRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -401,11 +402,14 @@ export default function AdminPortal() {
 
   const handleLogout = async () => {
     if (loggingOut) return;
+    setLogoutError('');
     setLoggingOut(true);
     try {
       await authService.logout();
-    } finally {
       window.location.replace('/');
+    } catch (error) {
+      setLogoutError(error.message);
+      setLoggingOut(false);
     }
   };
 
@@ -506,6 +510,7 @@ export default function AdminPortal() {
         </header>
 
         <div className={styles.content}>
+          {logoutError && <div className={styles.errorBanner}>{logoutError}</div>}
           {activeSection === 'overview' && (
             <Overview
               apiState={apiState}

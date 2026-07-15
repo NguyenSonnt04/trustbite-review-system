@@ -18,10 +18,21 @@ export async function DELETE(request) {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(ADMIN_SESSION_COOKIE)?.value || '';
   if (sessionToken) {
-    await requestAdminAuthApi('/auth/admin/web-session', {
+    const result = await requestAdminAuthApi('/auth/admin/web-session', {
       method: 'DELETE',
       sessionToken,
     });
+    if (!result.ok) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'LOGOUT_FAILED',
+            message: 'Không thể thu hồi phiên quản trị. Vui lòng thử lại.',
+          },
+        },
+        { status: 503, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
   }
 
   const response = new NextResponse(null, {

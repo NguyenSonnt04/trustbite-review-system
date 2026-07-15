@@ -6,6 +6,18 @@ const ADMIN_ROLES = new Set(['ADMIN', 'SUPER_ADMIN']);
 const MANAGEABLE_ROLES = new Set(['USER', 'ADMIN', 'SUPER_ADMIN']);
 const USER_STATUSES = new Set(['ACTIVE', 'SUSPENDED', 'DELETED']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/u;
+const USER_CREATE_FIELDS = new Set(['email', 'displayName', 'phoneNumber', 'dateOfBirth']);
+const USER_UPDATE_FIELDS = new Set(['displayName', 'phoneNumber', 'dateOfBirth', 'roles', 'reason']);
+
+const assertAllowedFields = (body, allowedFields) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Request body must be an object');
+  }
+  const unknownField = Object.keys(body).find((field) => !allowedFields.has(field));
+  if (unknownField) {
+    throw createHttpError(422, 'VALIDATION_ERROR', `Unsupported field: ${unknownField}`);
+  }
+};
 
 const normalizeRoleList = (roles = []) => [...new Set(
   roles.map((role) => String(role).trim().toUpperCase()).filter(Boolean),
@@ -268,18 +280,19 @@ export class AdminUserManagementService {
     if (result.rowCount === 0) {
       throw createHttpError(404, 'USER_NOT_FOUND', 'User not found');
     }
-    assertActorCanTarget(actor, result.rows[0]);
     return mapUserRow(result.rows[0]);
   }
 
   async createUser(actor, body = {}) {
     assertAdminActor(actor);
+    assertAllowedFields(body, USER_CREATE_FIELDS);
     const email = normalizeEmail(body.email);
     const displayName = normalizeDisplayName(body.displayName, { required: true });
     const phoneNumber = normalizePhoneNumber(body.phoneNumber, { required: true });
     const dateOfBirth = normalizeDateOfBirth(body.dateOfBirth, { required: true });
     const providerUser = await this.identityProvider.createUser({ email });
     let client;
+    let commitAttempted = false;
 
     try {
       client = await pool.connect();
@@ -300,11 +313,35 @@ export class AdminUserManagementService {
          VALUES ($1, $2, 'USER_CREATE', 'USER', $3, 'ACTIVE', $4)`,
         [actor.id, getActorRole(actor), inserted.rows[0].id, { roles: ['USER'] }],
       );
+      commitAttempted = true;
       await client.query('COMMIT');
       return mapUserRow({ ...inserted.rows[0], roles: ['USER'] });
     } catch (err) {
       if (client) {
         await client.query('ROLLBACK').catch(() => undefined);
+      }
+      if (commitAttempted) {
+        let committedUser;
+        try {
+          committedUser = await pool.query(
+            `SELECT u.*, ARRAY(
+               SELECT ur.role_id FROM user_roles ur
+               WHERE ur.user_id = u.id ORDER BY ur.role_id
+             ) AS roles
+             FROM users u
+             WHERE u.cognito_sub = $1`,
+            [providerUser.subject],
+          );
+        } catch {
+          throw createHttpError(
+            503,
+            'USER_PROVISIONING_OUTCOME_UNKNOWN',
+            'User provisioning outcome could not be verified safely',
+          );
+        }
+        if (committedUser.rowCount > 0) {
+          return mapUserRow(committedUser.rows[0]);
+        }
       }
       try {
         await this.identityProvider.deleteUser({ username: providerUser.username });
@@ -323,6 +360,7 @@ export class AdminUserManagementService {
 
   async updateUser(actor, userId, body = {}) {
     assertAdminActor(actor);
+    assertAllowedFields(body, USER_UPDATE_FIELDS);
     const displayName = normalizeDisplayName(body.displayName);
     const phoneNumber = normalizePhoneNumber(body.phoneNumber);
     const dateOfBirth = normalizeDateOfBirth(body.dateOfBirth);

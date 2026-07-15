@@ -70,8 +70,32 @@ variable "cognito_client_id" {
   default     = null
 }
 
+variable "cognito_admin_web_client_id" {
+  description = "AWS_COGNITO_ADMIN_WEB_CLIENT_ID runtime value required by administrator web authentication."
+  type        = string
+  default     = null
+}
+
+variable "cognito_admin_web_client_secret_arn" {
+  description = "Secrets Manager ARN containing AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET."
+  type        = string
+  default     = null
+}
+
 variable "cognito_user_pool_id" {
   description = "AWS_COGNITO_USER_POOL_ID runtime value required by the production API config."
+  type        = string
+  default     = null
+}
+
+variable "admin_web_bff_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_BFF_SECRET."
+  type        = string
+  default     = null
+}
+
+variable "admin_web_session_key_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_SESSION_KEY_SECRET."
   type        = string
   default     = null
 }
@@ -84,6 +108,12 @@ variable "create_live_resources" {
 variable "cpu_architecture" {
   description = "Fargate task CPU architecture."
   type        = string
+}
+
+variable "cognito_user_pool_arn" {
+  description = "Cognito user pool ARN required by the API task role for administrator provisioning."
+  type        = string
+  default     = null
 }
 
 variable "database_host" {

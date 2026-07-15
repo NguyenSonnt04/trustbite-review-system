@@ -67,6 +67,55 @@ describe('admin restaurant management', () => {
     await closeDbPool();
   });
 
+  it('rejects mixed null coordinates and unknown update fields', async () => {
+    const actor = { id: crypto.randomUUID(), roles: ['ADMIN'] };
+    const restaurantId = crypto.randomUUID();
+
+    await expect(adminRestaurantManagementService.updateRestaurant(
+      actor,
+      restaurantId,
+      {
+        latitude: null,
+        longitude: 106.7,
+        reason: 'Reject incomplete coordinate pair',
+      },
+    )).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+
+    await expect(adminRestaurantManagementService.updateRestaurant(
+      actor,
+      restaurantId,
+      {
+        name: 'Updated Restaurant',
+        unexpected: true,
+        reason: 'Reject unsupported update field',
+      },
+    )).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+    await expect(adminRestaurantManagementService.updateRestaurant(
+      actor,
+      restaurantId,
+      null,
+    )).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+    await expect(imageService.updateRestaurantImage({
+      userId: actor.id,
+      roles: actor.roles,
+      restaurantId,
+      imageId: crypto.randomUUID(),
+      fields: { caption: 'Unsupported payload', unexpected: true },
+    })).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+  });
+
   it('lists draft restaurants and returns an editable detail to ADMIN', async () => {
     const actor = await createUser({ displayName: 'Restaurant Admin' });
     const restaurant = await createRestaurant({
@@ -240,6 +289,51 @@ describe('admin restaurant management', () => {
           caption: 'Original caption',
           isPrimary: true,
         }),
+      ]);
+    } finally {
+      await cleanup({ userIds: [actor.id], restaurantIds: [restaurant.id] });
+    }
+  });
+
+  it('completes replacement when the source is concurrently removed after upload', async () => {
+    const actor = await createUser({ displayName: 'Concurrent Replace Admin' });
+    const restaurant = await createRestaurant({ name: 'Concurrent Replace Restaurant' });
+    const context = {
+      userId: actor.id,
+      roles: ['ADMIN'],
+      restaurantId: restaurant.id,
+    };
+
+    try {
+      const original = await imageService.uploadRestaurantImage({
+        ...context,
+        idempotencyKey: crypto.randomUUID(),
+        fields: { caption: 'Original caption', isPrimary: 'true' },
+        file: validJpeg(),
+      });
+      storageService.setRestaurantImageSignerForTests(vi.fn(async (_client, command) => {
+        await query('DELETE FROM restaurant_images WHERE id = $1', [original.body.id]);
+        return `https://signed.test/${command.input.Key}`;
+      }));
+
+      const replacement = await imageService.replaceRestaurantImage({
+        ...context,
+        imageId: original.body.id,
+        idempotencyKey: crypto.randomUUID(),
+        fields: {},
+        file: validJpeg(),
+      });
+
+      expect(replacement).toMatchObject({
+        statusCode: 200,
+        body: {
+          caption: 'Original caption',
+          isPrimary: true,
+        },
+      });
+      const images = await imageService.listRestaurantImages(context);
+      expect(images.items).toEqual([
+        expect.objectContaining({ id: replacement.body.id }),
       ]);
     } finally {
       await cleanup({ userIds: [actor.id], restaurantIds: [restaurant.id] });

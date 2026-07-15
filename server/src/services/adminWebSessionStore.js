@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import IORedis from 'ioredis';
-import { getRedisConnection } from '../config/ocr.js';
 import appConfig from '../config/app.js';
+import { getRedisConnection } from '../config/redis.js';
 import { HttpError, createHttpError } from '../utils/httpErrors.js';
 
 const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{40,128}$/u;
@@ -17,6 +17,7 @@ if count == 1 or ttl < 0 then
 end
 return { count, ttl }
 `;
+let missingClientAddressWarningEmitted = false;
 
 const createStoreUnavailableError = () => createHttpError(
   503,
@@ -161,6 +162,12 @@ export class AdminWebSessionStore {
     windowSeconds,
   }) {
     this.assertConfigured();
+    if (!ipAddress && !missingClientAddressWarningEmitted) {
+      missingClientAddressWarningEmitted = true;
+      console.warn(
+        '[Admin Auth] Trusted client IP is unavailable; login throttling is limited to the email-wide policy.',
+      );
+    }
 
     return runRedisOperation(async () => {
       const consume = async (scope, fingerprint, limit) => {

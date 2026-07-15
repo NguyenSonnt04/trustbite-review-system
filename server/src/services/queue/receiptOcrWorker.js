@@ -13,7 +13,8 @@
 
 import { Worker } from 'bullmq';
 import { pool } from '../../config/db.js';
-import { getOcrConfig, getRedisConnection } from '../../config/ocr.js';
+import { getOcrConfig } from '../../config/ocr.js';
+import { getRedisConnection } from '../../config/redis.js';
 import { processReceiptOcr } from '../ocrService.js';
 import { getOcrProvider } from '../providers/index.js';
 

@@ -13,9 +13,7 @@ const SESSION_INVALIDATING_CODES = new Set([
   'ADMIN_SESSION_INVALID',
   'ADMIN_SESSION_EXPIRED',
   'ADMIN_ACCESS_REQUIRED',
-  'DELETION_REQUEST_ACTIVE',
   'ACCOUNT_SUSPENDED',
-  'ACCOUNT_DELETED',
 ]);
 const MAX_BODY_BYTES = 16 * 1024;
 
@@ -37,8 +35,26 @@ const readBody = async (request) => {
   if (contentLength > MAX_BODY_BYTES) {
     return { error: 'PAYLOAD_TOO_LARGE' };
   }
+
+  const reader = request.body?.getReader();
+  if (!reader) return { error: 'INVALID_JSON' };
+  const decoder = new TextDecoder();
+  let size = 0;
+  let text = '';
+
   try {
-    return { body: await request.json() };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY_BYTES) {
+        await reader.cancel();
+        return { error: 'PAYLOAD_TOO_LARGE' };
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+    return { body: JSON.parse(text) };
   } catch {
     return { error: 'INVALID_JSON' };
   }

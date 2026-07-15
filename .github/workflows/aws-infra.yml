@@ -13,6 +13,7 @@ on:
       - "server/migrations/**"
       - "server/scripts/**"
       - "server/src/config/ocr.js"
+      - "server/src/config/redis.js"
       - "server/src/worker.js"
       - "server/package.json"
       - "server/package-lock.json"
@@ -30,6 +31,7 @@ on:
       - "server/migrations/**"
       - "server/scripts/**"
       - "server/src/config/ocr.js"
+      - "server/src/config/redis.js"
       - "server/src/worker.js"
       - "server/package.json"
       - "server/package-lock.json"
@@ -166,7 +168,12 @@ jobs:
       TF_VAR_redis_auth_token: ${{ secrets.REDIS_AUTH_TOKEN }}
       REDIS_AUTH_TOKEN_SECRET_ARN: ${{ vars.REDIS_AUTH_TOKEN_SECRET_ARN }}
       AWS_COGNITO_USER_POOL_ID: ${{ vars.AWS_COGNITO_USER_POOL_ID }}
+      AWS_COGNITO_USER_POOL_ARN: ${{ vars.AWS_COGNITO_USER_POOL_ARN }}
       AWS_COGNITO_CLIENT_ID: ${{ vars.AWS_COGNITO_CLIENT_ID }}
+      AWS_COGNITO_ADMIN_WEB_CLIENT_ID: ${{ vars.AWS_COGNITO_ADMIN_WEB_CLIENT_ID }}
+      AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN: ${{ vars.AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN }}
+      ADMIN_WEB_BFF_SECRET_ARN: ${{ vars.ADMIN_WEB_BFF_SECRET_ARN }}
+      ADMIN_WEB_SESSION_KEY_SECRET_ARN: ${{ vars.ADMIN_WEB_SESSION_KEY_SECRET_ARN }}
       ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
 
     steps:
@@ -222,8 +229,8 @@ jobs:
               echo "::error::create_ecs=true requires ecs_private_egress_enabled=true"
               exit 1
             fi
-            if [[ "$CREATE_ECS" == "true" && ( -z "$AWS_COGNITO_USER_POOL_ID" || -z "$AWS_COGNITO_CLIENT_ID" || -z "$API_CERTIFICATE_ARN" ) ]]; then
-              echo "::error::create_ecs=true requires AWS_COGNITO_USER_POOL_ID, AWS_COGNITO_CLIENT_ID, and API_CERTIFICATE_ARN GitHub environment variables"
+            if [[ "$CREATE_ECS" == "true" && ( -z "$AWS_COGNITO_USER_POOL_ID" || -z "$AWS_COGNITO_USER_POOL_ARN" || -z "$AWS_COGNITO_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN" || -z "$ADMIN_WEB_BFF_SECRET_ARN" || -z "$ADMIN_WEB_SESSION_KEY_SECRET_ARN" || -z "$API_CERTIFICATE_ARN" ) ]]; then
+              echo "::error::create_ecs=true requires Cognito user-pool identifiers, both app-client identifiers, admin secret ARNs, and API_CERTIFICATE_ARN"
               exit 1
             fi
             if [[ "$APPLY_REQUESTED" != "true" ]]; then
@@ -358,7 +365,12 @@ jobs:
             -var "environment=$TRUSTBITE_ENV" \
             -var "aws_region=$AWS_REGION" \
             -var "aws_cognito_user_pool_id=$AWS_COGNITO_USER_POOL_ID" \
+            -var "aws_cognito_user_pool_arn=$AWS_COGNITO_USER_POOL_ARN" \
             -var "aws_cognito_client_id=$AWS_COGNITO_CLIENT_ID" \
+            -var "aws_cognito_admin_web_client_id=$AWS_COGNITO_ADMIN_WEB_CLIENT_ID" \
+            -var "aws_cognito_admin_web_client_secret_arn=$AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN" \
+            -var "admin_web_bff_secret_arn=$ADMIN_WEB_BFF_SECRET_ARN" \
+            -var "admin_web_session_key_secret_arn=$ADMIN_WEB_SESSION_KEY_SECRET_ARN" \
             -var "allowed_origins=$ALLOWED_ORIGINS" \
             -var "api_certificate_arn=$API_CERTIFICATE_ARN" \
             -var "create_live_resources=true" \

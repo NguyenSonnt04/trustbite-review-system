@@ -88,6 +88,17 @@ describe('admin web BFF routes', () => {
     });
   });
 
+  it('rejects unsupported login request fields', async () => {
+    const response = await request(app)
+      .post('/api/v1/auth/admin/web-session')
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .send({ email: 'admin@example.com', password: 'password', unexpected: true })
+      .expect(422);
+
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(mocks.login).not.toHaveBeenCalled();
+  });
+
   it('does not substitute the shared BFF address when no client address is forwarded', async () => {
     mocks.login.mockResolvedValue({
       sessionToken: 'opaque-session-token',

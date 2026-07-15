@@ -5,14 +5,14 @@ const ORIGINAL_ENV = { ...process.env };
 async function loadOcrConfig(caseName) {
   vi.resetModules();
   const imports = {
-    'redis-defaults': () => import('../../../src/config/ocr.js?redis-defaults'),
-    'redis-tls': () => import('../../../src/config/ocr.js?redis-tls'),
-    'redis-tls-numeric': () => import('../../../src/config/ocr.js?redis-tls-numeric'),
+    'redis-defaults': () => import('../../../src/config/redis.js?redis-defaults'),
+    'redis-tls': () => import('../../../src/config/redis.js?redis-tls'),
+    'redis-tls-numeric': () => import('../../../src/config/redis.js?redis-tls-numeric'),
   };
   return imports[caseName]();
 }
 
-describe('OCR config', () => {
+describe('Redis config', () => {
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV };
     vi.resetModules();

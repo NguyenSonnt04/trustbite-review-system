@@ -8,6 +8,27 @@ import { listRestaurantImages } from './restaurantImageService.js';
 import { resolveRestaurantImageUrl } from './s3RestaurantImageStorageService.js';
 
 const RESTAURANT_STATUSES = new Set(['DRAFT', 'ACTIVE', 'SUSPENDED', 'CLOSED']);
+const RESTAURANT_UPDATE_FIELDS = new Set([
+  'name',
+  'description',
+  'address',
+  'phoneNumber',
+  'latitude',
+  'longitude',
+  'categoryIds',
+  'status',
+  'reason',
+]);
+
+const assertAllowedFields = (body, allowedFields) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Request body must be an object');
+  }
+  const unknownField = Object.keys(body).find((field) => !allowedFields.has(field));
+  if (unknownField) {
+    throw createHttpError(422, 'VALIDATION_ERROR', `Unsupported field: ${unknownField}`);
+  }
+};
 
 const getActorRole = (actor) => {
   const roles = new Set((actor?.roles || []).map((role) => String(role).toUpperCase()));
@@ -74,6 +95,9 @@ const normalizeCoordinates = (body) => {
   }
   if (body.latitude === null && body.longitude === null) {
     return { latitude: null, longitude: null, clearGeo: true };
+  }
+  if (body.latitude === null || body.longitude === null) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'coordinates must both be null or numeric');
   }
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
@@ -188,6 +212,7 @@ export class AdminRestaurantManagementService {
 
   async updateRestaurant(actor, restaurantId, body = {}) {
     const actorRole = getActorRole(actor);
+    assertAllowedFields(body, RESTAURANT_UPDATE_FIELDS);
     const reason = normalizeReason(body.reason);
     const updates = {
       name: normalizeName(body.name),
@@ -205,6 +230,7 @@ export class AdminRestaurantManagementService {
       throw createHttpError(422, 'VALIDATION_ERROR', 'At least one restaurant field is required');
     }
 
+    const responseContext = await this.getRestaurant(actor, restaurantId);
     const changedFields = Object.keys(updates).filter((key) => key !== 'clearGeo');
     const updated = await updateRestaurant(restaurantId, updates, {
       onBeforeCommit: async (client, { previous }) => {
@@ -229,7 +255,11 @@ export class AdminRestaurantManagementService {
     if (!updated) {
       throw createHttpError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found');
     }
-    return this.getRestaurant(actor, restaurantId);
+    return {
+      ...updated,
+      images: responseContext.images,
+      availableCategories: responseContext.availableCategories,
+    };
   }
 }
 

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import AdminIcon from '@/components/admin/AdminIcon';
 import styles from '@/app/page.module.css';
+import { authService } from '@/services/auth.service';
 
 export default function AdminHome() {
   const [email, setEmail] = useState('');
@@ -19,19 +20,10 @@ export default function AdminHome() {
     setSubmitting(true);
     setError('');
     try {
-      const response = await fetch('/api/admin-auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
-      const body = await response.json().catch(() => null);
-      if (!response.ok) {
-        setError(body?.error?.message || 'Không thể đăng nhập vào lúc này.');
-        return;
-      }
+      await authService.login({ email, password });
       window.location.assign('/admin');
-    } catch {
-      setError('Dịch vụ đăng nhập đang tạm thời gián đoạn.');
+    } catch (loginError) {
+      setError(loginError.message || 'Dịch vụ đăng nhập đang tạm thời gián đoạn.');
     } finally {
       setSubmitting(false);
     }

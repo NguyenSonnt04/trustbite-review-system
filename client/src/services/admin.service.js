@@ -4,8 +4,10 @@ const ADMIN_SESSION_ERROR_CODES = new Set([
   'ADMIN_SESSION_INVALID',
   'ADMIN_SESSION_EXPIRED',
   'ADMIN_ACCESS_REQUIRED',
-  'DELETION_REQUEST_ACTIVE',
   'ACCOUNT_SUSPENDED',
+]);
+const RESTAURANT_ACTOR_SESSION_ERROR_CODES = new Set([
+  'DELETION_REQUEST_ACTIVE',
   'ACCOUNT_DELETED',
 ]);
 
@@ -41,7 +43,13 @@ const requestAdminResource = async (basePath, path = '', {
     : await response.json().catch(() => null);
   if (!response.ok) {
     if (
-      ADMIN_SESSION_ERROR_CODES.has(responseBody?.error?.code)
+      (
+        ADMIN_SESSION_ERROR_CODES.has(responseBody?.error?.code)
+        || (
+          basePath === 'restaurants'
+          && RESTAURANT_ACTOR_SESSION_ERROR_CODES.has(responseBody?.error?.code)
+        )
+      )
       && typeof window !== 'undefined'
     ) {
       window.location.replace('/?reason=session_expired');

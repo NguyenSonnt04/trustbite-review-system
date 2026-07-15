@@ -49,6 +49,32 @@ const validateSegments = (segments, method) => {
   );
 };
 
+const readBoundedBytes = async (request, maxBytes) => {
+  const reader = request.body?.getReader();
+  if (!reader) return { bytes: new Uint8Array() };
+
+  const chunks = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return { error: 'PAYLOAD_TOO_LARGE' };
+    }
+    chunks.push(value);
+  }
+
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return { bytes };
+};
+
 const readRequestBody = async (request, method) => {
   if (['GET', 'DELETE'].includes(method)) return {};
   const contentType = request.headers.get('content-type') || '';
@@ -58,12 +84,12 @@ const readRequestBody = async (request, method) => {
   if (contentLength > maxBytes) return { error: 'PAYLOAD_TOO_LARGE' };
 
   try {
+    const streamed = await readBoundedBytes(request, maxBytes);
+    if (streamed.error) return streamed;
     if (isMultipart) {
-      const rawBody = await request.arrayBuffer();
-      if (rawBody.byteLength > maxBytes) return { error: 'PAYLOAD_TOO_LARGE' };
-      return { rawBody, contentType };
+      return { rawBody: streamed.bytes, contentType };
     }
-    return { body: await request.json() };
+    return { body: JSON.parse(new TextDecoder().decode(streamed.bytes)) };
   } catch {
     return { error: 'INVALID_BODY' };
   }

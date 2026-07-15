@@ -108,6 +108,12 @@ const getAdminLoginAddress = (req) => {
 
 export const createAdminWebSession = async (req, res, next) => {
   try {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'Request body must be an object');
+    }
+    if (Object.keys(req.body).some((field) => !['email', 'password'].includes(field))) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'Request body contains unsupported fields');
+    }
     const result = await adminWebAuthService.login({
       email: req.body?.email,
       password: req.body?.password,

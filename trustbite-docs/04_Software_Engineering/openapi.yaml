@@ -988,6 +988,84 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /auth/admin/web-session:
+    post:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+      summary: Create an opaque administrator web session
+      operationId: createAdminWebSession
+      parameters:
+      - name: x-trustbite-client-address
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Validated client IP forwarded only by a trusted Next.js deployment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminWebLoginRequest'
+      responses:
+        '201':
+          description: Opaque administrator session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWebSessionCreated'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    get:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Validate and refresh administrator authorization state
+      operationId: getAdminWebSession
+      responses:
+        '200':
+          description: Active administrator session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWebSession'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+      summary: Revoke an administrator web session
+      operationId: deleteAdminWebSession
+      responses:
+        '204':
+          description: Administrator session revoked
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
   /admin-web/users:
     get:
       tags:
@@ -1608,7 +1686,14 @@ paths:
       tags:
       - Reviews
       summary: Translate a review comment on demand
-      description: Requires authentication and review visibility. The original review comment remains canonical; translated text is derived display data and must not affect trust score, fraud scoring, receipt verification, or moderation decisions. Rate limits: 30 translation requests/hour/user with 5 requests/minute burst, secondary 120 requests/hour/IP. If Google returns timeout or 5xx five times within five minutes, backend opens a 60-second circuit breaker; cache miss returns 503 while cache hit still serves normally.
+      description: >-
+        Requires authentication and review visibility. The original review comment remains
+        canonical; translated text is derived display data and must not affect trust score,
+        fraud scoring, receipt verification, or moderation decisions. Rate limits are 30
+        translation requests/hour/user with a 5 requests/minute burst and a secondary 120
+        requests/hour/IP limit. If Google returns timeout or 5xx five times within five
+        minutes, the backend opens a 60-second circuit breaker; cache miss returns 503 while
+        cache hit still serves normally.
       operationId: translateReviewComment
       parameters:
       - $ref: '#/components/parameters/ReviewId'
@@ -1795,7 +1880,7 @@ components:
           nullable: true
           description: Mask in admin/public contexts.
         displayName:
-          type: string
+          type: [string, 'null']
           nullable: true
         dateOfBirth:
           type: string
@@ -2504,6 +2589,54 @@ components:
           deletionRequestedAt:
             type: [string, 'null']
             format: date-time
+    AdminWebLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+    AdminWebSessionUser:
+      type: object
+      required: [id, displayName, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: [string, 'null']
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [ADMIN, SUPER_ADMIN]
+    AdminWebSession:
+      type: object
+      required: [expiresAt, user]
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/AdminWebSessionUser'
+    AdminWebSessionCreated:
+      allOf:
+      - $ref: '#/components/schemas/AdminWebSession'
+      - type: object
+        required: [sessionToken]
+        properties:
+          sessionToken:
+            type: string
+            minLength: 1
+            description: Opaque token returned only to the trusted Next.js BFF and stored in an HttpOnly cookie.
     AdminUserListResponse:
       type: object
       required:
@@ -2761,13 +2894,14 @@ components:
           const: true
     AdminUserStatusChangeRequest:
       type: object
+      additionalProperties: false
       required:
       - reason
       properties:
         reason:
           type: string
           minLength: 10
-          maxLength: 1000
+          maxLength: 500
           description: Must be at least 10 characters long so admin actions always include an actionable audit reason.
     AdminSuspendUserResponse:
       type: object
