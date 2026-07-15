@@ -485,23 +485,44 @@
 }
 
 .restaurantDetailModal {
-  width: min(1180px, 100%);
+  display: flex;
+  width: min(1280px, calc(100vw - 48px));
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.restaurantDetailModal .modalBody {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .restaurantDetailLayout {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(420px, 1.1fr);
-  gap: 24px;
+  grid-template-columns: minmax(340px, 0.78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: 32px;
 }
 
 .restaurantProfileForm,
-.restaurantGallerySection {
+.restaurantMediaColumn,
+.restaurantGallerySection,
+.restaurantAvatarSection {
   min-width: 0;
 }
 
-.restaurantGallerySection {
+.restaurantMediaColumn {
   border-left: 1px solid var(--line);
-  padding-left: 24px;
+  padding-left: 32px;
+}
+
+.restaurantAvatarSection {
+  padding-bottom: 26px;
+}
+
+.restaurantGallerySection {
+  border-top: 1px solid var(--line);
+  padding-top: 26px;
 }
 
 .restaurantModalSectionHeader {
@@ -542,7 +563,7 @@
 
 .restaurantImageUpload {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(170px, 1fr) minmax(150px, 1fr) auto;
   align-items: end;
   gap: 12px;
   border: 1px solid var(--line);
@@ -551,14 +572,109 @@
   padding: 14px;
 }
 
-.imagePrimaryToggle {
-  display: inline-flex;
-  min-height: 42px;
-  align-items: center;
-  gap: 8px;
+.restaurantImageUpload .primaryButton {
+  white-space: nowrap;
+}
+
+.restaurantAvatarCard {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(220px, 1.2fr);
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.restaurantAvatarCard > a {
+  min-height: 190px;
+  background: var(--surface-muted);
+}
+
+.restaurantAvatarCard img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 190px;
+  object-fit: cover;
+}
+
+.restaurantAvatarCardBody {
+  min-width: 0;
+  padding: 16px;
+}
+
+.restaurantCaptionField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.restaurantCaptionField > span {
   color: #56575e;
   font-size: 12px;
   font-weight: 600;
+}
+
+.restaurantCaptionField input {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  outline: 0;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.restaurantCaptionField input:focus {
+  border-color: oklch(0.28 0.004 285 / 0.52);
+  box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.07);
+}
+
+.restaurantAvatarUpload {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.65fr) minmax(260px, 1.35fr);
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 14px;
+}
+
+.restaurantAvatarPlaceholder {
+  display: flex;
+  min-height: 156px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  color: var(--muted);
+  padding: 18px;
+  text-align: center;
+}
+
+.restaurantAvatarPlaceholder strong {
+  margin-top: 10px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.restaurantAvatarPlaceholder span {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.restaurantAvatarUploadFields {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.restaurantAvatarUploadFields .primaryButton {
+  justify-self: start;
 }
 
 .restaurantGalleryGrid {
@@ -1383,6 +1499,7 @@
 
 .modalHeader p {
   margin-top: 5px;
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: 12px;
 }
@@ -1760,6 +1877,19 @@
   display: none;
 }
 
+@media (max-width: 1240px) {
+  .restaurantDetailLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurantMediaColumn {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    padding-top: 30px;
+    padding-left: 0;
+  }
+}
+
 @media (max-width: 1120px) {
   .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1767,17 +1897,6 @@
 
   .profile div {
     display: none;
-  }
-
-  .restaurantDetailLayout {
-    grid-template-columns: 1fr;
-  }
-
-  .restaurantGallerySection {
-    border-top: 1px solid var(--line);
-    border-left: 0;
-    padding-top: 24px;
-    padding-left: 0;
   }
 
 }
@@ -1942,8 +2061,21 @@
   }
 
   .restaurantImageUpload,
+  .restaurantAvatarUpload,
+  .restaurantAvatarCard,
   .restaurantGalleryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .restaurantAvatarCard > a,
+  .restaurantAvatarCard img {
+    min-height: 210px;
+    max-height: 250px;
+  }
+
+  .restaurantAvatarUploadFields .primaryButton,
+  .restaurantImageUpload .primaryButton {
+    width: 100%;
   }
 
   .modalBackdrop {

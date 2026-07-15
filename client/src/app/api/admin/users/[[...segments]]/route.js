@@ -13,7 +13,13 @@ const SESSION_INVALIDATING_CODES = new Set([
   'ADMIN_SESSION_INVALID',
   'ADMIN_SESSION_EXPIRED',
   'ADMIN_ACCESS_REQUIRED',
+  'DELETION_REQUEST_ACTIVE',
   'ACCOUNT_SUSPENDED',
+  'ACCOUNT_DELETED',
+]);
+const TARGET_ACCOUNT_CODES = new Set([
+  'DELETION_REQUEST_ACTIVE',
+  'ACCOUNT_DELETED',
 ]);
 const MAX_BODY_BYTES = 16 * 1024;
 
@@ -105,7 +111,15 @@ const forward = async (request, context, method) => {
       status: result.status,
       headers: { 'Cache-Control': 'no-store' },
     });
-  if (SESSION_INVALIDATING_CODES.has(result.body?.error?.code)) {
+  const errorCode = result.body?.error?.code;
+  let invalidatesSession = SESSION_INVALIDATING_CODES.has(errorCode);
+  if (invalidatesSession && TARGET_ACCOUNT_CODES.has(errorCode)) {
+    const sessionResult = await requestAdminAuthApi('/auth/admin/web-session', {
+      sessionToken,
+    });
+    invalidatesSession = SESSION_INVALIDATING_CODES.has(sessionResult.body?.error?.code);
+  }
+  if (invalidatesSession) {
     response.cookies.set(ADMIN_SESSION_COOKIE, '', getExpiredSessionCookieOptions());
   }
   return response;

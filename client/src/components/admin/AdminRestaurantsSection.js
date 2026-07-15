@@ -53,7 +53,8 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
   const [submitting, setSubmitting] = useState(false);
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadCaption, setUploadCaption] = useState('');
-  const [uploadPrimary, setUploadPrimary] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarCaption, setAvatarCaption] = useState('');
   const [captions, setCaptions] = useState({});
   const mutationKeys = useRef(new Map());
 
@@ -94,6 +95,9 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
       setCaptions(Object.fromEntries(
         (result.images || []).map((image) => [image.id, image.caption || '']),
       ));
+      setAvatarCaption(
+        (result.images || []).find((image) => image.isPrimary)?.caption || '',
+      );
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -119,6 +123,10 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
       || !sameNumbers(form.categoryIds, restaurant.categoryIds)
     );
   }, [form, restaurant]);
+
+  const images = restaurant?.images || [];
+  const primaryImage = images.find((image) => image.isPrimary) || null;
+  const galleryImages = images.filter((image) => !image.isPrimary);
 
   const refreshAfterMutation = async () => {
     await loadDetail();
@@ -165,16 +173,15 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
       const body = new FormData();
       body.set('restaurantImage', uploadFile);
       body.set('caption', uploadCaption);
-      body.set('isPrimary', String(uploadPrimary || (restaurant.images || []).length === 0));
+      body.set('isPrimary', 'false');
       const mutation = imageMutationKey('upload', uploadFile, [
         uploadCaption.trim(),
-        String(uploadPrimary || (restaurant.images || []).length === 0),
+        'false',
       ]);
       await adminService.uploadRestaurantImage(restaurantId, body, mutation.idempotencyKey);
       mutationKeys.current.delete(mutation.fingerprint);
       setUploadFile(null);
       setUploadCaption('');
-      setUploadPrimary(false);
       formElement.reset();
       await refreshAfterMutation();
     } catch (requestError) {
@@ -184,16 +191,41 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
     }
   };
 
-  const replaceImage = async (image, file) => {
+  const uploadAvatar = async (event) => {
+    event.preventDefault();
+    if (!avatarFile || primaryImage) return;
+    const formElement = event.currentTarget;
+    setSubmitting(true);
+    setError('');
+    try {
+      const body = new FormData();
+      body.set('restaurantImage', avatarFile);
+      body.set('caption', avatarCaption);
+      body.set('isPrimary', 'true');
+      const mutation = imageMutationKey('avatar', avatarFile, [avatarCaption.trim()]);
+      await adminService.uploadRestaurantImage(restaurantId, body, mutation.idempotencyKey);
+      mutationKeys.current.delete(mutation.fingerprint);
+      setAvatarFile(null);
+      setAvatarCaption('');
+      formElement.reset();
+      await refreshAfterMutation();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const replaceImage = async (image, file, caption = captions[image.id] || '') => {
     if (!file) return;
     setSubmitting(true);
     setError('');
     try {
       const body = new FormData();
       body.set('restaurantImage', file);
-      body.set('caption', captions[image.id] || '');
+      body.set('caption', caption);
       const mutation = imageMutationKey(`replace:${image.id}`, file, [
-        (captions[image.id] || '').trim(),
+        caption.trim(),
       ]);
       await adminService.replaceRestaurantImage(
         restaurantId,
@@ -411,92 +443,50 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                 </div>
               </form>
 
-              <section className={styles.restaurantGallerySection}>
-                <div className={styles.restaurantModalSectionHeader}>
-                  <div>
-                    <h3>Thư viện ảnh</h3>
-                    <p>{restaurant.images?.length || 0} ảnh · JPG, PNG hoặc WebP · tối đa 5 MB</p>
+              <div className={styles.restaurantMediaColumn}>
+                <section className={styles.restaurantAvatarSection}>
+                  <div className={styles.restaurantModalSectionHeader}>
+                    <div>
+                      <h3>Ảnh đại diện</h3>
+                      <p>Ảnh nhận diện chính, hiển thị tại danh sách và trang nhà hàng.</p>
+                    </div>
                   </div>
-                </div>
 
-                <form className={styles.restaurantImageUpload} onSubmit={uploadImage}>
-                  <Field
-                    accept="image/jpeg,image/png,image/webp"
-                    label="Chọn ảnh mới"
-                    onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
-                    required
-                    type="file"
-                  />
-                  <Field
-                    label="Chú thích"
-                    maxLength={255}
-                    onChange={(event) => setUploadCaption(event.target.value)}
-                    value={uploadCaption}
-                  />
-                  <label className={styles.imagePrimaryToggle}>
-                    <input
-                      checked={uploadPrimary}
-                      onChange={(event) => setUploadPrimary(event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>Đặt làm ảnh đại diện</span>
-                  </label>
-                  <button className={styles.primaryButton} disabled={!uploadFile || submitting} type="submit">
-                    <AdminIcon name="upload" size={16} />
-                    Thêm ảnh
-                  </button>
-                </form>
-
-                <div className={styles.restaurantGalleryGrid}>
-                  {(restaurant.images || []).map((image) => (
-                    <article className={styles.restaurantImageCard} key={image.id}>
-                      <a href={image.imageUrl} rel="noreferrer" target="_blank">
+                  {primaryImage ? (
+                    <article className={styles.restaurantAvatarCard}>
+                      <a href={primaryImage.imageUrl} rel="noreferrer" target="_blank">
                         <Image
-                          alt={image.caption || restaurant.name}
+                          alt={primaryImage.caption || `Ảnh đại diện ${restaurant.name}`}
                           height={360}
-                          src={image.imageUrl}
+                          src={primaryImage.imageUrl}
                           unoptimized
                           width={640}
                         />
                       </a>
-                      <div className={styles.restaurantImageCardBody}>
+                      <div className={styles.restaurantAvatarCardBody}>
                         <div className={styles.restaurantImageMeta}>
-                          {image.isPrimary && <Badge tone="success">Ảnh đại diện</Badge>}
-                          <span>{new Date(image.createdAt).toLocaleDateString('vi-VN')}</span>
+                          <Badge tone="success">Đang sử dụng</Badge>
+                          <span>{new Date(primaryImage.createdAt).toLocaleDateString('vi-VN')}</span>
                         </div>
-                        <input
-                          aria-label="Chú thích ảnh"
-                          maxLength={255}
-                          onChange={(event) => setCaptions({
-                            ...captions,
-                            [image.id]: event.target.value,
-                          })}
-                          value={captions[image.id] || ''}
-                        />
+                        <label className={styles.restaurantCaptionField}>
+                          <span>Chú thích ảnh đại diện</span>
+                          <input
+                            maxLength={255}
+                            onChange={(event) => setAvatarCaption(event.target.value)}
+                            value={avatarCaption}
+                          />
+                        </label>
                         <div className={styles.restaurantImageActions}>
-                          <a className={styles.secondaryButton} href={image.imageUrl} rel="noreferrer" target="_blank">
-                            Xem ảnh
-                          </a>
                           <button
                             className={styles.secondaryButton}
-                            disabled={submitting || captions[image.id] === (image.caption || '')}
-                            onClick={() => updateImage(image, { caption: captions[image.id] })}
+                            disabled={submitting || avatarCaption === (primaryImage.caption || '')}
+                            onClick={() => updateImage(primaryImage, { caption: avatarCaption })}
                             type="button"
                           >
                             Lưu chú thích
                           </button>
-                          {!image.isPrimary && (
-                            <button
-                              className={styles.secondaryButton}
-                              disabled={submitting}
-                              onClick={() => updateImage(image, { isPrimary: true })}
-                              type="button"
-                            >
-                              Đặt ảnh chính
-                            </button>
-                          )}
                           <label className={styles.secondaryButton}>
-                            Thay ảnh
+                            Thay ảnh đại diện
                             <input
                               accept="image/jpeg,image/png,image/webp"
                               disabled={submitting}
@@ -504,7 +494,7 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                               onChange={(event) => {
                                 const file = event.target.files?.[0];
                                 event.target.value = '';
-                                replaceImage(image, file);
+                                replaceImage(primaryImage, file, avatarCaption);
                               }}
                               type="file"
                             />
@@ -512,7 +502,7 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                           <button
                             className={styles.dangerButton}
                             disabled={submitting}
-                            onClick={() => removeImage(image)}
+                            onClick={() => removeImage(primaryImage)}
                             type="button"
                           >
                             Xóa
@@ -520,16 +510,150 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                         </div>
                       </div>
                     </article>
-                  ))}
-                  {(restaurant.images || []).length === 0 && (
-                    <div className={styles.restaurantGalleryEmpty}>
-                      <AdminIcon name="image" size={24} />
-                      <strong>Chưa có ảnh nhà hàng</strong>
-                      <p>Chọn ảnh phía trên để tạo thư viện đầu tiên.</p>
-                    </div>
+                  ) : (
+                    <form className={styles.restaurantAvatarUpload} onSubmit={uploadAvatar}>
+                      <div className={styles.restaurantAvatarPlaceholder}>
+                        <AdminIcon name="image" size={24} />
+                        <strong>Chưa có ảnh đại diện</strong>
+                        <span>Chọn một ảnh vuông hoặc ngang, tối đa 5 MB.</span>
+                      </div>
+                      <div className={styles.restaurantAvatarUploadFields}>
+                        <Field
+                          accept="image/jpeg,image/png,image/webp"
+                          label="Chọn ảnh đại diện"
+                          onChange={(event) => setAvatarFile(event.target.files?.[0] || null)}
+                          required
+                          type="file"
+                        />
+                        <Field
+                          label="Chú thích"
+                          maxLength={255}
+                          onChange={(event) => setAvatarCaption(event.target.value)}
+                          value={avatarCaption}
+                        />
+                        <button
+                          className={styles.primaryButton}
+                          disabled={!avatarFile || submitting}
+                          type="submit"
+                        >
+                          <AdminIcon name="upload" size={16} />
+                          Tải ảnh đại diện
+                        </button>
+                      </div>
+                    </form>
                   )}
-                </div>
-              </section>
+                </section>
+
+                <section className={styles.restaurantGallerySection}>
+                  <div className={styles.restaurantModalSectionHeader}>
+                    <div>
+                      <h3>Ảnh chi tiết nhà hàng</h3>
+                      <p>{galleryImages.length} ảnh trong thư viện · JPG, PNG hoặc WebP · tối đa 5 MB</p>
+                    </div>
+                  </div>
+
+                  <form className={styles.restaurantImageUpload} onSubmit={uploadImage}>
+                    <Field
+                      accept="image/jpeg,image/png,image/webp"
+                      label="Chọn ảnh chi tiết"
+                      onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
+                      required
+                      type="file"
+                    />
+                    <Field
+                      label="Chú thích"
+                      maxLength={255}
+                      onChange={(event) => setUploadCaption(event.target.value)}
+                      value={uploadCaption}
+                    />
+                    <button className={styles.primaryButton} disabled={!uploadFile || submitting} type="submit">
+                      <AdminIcon name="upload" size={16} />
+                      Thêm vào thư viện
+                    </button>
+                  </form>
+
+                  <div className={styles.restaurantGalleryGrid}>
+                    {galleryImages.map((image) => (
+                      <article className={styles.restaurantImageCard} key={image.id}>
+                        <a href={image.imageUrl} rel="noreferrer" target="_blank">
+                          <Image
+                            alt={image.caption || restaurant.name}
+                            height={360}
+                            src={image.imageUrl}
+                            unoptimized
+                            width={640}
+                          />
+                        </a>
+                        <div className={styles.restaurantImageCardBody}>
+                          <div className={styles.restaurantImageMeta}>
+                            <span>Ảnh chi tiết</span>
+                            <span>{new Date(image.createdAt).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                          <input
+                            aria-label="Chú thích ảnh"
+                            maxLength={255}
+                            onChange={(event) => setCaptions({
+                              ...captions,
+                              [image.id]: event.target.value,
+                            })}
+                            value={captions[image.id] || ''}
+                          />
+                          <div className={styles.restaurantImageActions}>
+                            <a className={styles.secondaryButton} href={image.imageUrl} rel="noreferrer" target="_blank">
+                              Xem ảnh
+                            </a>
+                            <button
+                              className={styles.secondaryButton}
+                              disabled={submitting || captions[image.id] === (image.caption || '')}
+                              onClick={() => updateImage(image, { caption: captions[image.id] })}
+                              type="button"
+                            >
+                              Lưu chú thích
+                            </button>
+                            <button
+                              className={styles.secondaryButton}
+                              disabled={submitting}
+                              onClick={() => updateImage(image, { isPrimary: true })}
+                              type="button"
+                            >
+                              Dùng làm ảnh đại diện
+                            </button>
+                            <label className={styles.secondaryButton}>
+                              Thay ảnh
+                              <input
+                                accept="image/jpeg,image/png,image/webp"
+                                disabled={submitting}
+                                hidden
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  event.target.value = '';
+                                  replaceImage(image, file);
+                                }}
+                                type="file"
+                              />
+                            </label>
+                            <button
+                              className={styles.dangerButton}
+                              disabled={submitting}
+                              onClick={() => removeImage(image)}
+                              type="button"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                    {galleryImages.length === 0 && (
+                      <div className={styles.restaurantGalleryEmpty}>
+                        <AdminIcon name="image" size={24} />
+                        <strong>Chưa có ảnh chi tiết</strong>
+                        <p>Ảnh đại diện được quản lý riêng ở phía trên.</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
             </div>
           )}
         </div>
