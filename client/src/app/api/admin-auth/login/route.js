@@ -27,7 +27,10 @@ const getClientAddress = (request) => {
   if (!trustedHeader || !HEADER_NAME_PATTERN.test(trustedHeader)) {
     return null;
   }
-  const value = request.headers.get(trustedHeader)?.split(',')[0]?.trim() || '';
+  const value = request.headers.get(trustedHeader)?.trim() || '';
+  if (value.includes(',')) {
+    return null;
+  }
   return isIP(value) > 0 ? value : null;
 };
 
@@ -87,7 +90,7 @@ export async function POST(request) {
   const clientAddress = getClientAddress(request);
   if (process.env.NODE_ENV === 'production' && !clientAddress) {
     return NextResponse.json(
-      { error: { code: 'AUTH_NOT_CONFIGURED', message: 'Dịch vụ đăng nhập đang tạm thời gián đoạn.' } },
+      { error: { code: 'AUTH_PROXY_NOT_CONFIGURED', message: 'Dịch vụ đăng nhập đang tạm thời gián đoạn.' } },
       { status: 503, headers: noStoreHeaders },
     );
   }
