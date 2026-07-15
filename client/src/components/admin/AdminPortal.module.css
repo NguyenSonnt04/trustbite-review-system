@@ -453,7 +453,8 @@
   font-size: 10px;
 }
 
-.restaurantSection .primaryButton {
+.restaurantSection .primaryButton,
+.restaurantSection .dangerButton {
   min-height: 42px;
   padding: 0 16px;
   font-size: 13px;
@@ -475,6 +476,115 @@
   font-size: 13px;
 }
 
+.restaurantBulkActions {
+  display: grid;
+  grid-template-columns: minmax(190px, 1fr) minmax(260px, 1.2fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-bottom: 14px;
+  border: 1px solid #f2c6c4;
+  border-radius: 9px;
+  background: var(--danger-soft);
+  padding: 14px;
+}
+
+.restaurantBulkSummary {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.restaurantBulkSummary strong {
+  color: var(--danger);
+  font-size: 14px;
+}
+
+.restaurantBulkSummary span {
+  color: #7d5b59;
+  font-size: 11px;
+}
+
+.restaurantBulkReason {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.restaurantBulkReason > span {
+  color: #6e4745;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.restaurantBulkReason input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #dfafac;
+  border-radius: 7px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 11px;
+  font-size: 13px;
+}
+
+.restaurantBulkReason input:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px oklch(0.58 0.18 25 / 0.12);
+}
+
+.restaurantBulkReason input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.restaurantBulkReason small {
+  color: var(--danger);
+  font-size: 11px;
+}
+
+.restaurantBulkButtons {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.restaurantBulkSuccess,
+.successBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #c7ead3;
+  border-radius: 8px;
+  background: var(--success-soft);
+  color: var(--success);
+  padding: 11px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.restaurantBulkSuccess {
+  margin-bottom: 14px;
+}
+
+.selectionCell {
+  width: 46px;
+  text-align: center;
+}
+
+.selectionCell input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--ink);
+}
+
+.selectedTableRow {
+  background: oklch(0.96 0.01 25);
+}
+
 .restaurantTableImage {
   width: 36px;
   height: 36px;
@@ -484,7 +594,7 @@
   object-fit: cover;
 }
 
-.restaurantDetailModal {
+.modal.restaurantDetailModal {
   display: flex;
   width: min(1280px, calc(100vw - 48px));
   flex-direction: column;
@@ -1504,6 +1614,24 @@
   font-size: 12px;
 }
 
+.restaurantModalHeaderTitle {
+  min-width: 0;
+  flex: 1;
+}
+
+.restaurantModalHeaderActions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.restaurantModalHeaderActions .primaryButton,
+.restaurantModalHeaderActions .secondaryButton {
+  min-height: 38px;
+  padding: 0 14px;
+}
+
 .modalBody {
   padding: 22px;
 }
@@ -1544,6 +1672,70 @@
   font-size: 14px;
 }
 
+.filePicker {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  padding: 4px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.filePicker:focus-within {
+  border-color: oklch(0.28 0.004 285 / 0.52);
+  box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.07);
+}
+
+.formField .filePickerInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.filePickerButton {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 5px;
+  background: var(--ink);
+  color: var(--surface);
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 650;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.filePickerButton:hover {
+  background: #34353a;
+}
+
+.filePickerButton:active {
+  transform: translateY(1px);
+}
+
+.filePickerName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .formField textarea {
   min-height: 86px;
   margin-top: 16px;
@@ -1565,14 +1757,29 @@
   box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.07);
 }
 
-.formField input[aria-invalid="true"] {
+.formField input[aria-invalid="true"],
+.formField textarea[aria-invalid="true"] {
   border-color: var(--danger);
+}
+
+.formFieldHelp {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.formField textarea[aria-invalid="true"] + .formFieldHelp {
+  color: var(--danger);
 }
 
 .formField small,
 .roleFieldset small {
   color: var(--danger);
   font-size: 11px;
+}
+
+.successBanner {
+  margin-top: 16px;
 }
 
 .infoCallout {
@@ -1895,6 +2102,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .restaurantBulkActions {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .restaurantBulkSummary {
+    grid-column: 1 / -1;
+  }
+
   .profile div {
     display: none;
   }
@@ -2058,6 +2273,33 @@
 
   .formGrid {
     grid-template-columns: 1fr;
+  }
+
+  .restaurantBulkActions {
+    grid-template-columns: 1fr;
+  }
+
+  .restaurantBulkSummary {
+    grid-column: auto;
+  }
+
+  .restaurantBulkButtons,
+  .restaurantBulkButtons button {
+    width: 100%;
+  }
+
+  .restaurantBulkButtons {
+    flex-direction: column;
+  }
+
+  .restaurantDetailModal .modalHeader {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .restaurantModalHeaderActions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .restaurantImageUpload,

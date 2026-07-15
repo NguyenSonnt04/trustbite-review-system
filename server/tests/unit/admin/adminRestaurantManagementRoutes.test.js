@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   listRestaurants: vi.fn(),
   getRestaurant: vi.fn(),
   updateRestaurant: vi.fn(),
+  deleteRestaurants: vi.fn(),
   uploadImage: vi.fn(),
   updateImage: vi.fn(),
   replaceImage: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('../../../src/services/adminRestaurantManagementService.js', () => ({
     listRestaurants: mocks.listRestaurants,
     getRestaurant: mocks.getRestaurant,
     updateRestaurant: mocks.updateRestaurant,
+    deleteRestaurants: mocks.deleteRestaurants,
   },
 }));
 
@@ -107,6 +109,40 @@ describe('admin restaurant management BFF routes', () => {
       expect.objectContaining({ name: 'Updated Restaurant' }),
     );
     expect(response.body.name).toBe('Updated Restaurant');
+  });
+
+  it('soft-deletes selected restaurants through the admin boundary', async () => {
+    const secondRestaurantId = '33333333-3333-4333-8333-333333333333';
+    const idempotencyKey = '44444444-4444-4444-8444-444444444444';
+    mocks.deleteRestaurants.mockResolvedValue({
+      statusCode: 200,
+      replayed: false,
+      body: {
+        deletedIds: [restaurantId, secondRestaurantId],
+        deletedCount: 2,
+      },
+    });
+
+    const response = await request(app)
+      .post('/api/v1/admin-web/restaurants/bulk-delete')
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .set('idempotency-key', idempotencyKey)
+      .send({
+        restaurantIds: [restaurantId, secondRestaurantId],
+        reason: 'Confirmed duplicate restaurant records',
+      })
+      .expect(200);
+
+    expect(mocks.deleteRestaurants).toHaveBeenCalledWith(
+      sessionUser,
+      expect.objectContaining({
+        restaurantIds: [restaurantId, secondRestaurantId],
+        reason: 'Confirmed duplicate restaurant records',
+      }),
+      idempotencyKey,
+    );
+    expect(response.body.deletedCount).toBe(2);
   });
 
   it('forwards one validated multipart restaurant image', async () => {
