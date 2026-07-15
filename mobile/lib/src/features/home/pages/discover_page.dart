@@ -9,6 +9,7 @@ import 'package:trustbite_mobile/src/features/home/pages/restaurant_detail_page.
 import 'package:trustbite_mobile/src/features/home/widgets/home_header.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/restaurant_card.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/see_all_chip.dart';
+import 'package:trustbite_mobile/src/features/reviews/review_reaction_service.dart';
 
 class DiscoverPage extends StatelessWidget {
   const DiscoverPage({
@@ -19,6 +20,7 @@ class DiscoverPage extends StatelessWidget {
     required this.currentUser,
     required this.onLogin,
     required this.restaurantRepository,
+    this.reviewReactionRepository,
   });
 
   final int activeServiceIndex;
@@ -27,6 +29,7 @@ class DiscoverPage extends StatelessWidget {
   final Map<String, dynamic>? currentUser;
   final Future<bool> Function() onLogin;
   final RestaurantDiscoveryRepository restaurantRepository;
+  final ReviewReactionRepository? reviewReactionRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +50,7 @@ class DiscoverPage extends StatelessWidget {
           repository: restaurantRepository,
           isSignedIn: isSignedIn,
           onLogin: onLogin,
+          reviewReactionRepository: reviewReactionRepository,
         ),
         const SizedBox(height: 20),
         _ServicesSection(
@@ -137,11 +141,13 @@ class _NearbySection extends StatefulWidget {
     required this.repository,
     required this.isSignedIn,
     required this.onLogin,
+    required this.reviewReactionRepository,
   });
 
   final RestaurantDiscoveryRepository repository;
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
+  final ReviewReactionRepository? reviewReactionRepository;
 
   @override
   State<_NearbySection> createState() => _NearbySectionState();
@@ -258,6 +264,8 @@ class _NearbySectionState extends State<_NearbySection> {
                           initialRestaurant: restaurant,
                           isSignedIn: widget.isSignedIn,
                           onLogin: widget.onLogin,
+                          reviewReactionRepository:
+                              widget.reviewReactionRepository,
                         ),
                       ),
                     ),

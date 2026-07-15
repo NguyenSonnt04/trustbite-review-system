@@ -88,6 +88,32 @@ class HomeRestaurantReviewPage {
   final int total;
 }
 
+enum ReviewReactionType {
+  love('LOVE', '❤️', 'Yêu thích'),
+  haha('HAHA', '😆', 'Haha'),
+  angry('ANGRY', '😡', 'Phẫn nộ');
+
+  const ReviewReactionType(this.apiValue, this.emoji, this.label);
+
+  final String apiValue;
+  final String emoji;
+  final String label;
+}
+
+class ReviewReactionCounts {
+  const ReviewReactionCounts({this.love = 0, this.haha = 0, this.angry = 0});
+
+  final int love;
+  final int haha;
+  final int angry;
+
+  int forType(ReviewReactionType type) => switch (type) {
+    ReviewReactionType.love => love,
+    ReviewReactionType.haha => haha,
+    ReviewReactionType.angry => angry,
+  };
+}
+
 class HomeRestaurantReview {
   const HomeRestaurantReview({
     required this.id,
@@ -99,12 +125,14 @@ class HomeRestaurantReview {
     required this.ambienceRating,
     required this.averageRating,
     required this.reviewerDisplayName,
+    this.reviewerAvatarUrl,
     required this.comment,
     required this.status,
     required this.verificationStatus,
     required this.trustLabel,
     required this.visitedAt,
     required this.createdAt,
+    this.reactionCounts = const ReviewReactionCounts(),
   });
 
   final String id;
@@ -116,12 +144,14 @@ class HomeRestaurantReview {
   final int ambienceRating;
   final double averageRating;
   final String reviewerDisplayName;
+  final String? reviewerAvatarUrl;
   final String comment;
   final String status;
   final String verificationStatus;
   final String trustLabel;
   final DateTime? visitedAt;
   final DateTime createdAt;
+  final ReviewReactionCounts reactionCounts;
 }
 
 class RestaurantMockComment {

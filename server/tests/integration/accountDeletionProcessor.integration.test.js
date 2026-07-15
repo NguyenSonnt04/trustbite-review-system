@@ -25,6 +25,7 @@ async function cleanupUser(userId) {
   await query('DELETE FROM user_saved_lists WHERE user_id = $1', [userId]);
   await query('DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1', [userId]);
   await query('DELETE FROM user_blocks WHERE blocker_user_id = $1 OR blocked_user_id = $1', [userId]);
+  await query('DELETE FROM review_reactions WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_votes WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_tags WHERE review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_replies WHERE review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);

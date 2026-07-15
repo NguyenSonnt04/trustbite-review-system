@@ -14,6 +14,10 @@ Mobile users must complete these fields before entering the signed-in product:
   normalized from `0xxxxxxxxx` to `+84xxxxxxxxx` by Express.
 
 The trimmed `displayName` is public on the user's public restaurant reviews.
+When an optional avatar is configured, public reviews may expose only a
+short-lived backend-resolved `reviewerAvatarUrl`; the stored avatar reference is
+never returned directly. Missing avatars use the mobile default-person
+silhouette. Deleted users always receive the anonymous name and a null avatar.
 Public review APIs never expose the associated user ID, email, phone number, or
 Cognito subject. Deleted users are shown as `Người dùng TrustBite`.
 

@@ -389,6 +389,11 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
        WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)`,
       [request.user_id],
     );
+    const reviewReactionsResult = await client.query(
+      `DELETE FROM review_reactions
+       WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)`,
+      [request.user_id],
+    );
     const moderationReportsResult = await client.query(
       `UPDATE moderation_reports
        SET description = NULL,
@@ -612,6 +617,7 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
             blocks: blocksResult.rowCount,
             reviewTags: reviewTagsResult.rowCount,
             reviewVotes: reviewVotesResult.rowCount,
+            reviewReactions: reviewReactionsResult.rowCount,
           },
           removedSystemRows: {
             notifications: notificationsResult.rowCount,

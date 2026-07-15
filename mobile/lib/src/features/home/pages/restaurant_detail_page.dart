@@ -6,6 +6,7 @@ import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_ser
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/reviews/review_creation_page.dart';
+import 'package:trustbite_mobile/src/features/reviews/review_reaction_service.dart';
 import 'package:trustbite_mobile/src/features/reviews/review_submission_service.dart';
 
 class RestaurantDetailPage extends StatefulWidget {
@@ -18,6 +19,7 @@ class RestaurantDetailPage extends StatefulWidget {
     required this.onLogin,
     this.reviewRepository,
     this.receiptPicker,
+    this.reviewReactionRepository,
   });
 
   final String restaurantId;
@@ -27,6 +29,7 @@ class RestaurantDetailPage extends StatefulWidget {
   final Future<bool> Function() onLogin;
   final ReviewSubmissionRepository? reviewRepository;
   final ReceiptPicker? receiptPicker;
+  final ReviewReactionRepository? reviewReactionRepository;
 
   @override
   State<RestaurantDetailPage> createState() => _RestaurantDetailPageState();
@@ -71,6 +74,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
             onLogin: widget.onLogin,
             reviewRepository: widget.reviewRepository,
             receiptPicker: widget.receiptPicker,
+            reviewReactionRepository: widget.reviewReactionRepository,
           );
         },
       ),
@@ -188,6 +192,7 @@ class _DetailContent extends StatefulWidget {
     required this.onLogin,
     required this.reviewRepository,
     required this.receiptPicker,
+    required this.reviewReactionRepository,
   });
 
   final HomeRestaurantDetail detail;
@@ -197,6 +202,7 @@ class _DetailContent extends StatefulWidget {
   final Future<bool> Function() onLogin;
   final ReviewSubmissionRepository? reviewRepository;
   final ReceiptPicker? receiptPicker;
+  final ReviewReactionRepository? reviewReactionRepository;
 
   @override
   State<_DetailContent> createState() => _DetailContentState();
@@ -360,7 +366,7 @@ class _DetailContentState extends State<_DetailContent> {
               children: [
                 if (detail.address != null)
                   _InformationRow(
-                    icon: Icons.place_rounded,
+                    icon: Icons.location_on_outlined,
                     text: detail.address!,
                   ),
                 if (detail.phoneNumber != null) ...[
@@ -397,7 +403,7 @@ class _DetailContentState extends State<_DetailContent> {
                 _RatingSummaryCard(breakdown: detail.ratingBreakdown),
                 const SizedBox(height: 32),
                 const _SectionHeading(
-                  icon: Icons.restaurant_menu_rounded,
+                  icon: Icons.restaurant_outlined,
                   title: 'Thực đơn điện tử',
                   subtitle: 'Giá mặc định do nhà hàng cung cấp',
                 ),
@@ -437,7 +443,14 @@ class _DetailContentState extends State<_DetailContent> {
                         else if (page!.items.isEmpty)
                           const _ReviewsEmpty()
                         else
-                          _RestaurantReviewList(items: page.items),
+                          _RestaurantReviewList(
+                            items: page.items,
+                            isSignedIn: widget.isSignedIn,
+                            onLogin: widget.onLogin,
+                            repository:
+                                widget.reviewReactionRepository ??
+                                ReviewReactionService(apiClient: appApiClient),
+                          ),
                       ],
                     );
                   },
@@ -524,17 +537,11 @@ class _SectionHeading extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 42,
-          height: 42,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: HomeColors.brand.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(icon, color: HomeColors.brand, size: 21),
+        SizedBox(
+          width: 26,
+          child: Icon(icon, color: HomeColors.brand, size: 24),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,9 +821,17 @@ class _ReviewsEmpty extends StatelessWidget {
 }
 
 class _RestaurantReviewList extends StatelessWidget {
-  const _RestaurantReviewList({required this.items});
+  const _RestaurantReviewList({
+    required this.items,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.repository,
+  });
 
   final List<HomeRestaurantReview> items;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository repository;
 
   @override
   Widget build(BuildContext context) {
@@ -824,7 +839,12 @@ class _RestaurantReviewList extends StatelessWidget {
       key: const ValueKey('restaurant-reviews-list'),
       children: [
         for (var index = 0; index < items.length; index++) ...[
-          _RestaurantReviewCard(review: items[index]),
+          _RestaurantReviewCard(
+            review: items[index],
+            isSignedIn: isSignedIn,
+            onLogin: onLogin,
+            repository: repository,
+          ),
           if (index != items.length - 1) const SizedBox(height: 18),
         ],
       ],
@@ -832,10 +852,41 @@ class _RestaurantReviewList extends StatelessWidget {
   }
 }
 
-class _RestaurantReviewCard extends StatelessWidget {
-  const _RestaurantReviewCard({required this.review});
+class _RestaurantReviewCard extends StatefulWidget {
+  const _RestaurantReviewCard({
+    required this.review,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.repository,
+  });
 
   final HomeRestaurantReview review;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository repository;
+
+  @override
+  State<_RestaurantReviewCard> createState() => _RestaurantReviewCardState();
+}
+
+class _RestaurantReviewCardState extends State<_RestaurantReviewCard> {
+  static const _collapsedCommentLines = 5;
+  static const _longCommentThreshold = 180;
+
+  bool _isExpanded = false;
+  ReviewReactionType? _reaction;
+  late ReviewReactionCounts _reactionCounts;
+  bool _reactionInFlight = false;
+  late bool _isSignedIn;
+
+  HomeRestaurantReview get review => widget.review;
+
+  @override
+  void initState() {
+    super.initState();
+    _reactionCounts = review.reactionCounts;
+    _isSignedIn = widget.isSignedIn;
+  }
 
   String _formatTime() {
     final date = review.visitedAt ?? review.createdAt;
@@ -850,132 +901,365 @@ class _RestaurantReviewCard extends StatelessWidget {
         '${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
+  Future<void> _showReactionPicker(LongPressStartDetails _) async {
+    final screenSize = MediaQuery.sizeOf(context);
+    final cardBox = context.findRenderObject()! as RenderBox;
+    final cardOrigin = cardBox.localToGlobal(Offset.zero);
+    const pickerWidth = 120.0;
+    const pickerHeight = 40.0;
+    final left = (cardOrigin.dx + 50).clamp(
+      8.0,
+      screenSize.width - pickerWidth - 8,
+    );
+    final top = (cardOrigin.dy + cardBox.size.height + 4).clamp(
+      8.0,
+      screenSize.height - pickerHeight - 8,
+    );
+
+    final selected = await showGeneralDialog<ReviewReactionType>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Đóng lựa chọn cảm xúc',
+      barrierColor: Colors.transparent,
+      transitionDuration: const Duration(milliseconds: 190),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return Stack(
+          children: [
+            Positioned(
+              left: left,
+              top: top,
+              child: Material(
+                color: Colors.white,
+                elevation: 8,
+                shadowColor: const Color(0x33000000),
+                borderRadius: BorderRadius.circular(999),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 4,
+                    vertical: 2,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: ReviewReactionType.values
+                        .map((reaction) {
+                          return Semantics(
+                            button: true,
+                            label: reaction.label,
+                            child: InkResponse(
+                              radius: 18,
+                              onTap: () =>
+                                  Navigator.of(dialogContext).pop(reaction),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 5,
+                                  vertical: 2,
+                                ),
+                                child: Text(
+                                  reaction.emoji,
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                              ),
+                            ),
+                          );
+                        })
+                        .toList(growable: false),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final fadeAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOut,
+          reverseCurve: Curves.easeIn,
+        );
+        final popAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: fadeAnimation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, -0.12),
+              end: Offset.zero,
+            ).animate(fadeAnimation),
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.72, end: 1).animate(popAnimation),
+              alignment: Alignment.topLeft,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected != null && mounted) await _persistReaction(selected);
+  }
+
+  Future<void> _persistReaction(ReviewReactionType selected) async {
+    if (_reactionInFlight) return;
+    if (!_isSignedIn) {
+      _isSignedIn = await widget.onLogin();
+    }
+    if (!_isSignedIn || !mounted) return;
+
+    final previousReaction = _reaction;
+    final previousCounts = _reactionCounts;
+    final nextReaction = selected == previousReaction ? null : selected;
+    setState(() {
+      _reactionInFlight = true;
+      _reaction = nextReaction;
+      _reactionCounts = _optimisticCounts(
+        previousCounts,
+        previousReaction,
+        nextReaction,
+      );
+    });
+
+    try {
+      final result = nextReaction == null
+          ? await widget.repository.removeReaction(review.id)
+          : await widget.repository.setReaction(
+              reviewId: review.id,
+              reaction: nextReaction,
+            );
+      if (!mounted) return;
+      setState(() {
+        _reaction = result.myReaction;
+        _reactionCounts = result.reactionCounts;
+      });
+    } on Exception {
+      if (!mounted) return;
+      setState(() {
+        _reaction = previousReaction;
+        _reactionCounts = previousCounts;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể lưu cảm xúc. Vui lòng thử lại.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _reactionInFlight = false);
+    }
+  }
+
+  ReviewReactionCounts _optimisticCounts(
+    ReviewReactionCounts current,
+    ReviewReactionType? previous,
+    ReviewReactionType? next,
+  ) {
+    int adjusted(ReviewReactionType type) {
+      var count = current.forType(type);
+      if (previous == type) count = (count - 1).clamp(0, 1 << 31);
+      if (next == type) count += 1;
+      return count;
+    }
+
+    return ReviewReactionCounts(
+      love: adjusted(ReviewReactionType.love),
+      haha: adjusted(ReviewReactionType.haha),
+      angry: adjusted(ReviewReactionType.angry),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isVerified = review.status == 'VERIFIED';
+    final isLongComment = review.comment.runes.length > _longCommentThreshold;
+    final avatarUrl = review.reviewerAvatarUrl?.trim();
+    final avatarImage = avatarUrl == null || avatarUrl.isEmpty
+        ? null
+        : NetworkImage(avatarUrl);
     return Semantics(
       label:
           '${review.reviewerDisplayName}, đánh giá '
           '${review.averageRating.toStringAsFixed(1)} trên 5, '
           '${isVerified ? 'đã xác thực' : 'tham khảo'}',
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: HomeColors.brand.withValues(alpha: 0.12),
-            child: Icon(
-              isVerified
-                  ? Icons.verified_user_rounded
-                  : Icons.rate_review_outlined,
-              size: 18,
-              color: HomeColors.brand,
+      child: GestureDetector(
+        key: ValueKey('review-reaction-target-${review.id}'),
+        behavior: HitTestBehavior.opaque,
+        onLongPressStart: _showReactionPicker,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              key: ValueKey('reviewer-avatar-${review.id}'),
+              radius: 20,
+              backgroundColor: const Color(0xFFE4E6EB),
+              foregroundImage: avatarImage,
+              onForegroundImageError: avatarImage == null
+                  ? null
+                  : (exception, stackTrace) {},
+              child: const Icon(
+                Icons.person_rounded,
+                size: 24,
+                color: Color(0xFF65676B),
+              ),
             ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  key: const ValueKey('restaurant-review-bubble'),
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF0F2F5),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    key: const ValueKey('restaurant-review-bubble'),
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(14, 11, 14, 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF0F2F5),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                review.reviewerDisplayName,
+                                style: AppTypography.bodyStrong.copyWith(
+                                  color: AppTypography.ink,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: HomeColors.brand,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    review.averageRating.toStringAsFixed(1),
+                                    style: AppTypography.tiny.copyWith(
+                                      color: AppTypography.ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          review.comment,
+                          maxLines: isLongComment && !_isExpanded
+                              ? _collapsedCommentLines
+                              : null,
+                          overflow: isLongComment && !_isExpanded
+                              ? TextOverflow.ellipsis
+                              : TextOverflow.visible,
+                          style: AppTypography.body.copyWith(
+                            color: const Color(0xFF30343B),
+                            fontWeight: FontWeight.w700,
+                            height: 1.42,
+                          ),
+                        ),
+                        if (isLongComment) ...[
+                          const SizedBox(height: 5),
+                          GestureDetector(
+                            onTap: () =>
+                                setState(() => _isExpanded = !_isExpanded),
                             child: Text(
-                              review.reviewerDisplayName,
-                              style: AppTypography.bodyStrong.copyWith(
-                                color: AppTypography.ink,
+                              _isExpanded ? 'Xem bớt' : 'Xem thêm',
+                              style: AppTypography.caption.copyWith(
+                                color: const Color(0xFF4B5563),
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
                           ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.star_rounded,
-                                  color: HomeColors.brand,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  review.averageRating.toStringAsFixed(1),
-                                  style: AppTypography.tiny.copyWith(
-                                    color: AppTypography.ink,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        review.comment,
-                        style: AppTypography.body.copyWith(
-                          color: const Color(0xFF30343B),
-                          fontWeight: FontWeight.w700,
-                          height: 1.42,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 7),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      Text(
-                        _formatTime(),
-                        style: AppTypography.tiny.copyWith(
-                          color: const Color(0xFF4B5563),
+                  const SizedBox(height: 7),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: Row(
+                      children: [
+                        Text(
+                          _formatTime(),
+                          style: AppTypography.tiny.copyWith(
+                            color: const Color(0xFF4B5563),
+                          ),
                         ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        isVerified
-                            ? Icons.verified_rounded
-                            : Icons.info_outline_rounded,
-                        size: 14,
-                        color: isVerified
-                            ? const Color(0xFF16803B)
-                            : HomeColors.muted,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isVerified ? 'Đã xác thực' : 'Đánh giá tham khảo',
-                        style: AppTypography.tiny.copyWith(
+                        for (final reaction in ReviewReactionType.values)
+                          if (_reactionCounts.forType(reaction) > 0) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              key: _reaction == reaction
+                                  ? ValueKey('selected-reaction-${review.id}')
+                                  : ValueKey(
+                                      'reaction-count-${review.id}-${reaction.apiValue}',
+                                    ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: _reaction == reaction
+                                    ? Border.all(color: const Color(0xFFD6D9DE))
+                                    : null,
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color(0x14000000),
+                                    blurRadius: 6,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '${reaction.emoji} ${_reactionCounts.forType(reaction)}',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        const Spacer(),
+                        Icon(
+                          isVerified
+                              ? Icons.verified_rounded
+                              : Icons.info_outline_rounded,
+                          size: 14,
                           color: isVerified
                               ? const Color(0xFF16803B)
-                              : const Color(0xFF4B5563),
+                              : HomeColors.muted,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Text(
+                          isVerified ? 'Đã xác thực' : 'Đánh giá tham khảo',
+                          style: AppTypography.tiny.copyWith(
+                            color: isVerified
+                                ? const Color(0xFF16803B)
+                                : const Color(0xFF4B5563),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1021,15 +1305,9 @@ class _InformationRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: HomeColors.brand.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Icon(icon, color: HomeColors.brand, size: 18),
+        SizedBox(
+          width: 24,
+          child: Icon(icon, color: HomeColors.brand, size: 22),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -1069,20 +1347,7 @@ class _RatingSummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFEEE5),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Icon(
-                  Icons.star_rounded,
-                  color: HomeColors.brand,
-                  size: 24,
-                ),
-              ),
+              const Icon(Icons.star_rounded, color: HomeColors.brand, size: 28),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

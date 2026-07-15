@@ -128,6 +128,14 @@ class TrustBiteApiClient {
     return _requestJson(method: 'PATCH', path: path, body: jsonEncode(body));
   }
 
+  Future<Map<String, dynamic>> putJson(String path, Map<String, dynamic> body) {
+    return _requestJson(method: 'PUT', path: path, body: jsonEncode(body));
+  }
+
+  Future<Map<String, dynamic>> deleteJson(String path) {
+    return _requestJson(method: 'DELETE', path: path);
+  }
+
   Future<Map<String, dynamic>> postMultipart(
     String path, {
     required Map<String, String> fields,

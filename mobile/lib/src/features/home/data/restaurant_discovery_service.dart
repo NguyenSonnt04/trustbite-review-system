@@ -193,6 +193,7 @@ class RestaurantDiscoveryService implements RestaurantDiscoveryRepository {
         value['reviewerDisplayName'],
         'Review reviewer display name',
       ),
+      reviewerAvatarUrl: _readOptionalString(value['reviewerAvatarUrl']),
       comment: _readRequiredString(value['comment'], 'Review comment'),
       status: status,
       verificationStatus: _readRequiredString(
@@ -205,6 +206,19 @@ class RestaurantDiscoveryService implements RestaurantDiscoveryRepository {
       ),
       visitedAt: _readOptionalDate(value['visitedAt'], 'Review visited date'),
       createdAt: _readRequiredDate(value['createdAt'], 'Review created date'),
+      reactionCounts: _parseReactionCounts(value['reactionCounts']),
+    );
+  }
+
+  ReviewReactionCounts _parseReactionCounts(Object? value) {
+    if (value == null) return const ReviewReactionCounts();
+    if (value is! Map<String, dynamic>) {
+      throw const FormatException('Review reaction counts must be an object.');
+    }
+    return ReviewReactionCounts(
+      love: _readRequiredInteger(value['LOVE'], 'LOVE reaction count'),
+      haha: _readRequiredInteger(value['HAHA'], 'HAHA reaction count'),
+      angry: _readRequiredInteger(value['ANGRY'], 'ANGRY reaction count'),
     );
   }
 

@@ -292,7 +292,12 @@ status=VERIFIED|REFERENCE_ONLY|ALL&page=1&pageSize=20
 Phản hồi phải phân biệt rõ review `VERIFIED` và `REFERENCE_ONLY` để mobile hiển
 thị trust badge. Mỗi review public có `reviewerDisplayName` lấy từ display name
 đã trim; user đã xóa hoặc không có tên dùng fallback `Người dùng TrustBite`.
-Không trả `userId`, email, số điện thoại, Cognito subject hoặc dữ liệu hóa đơn.
+`reviewerAvatarUrl` là signed read URL ngắn hạn cho avatar TrustBite, hoặc
+`null` nếu user chưa có avatar, đã bị xóa, reference không hợp lệ hay provider
+tạm thời lỗi. Không trả stored avatar reference, `userId`, email, số điện thoại,
+Cognito subject hoặc dữ liệu hóa đơn. Mỗi item trả thêm `reactionCounts` với
+ba số đếm `LOVE`, `HAHA`, `ANGRY`; không trả danh sách user đã reaction hoặc
+`myReaction` trên endpoint public.
 
 ---
 
@@ -353,6 +358,26 @@ Yêu cầu:
   "reason": "USER_SKIPPED_RECEIPT"
 }
 ```
+
+### PUT /reviews/{reviewId}/reaction
+
+Auth: user TrustBite đang hoạt động. `userId` chỉ lấy từ auth context, không lấy
+từ request body.
+
+```json
+{
+  "reactionType": "LOVE"
+}
+```
+
+`reactionType` chỉ nhận `LOVE`, `HAHA`, `ANGRY`. Review phải public và có trạng
+thái `VERIFIED` hoặc `REFERENCE_ONLY`. API tạo mới hoặc thay thế reaction hiện
+tại của user bằng khóa duy nhất `(review_id,user_id)`.
+
+### DELETE /reviews/{reviewId}/reaction
+
+Xóa riêng reaction của user đang đăng nhập và có tính idempotent. Cả PUT và
+DELETE trả `reviewId`, `myReaction`, và `reactionCounts` mới nhất.
 
 Phản hồi:
 

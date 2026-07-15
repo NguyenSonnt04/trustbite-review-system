@@ -265,6 +265,7 @@ describe('restaurant detail and public reviews API', () => {
       expect(allIds).not.toEqual(expect.arrayContaining([rejected.id, privateReview.id]));
       expect(allResponse.body.items.every((item) => item.reviewerDisplayName === 'Public Review Reader')).toBe(true);
       for (const item of allResponse.body.items) {
+        expect(item.reviewerAvatarUrl).toBeNull();
         expect(item).not.toHaveProperty('userId');
         expect(item).not.toHaveProperty('email');
         expect(item).not.toHaveProperty('phoneNumber');
@@ -308,7 +309,8 @@ describe('restaurant detail and public reviews API', () => {
       await query(
         `UPDATE users
          SET status = 'DELETED',
-             display_name = 'Must Not Leak'
+             display_name = 'Must Not Leak',
+             avatar_url = 'https://private.example/must-not-leak.png'
          WHERE id = $1`,
         [reviewer.id],
       );
@@ -321,9 +323,11 @@ describe('restaurant detail and public reviews API', () => {
         expect.objectContaining({
           id: review.id,
           reviewerDisplayName: 'Người dùng TrustBite',
+          reviewerAvatarUrl: null,
         }),
       ]);
       expect(JSON.stringify(response.body)).not.toContain('Must Not Leak');
+      expect(JSON.stringify(response.body)).not.toContain('private.example');
     } finally {
       await cleanup({
         reviewIds: [review.id],

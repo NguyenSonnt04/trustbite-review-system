@@ -221,10 +221,12 @@ void main() {
               "ambienceRating": 4,
               "averageRating": 4.5,
               "reviewerDisplayName": "Nguyễn An",
+              "reviewerAvatarUrl": "https://cdn.trustbite.test/avatars/nguyen-an.png",
               "comment": "Món ăn ngon và phục vụ rất nhiệt tình.",
               "status": "VERIFIED",
               "verificationStatus": "VERIFIED",
               "trustLabel": "RECEIPT_VERIFIED",
+              "reactionCounts": {"LOVE": 4, "HAHA": 2, "ANGRY": 1},
               "visitedAt": "2026-07-12T10:00:00.000Z",
               "createdAt": "2026-07-13T10:00:00.000Z",
               "updatedAt": "2026-07-13T10:00:00.000Z"
@@ -254,7 +256,14 @@ void main() {
     expect(page.items.single.comment, contains('Món ăn ngon'));
     expect(page.items.single.averageRating, 4.5);
     expect(page.items.single.reviewerDisplayName, 'Nguyễn An');
+    expect(
+      page.items.single.reviewerAvatarUrl,
+      'https://cdn.trustbite.test/avatars/nguyen-an.png',
+    );
     expect(page.items.single.status, 'VERIFIED');
+    expect(page.items.single.reactionCounts.love, 4);
+    expect(page.items.single.reactionCounts.haha, 2);
+    expect(page.items.single.reactionCounts.angry, 1);
     expect(page.items.single.visitedAt, DateTime.utc(2026, 7, 12, 10));
   });
 

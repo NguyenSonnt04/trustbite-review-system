@@ -6,12 +6,14 @@ import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart
 import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/home/pages/discover_page.dart';
+import 'package:trustbite_mobile/src/features/reviews/review_reaction_service.dart';
 
 void main() {
   Widget buildPage(
     RestaurantDiscoveryRepository repository, {
     bool isSignedIn = false,
     Future<bool> Function()? onLogin,
+    ReviewReactionRepository? reviewReactionRepository,
   }) {
     return MaterialApp(
       home: Scaffold(
@@ -22,6 +24,7 @@ void main() {
           currentUser: null,
           onLogin: onLogin ?? () async => true,
           restaurantRepository: repository,
+          reviewReactionRepository: reviewReactionRepository,
         ),
       ),
     );
@@ -111,6 +114,8 @@ void main() {
                 ambienceRating: 4,
                 averageRating: 4.5,
                 reviewerDisplayName: 'Nguyễn An',
+                reviewerAvatarUrl:
+                    'https://cdn.trustbite.test/avatars/nguyen-an.png',
                 comment: 'Món ăn thật từ backend và phục vụ rất nhiệt tình.',
                 status: 'VERIFIED',
                 verificationStatus: 'VERIFIED',
@@ -161,6 +166,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Nguyễn An'), findsOneWidget);
+    final reviewerAvatar = tester.widget<CircleAvatar>(
+      find.byKey(const ValueKey('reviewer-avatar-review-1')),
+    );
+    expect(reviewerAvatar.foregroundImage, isA<NetworkImage>());
+    expect(
+      (reviewerAvatar.foregroundImage! as NetworkImage).url,
+      'https://cdn.trustbite.test/avatars/nguyen-an.png',
+    );
     expect(find.text('Đánh giá công khai'), findsNothing);
     expect(find.text('Đã xác thực'), findsOneWidget);
     expect(
@@ -175,6 +188,114 @@ void main() {
     await tester.pumpAndSettle();
     expect(loginCalls, 1);
     expect(find.byKey(const ValueKey('review-creation-page')), findsOneWidget);
+  });
+
+  testWidgets('collapses long comments and supports three reactions', (
+    tester,
+  ) async {
+    const longComment =
+        'Harness the power of AI and machine learning with a comprehensive '
+        'suite of services. These workshops provide hands-on experience '
+        'building intelligent applications that solve real-world problems. '
+        'Master both pre-built AI services and custom model development, '
+        'deployment, and management with practical production guidance.';
+    await tester.pumpWidget(
+      buildPage(
+        _FakeRestaurantRepository(
+          const [
+            HomeRestaurant(
+              id: 'restaurant-long-review',
+              name: 'Quán bình luận dài',
+              rating: '5.0',
+              distance: null,
+              status: '1 review xác thực',
+              image: null,
+              featured: false,
+            ),
+          ],
+          detail: const HomeRestaurantDetail(
+            id: 'restaurant-long-review',
+            name: 'Quán bình luận dài',
+            description: null,
+            address: null,
+            phoneNumber: null,
+            imageUrl: null,
+            trustScore: 5,
+            verifiedReviewCount: 1,
+            ratingBreakdown: RestaurantRatingBreakdown(
+              averageFood: 5,
+              averagePrice: 5,
+              averageService: 5,
+              averageAmbience: 5,
+              averageOverall: 5,
+              reviewCount: 1,
+            ),
+          ),
+          reviews: HomeRestaurantReviewPage(
+            items: [
+              HomeRestaurantReview(
+                id: 'review-long',
+                restaurantId: 'restaurant-long-review',
+                branchId: null,
+                foodRating: 5,
+                priceRating: 5,
+                serviceRating: 5,
+                ambienceRating: 5,
+                averageRating: 5,
+                reviewerDisplayName: 'Nguyen Dao Son',
+                comment: longComment,
+                status: 'VERIFIED',
+                verificationStatus: 'VERIFIED',
+                trustLabel: 'RECEIPT_VERIFIED',
+                visitedAt: null,
+                createdAt: DateTime.utc(2026, 7, 15),
+              ),
+            ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
+          ),
+        ),
+        isSignedIn: true,
+        reviewReactionRepository: const _FakeReviewReactionRepository(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Quán bình luận dài'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Xem thêm'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+
+    expect(find.text('Xem thêm'), findsOneWidget);
+    await tester.ensureVisible(find.text('Xem thêm'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xem thêm'));
+    await tester.pumpAndSettle();
+    expect(find.text('Xem bớt'), findsOneWidget);
+    await tester.tap(find.text('Xem bớt'));
+    await tester.pumpAndSettle();
+
+    final reactionTarget = find.byKey(
+      const ValueKey('review-reaction-target-review-long'),
+    );
+    await tester.ensureVisible(reactionTarget);
+    await tester.pumpAndSettle();
+    await tester.longPress(reactionTarget);
+    await tester.pumpAndSettle();
+    expect(find.text('❤️'), findsOneWidget);
+    expect(find.text('😆'), findsOneWidget);
+    expect(find.text('😡'), findsOneWidget);
+
+    await tester.tap(find.text('❤️'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('selected-reaction-review-long')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('retries a failed restaurant detail request', (tester) async {
@@ -233,6 +354,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Bình luận backend tải lại.'), findsOneWidget);
+    final defaultAvatar = tester.widget<CircleAvatar>(
+      find.byKey(const ValueKey('reviewer-avatar-review-retry')),
+    );
+    expect(defaultAvatar.foregroundImage, isNull);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('reviewer-avatar-review-retry')),
+        matching: find.byIcon(Icons.person_rounded),
+      ),
+      findsOneWidget,
+    );
     expect(repository.detailCalls, 1);
   });
 
@@ -400,6 +532,35 @@ class _DetailFailingOnceRestaurantRepository
       page: 1,
       pageSize: 20,
       total: 0,
+    );
+  }
+}
+
+class _FakeReviewReactionRepository implements ReviewReactionRepository {
+  const _FakeReviewReactionRepository();
+
+  @override
+  Future<ReviewReactionResult> removeReaction(String reviewId) async {
+    return ReviewReactionResult(
+      reviewId: reviewId,
+      myReaction: null,
+      reactionCounts: const ReviewReactionCounts(),
+    );
+  }
+
+  @override
+  Future<ReviewReactionResult> setReaction({
+    required String reviewId,
+    required ReviewReactionType reaction,
+  }) async {
+    return ReviewReactionResult(
+      reviewId: reviewId,
+      myReaction: reaction,
+      reactionCounts: ReviewReactionCounts(
+        love: reaction == ReviewReactionType.love ? 1 : 0,
+        haha: reaction == ReviewReactionType.haha ? 1 : 0,
+        angry: reaction == ReviewReactionType.angry ? 1 : 0,
+      ),
     );
   }
 }

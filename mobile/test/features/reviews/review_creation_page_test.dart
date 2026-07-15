@@ -194,6 +194,45 @@ void main() {
       'fixed-idempotency-key',
     ]);
   });
+
+  testWidgets('stops automatic status polling after the configured limit', (
+    tester,
+  ) async {
+    final repository = _FakeReviewRepository(pendingStatus: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewCreationPage(
+          restaurantId: 'restaurant-1',
+          restaurantName: 'Quán kiểm thử',
+          repository: repository,
+          receiptPicker: const _FakeReceiptPicker(),
+          pollInterval: const Duration(milliseconds: 1),
+          maxPollAttempts: 2,
+        ),
+      ),
+    );
+
+    for (final label in ['Món ăn', 'Giá cả', 'Phục vụ', 'Không gian']) {
+      await tester.tap(find.byKey(ValueKey('rating-$label-5')));
+    }
+    await tester.enterText(
+      find.byKey(const ValueKey('review-comment-field')),
+      'Món ăn rất ngon, phục vụ nhiệt tình và không gian sạch sẽ, đáng quay lại.',
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('submit-review-button')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byKey(const ValueKey('submit-review-button')));
+    await tester.pumpAndSettle(const Duration(milliseconds: 1));
+
+    expect(repository.statusCalls, 3);
+    expect(
+      find.text('Trạng thái đang được xử lý, vui lòng kiểm tra lại sau.'),
+      findsOneWidget,
+    );
+  });
 }
 
 class _FakeReceiptPicker implements ReceiptPicker {
@@ -210,10 +249,15 @@ class _FakeReceiptPicker implements ReceiptPicker {
 }
 
 class _FakeReviewRepository implements ReviewSubmissionRepository {
-  _FakeReviewRepository({this.failFirstUpload = false, this.createError});
+  _FakeReviewRepository({
+    this.failFirstUpload = false,
+    this.createError,
+    this.pendingStatus = false,
+  });
 
   final bool failFirstUpload;
   final Object? createError;
+  final bool pendingStatus;
   int createCalls = 0;
   int skipCalls = 0;
   int uploadCalls = 0;
@@ -271,6 +315,16 @@ class _FakeReviewRepository implements ReviewSubmissionRepository {
   @override
   Future<ReviewVerificationState> fetchStatus(String reviewId) async {
     statusCalls += 1;
+    if (pendingStatus) {
+      return const ReviewVerificationState(
+        reviewId: 'review-1',
+        status: 'SUBMITTED',
+        verificationStatus: 'HASH_CHECKING',
+        trustLabel: 'PENDING',
+        publicVisibility: 'PRIVATE',
+        decisionReason: null,
+      );
+    }
     if (skipCalls > 0) {
       return const ReviewVerificationState(
         reviewId: 'review-1',

@@ -4,10 +4,14 @@ Reviews are authenticated user submissions tied to a restaurant and optional
 branch. A review becomes trusted only after backend receipt/OCR verification
 finishes; clients may show progress, but must not decide trust outcomes.
 
-Public review responses include only the author's privacy-safe
-`reviewerDisplayName`. Deleted or unnamed authors use `Người dùng TrustBite`;
-user IDs, Cognito subjects, email addresses, phone numbers, and receipt data
-remain private.
+Public review responses include the author's privacy-safe
+`reviewerDisplayName` and nullable `reviewerAvatarUrl`. The avatar URL is a
+short-lived backend-resolved read URL for a TrustBite-owned avatar object.
+Deleted users always receive `reviewerAvatarUrl=null`; missing, invalid, or
+temporarily unavailable avatar objects also degrade to `null`. Deleted or
+unnamed authors use `Người dùng TrustBite`; user IDs, Cognito subjects, email
+addresses, phone numbers, stored avatar references, and receipt data remain
+private.
 
 ## Create Review
 
@@ -106,6 +110,27 @@ the authenticated user's review status and latest receipt decision metadata.
 Non-owners receive `404 NOT_FOUND` to avoid leaking review existence.
 
 The response omits private storage details such as receipt file URLs and hashes.
+
+## Review Reactions
+
+Authenticated users may select exactly one `LOVE`, `HAHA`, or `ANGRY`
+reaction on a public `VERIFIED` or `REFERENCE_ONLY` review.
+
+- `PUT /api/v1/reviews/:reviewId/reaction` with
+  `{"reactionType":"LOVE|HAHA|ANGRY"}` creates or replaces the caller's
+  reaction.
+- `DELETE /api/v1/reviews/:reviewId/reaction` removes only the caller's
+  reaction and is idempotent.
+- The authenticated user ID comes only from the Cognito-backed auth context;
+  request bodies cannot select or impersonate another user.
+- The database primary key `(review_id,user_id)` enforces one reaction per
+  user/review under concurrent requests.
+- Non-public reviews and inactive/deleted restaurants return `404` to avoid
+  leaking private review state.
+- Public review responses expose only `reactionCounts` for `LOVE`, `HAHA`, and
+  `ANGRY`. They never expose reacting-user IDs or `myReaction`.
+- Account deletion removes reactions created by the user and reactions on the
+  user's deleted reviews.
 
 ## Out Of Scope
 

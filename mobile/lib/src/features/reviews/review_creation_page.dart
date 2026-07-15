@@ -51,12 +51,16 @@ class ReviewCreationPage extends StatefulWidget {
     required this.restaurantName,
     required this.repository,
     required this.receiptPicker,
+    this.pollInterval = const Duration(seconds: 4),
+    this.maxPollAttempts = 60,
   });
 
   final String restaurantId;
   final String restaurantName;
   final ReviewSubmissionRepository repository;
   final ReceiptPicker receiptPicker;
+  final Duration pollInterval;
+  final int maxPollAttempts;
 
   @override
   State<ReviewCreationPage> createState() => _ReviewCreationPageState();
@@ -78,6 +82,9 @@ class _ReviewCreationPageState extends State<ReviewCreationPage> {
   bool _receiptVerificationSkipped = false;
   ReviewVerificationState? _status;
   Timer? _pollTimer;
+  int _automaticPollAttempts = 0;
+  bool _pollInFlight = false;
+  bool _pollingExhausted = false;
 
   @override
   void dispose() {
@@ -185,7 +192,11 @@ class _ReviewCreationPageState extends State<ReviewCreationPage> {
       }
       final status = await widget.repository.fetchStatus(intent.reviewId);
       if (!mounted) return;
-      setState(() => _status = status);
+      setState(() {
+        _status = status;
+        _automaticPollAttempts = 0;
+        _pollingExhausted = false;
+      });
       _startPollingIfNeeded();
     } catch (error) {
       if (!mounted) return;
@@ -203,15 +214,22 @@ class _ReviewCreationPageState extends State<ReviewCreationPage> {
 
   void _startPollingIfNeeded() {
     _pollTimer?.cancel();
-    if (_status?.isTerminal != false) return;
-    _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      _refreshStatus();
+    if (_status?.isTerminal != false || _pollingExhausted) return;
+    _pollTimer = Timer(widget.pollInterval, () {
+      _refreshStatus(automatic: true);
     });
   }
 
-  Future<void> _refreshStatus() async {
+  Future<void> _refreshStatus({bool automatic = false}) async {
     final reviewId = _reviewId;
-    if (reviewId == null) return;
+    if (reviewId == null || _pollInFlight) return;
+    if (automatic && _automaticPollAttempts >= widget.maxPollAttempts) {
+      if (mounted) setState(() => _pollingExhausted = true);
+      return;
+    }
+
+    _pollInFlight = true;
+    if (automatic) _automaticPollAttempts += 1;
     try {
       final status = await widget.repository.fetchStatus(reviewId);
       if (!mounted) return;
@@ -220,6 +238,15 @@ class _ReviewCreationPageState extends State<ReviewCreationPage> {
     } on Exception {
       if (!mounted) return;
       setState(() => _error = 'Chưa thể cập nhật trạng thái. Hãy thử lại.');
+    } finally {
+      _pollInFlight = false;
+      if (mounted && _status?.isTerminal == false && automatic) {
+        if (_automaticPollAttempts >= widget.maxPollAttempts) {
+          setState(() => _pollingExhausted = true);
+        } else {
+          _startPollingIfNeeded();
+        }
+      }
     }
   }
 
@@ -403,6 +430,17 @@ class _ReviewCreationPageState extends State<ReviewCreationPage> {
                 color: const Color(0xFF4B5563),
               ),
             ),
+            if (_pollingExhausted) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Trạng thái đang được xử lý, vui lòng kiểm tra lại sau.',
+                key: const ValueKey('review-polling-exhausted-message'),
+                textAlign: TextAlign.center,
+                style: AppTypography.bodyStrong.copyWith(
+                  color: const Color(0xFF4B5563),
+                ),
+              ),
+            ],
             const SizedBox(height: 22),
             if (!status.isTerminal)
               OutlinedButton.icon(

@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import { PENDING_ADMIN_REVIEW_PUBLIC_REASON } from '../config/receiptStatus.js';
 import { createHttpError } from '../utils/httpErrors.js';
+import { avatarUploadService } from './avatarStorageService.js';
 
 const REVIEW_SELECT_PROJECTION = `
   SELECT
@@ -17,6 +18,10 @@ const REVIEW_SELECT_PROJECTION = `
       WHEN u.status = 'DELETED' THEN NULL
       ELSE NULLIF(BTRIM(u.display_name), '')
     END AS "reviewerDisplayName",
+    CASE
+      WHEN u.status = 'DELETED' THEN NULL
+      ELSE u.avatar_url
+    END AS "reviewerAvatarReference",
     r.comment,
     r.status,
     r.verification_status AS "verificationStatus",
@@ -25,21 +30,33 @@ const REVIEW_SELECT_PROJECTION = `
     r.trust_weight_bucket AS "trustWeightBucket",
     r.visited_at AS "visitedAt",
     r.created_at AS "createdAt",
-    r.updated_at AS "updatedAt"
+    r.updated_at AS "updatedAt",
+    reactions."loveCount",
+    reactions."hahaCount",
+    reactions."angryCount"
   FROM reviews r
   JOIN users u ON u.id = r.user_id
+  LEFT JOIN LATERAL (
+    SELECT
+      COUNT(*) FILTER (WHERE reaction_type = 'LOVE')::int AS "loveCount",
+      COUNT(*) FILTER (WHERE reaction_type = 'HAHA')::int AS "hahaCount",
+      COUNT(*) FILTER (WHERE reaction_type = 'ANGRY')::int AS "angryCount"
+    FROM review_reactions
+    WHERE review_id = r.id
+  ) reactions ON true
 `;
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MIN_VERIFIED_COMMENT_LENGTH = 50;
 const RATING_FIELDS = ['foodRating', 'priceRating', 'serviceRating', 'ambienceRating'];
 
-function toPublicReview(row) {
+function toPublicReview(row, reviewerAvatarUrl = null) {
   return {
     id: row.id,
     restaurantId: row.restaurantId,
     branchId: row.branchId,
     reviewerDisplayName: row.reviewerDisplayName ?? 'Người dùng TrustBite',
+    reviewerAvatarUrl,
     foodRating: row.foodRating,
     priceRating: row.priceRating,
     serviceRating: row.serviceRating,
@@ -49,6 +66,11 @@ function toPublicReview(row) {
     status: row.status,
     verificationStatus: row.verificationStatus,
     trustLabel: row.trustLabel,
+    reactionCounts: {
+      LOVE: Number(row.loveCount ?? 0),
+      HAHA: Number(row.hahaCount ?? 0),
+      ANGRY: Number(row.angryCount ?? 0),
+    },
     visitedAt: row.visitedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -506,6 +528,7 @@ export async function listPublicReviewsByRestaurant(restaurantId, { status = 'AL
   const countQuery = `
     SELECT COUNT(*) AS total
     FROM reviews r
+    JOIN users u ON u.id = r.user_id
     ${whereClause}
   `;
 
@@ -514,8 +537,15 @@ export async function listPublicReviewsByRestaurant(restaurantId, { status = 'AL
     pool.query(countQuery, params),
   ]);
 
+  const items = await Promise.all(
+    dataResult.rows.map(async (row) => toPublicReview(
+      row,
+      await avatarUploadService.resolveReadUrl(row.reviewerAvatarReference),
+    )),
+  );
+
   return {
-    items: dataResult.rows.map(toPublicReview),
+    items,
     page: safePage,
     pageSize: safeSize,
     total: parseInt(countResult.rows[0].total, 10),
