@@ -25,10 +25,10 @@ const CREDENTIAL_REJECTION_CODES = new Set([
 const getClientAddress = (request) => {
   const trustedHeader = process.env.ADMIN_WEB_TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
   if (!trustedHeader || !HEADER_NAME_PATTERN.test(trustedHeader)) {
-    return '';
+    return null;
   }
   const value = request.headers.get(trustedHeader)?.split(',')[0]?.trim() || '';
-  return isIP(value) > 0 ? value : '';
+  return isIP(value) > 0 ? value : null;
 };
 
 const readBoundedJson = async (request) => {
@@ -84,6 +84,14 @@ export async function POST(request) {
     );
   }
 
+  const clientAddress = getClientAddress(request);
+  if (process.env.NODE_ENV === 'production' && !clientAddress) {
+    return NextResponse.json(
+      { error: { code: 'AUTH_NOT_CONFIGURED', message: 'Dịch vụ đăng nhập đang tạm thời gián đoạn.' } },
+      { status: 503, headers: noStoreHeaders },
+    );
+  }
+
   const contentLength = Number.parseInt(request.headers.get('content-length') || '0', 10);
   if (Number.isFinite(contentLength) && contentLength > MAX_LOGIN_BODY_BYTES) {
     return NextResponse.json(
@@ -115,7 +123,7 @@ export async function POST(request) {
 
   const result = await requestAdminAuthApi('/auth/admin/web-session', {
     method: 'POST',
-    clientAddress: getClientAddress(request),
+    clientAddress,
     body: {
       email: body?.email,
       password: body?.password,
