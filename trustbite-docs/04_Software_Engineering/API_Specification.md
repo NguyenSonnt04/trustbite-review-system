@@ -289,7 +289,10 @@ Tham số truy vấn:
 status=VERIFIED|REFERENCE_ONLY|ALL&page=1&pageSize=20
 ```
 
-Phản hồi phải phân biệt rõ review `VERIFIED` và `REFERENCE_ONLY` để mobile hiển thị trust badge.
+Phản hồi phải phân biệt rõ review `VERIFIED` và `REFERENCE_ONLY` để mobile hiển
+thị trust badge. Mỗi review public có `reviewerDisplayName` lấy từ display name
+đã trim; user đã xóa hoặc không có tên dùng fallback `Người dùng TrustBite`.
+Không trả `userId`, email, số điện thoại, Cognito subject hoặc dữ liệu hóa đơn.
 
 ---
 

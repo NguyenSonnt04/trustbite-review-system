@@ -13,6 +13,10 @@ const REVIEW_SELECT_PROJECTION = `
     r.service_rating AS "serviceRating",
     r.ambience_rating AS "ambienceRating",
     r.average_rating AS "averageRating",
+    CASE
+      WHEN u.status = 'DELETED' THEN NULL
+      ELSE NULLIF(BTRIM(u.display_name), '')
+    END AS "reviewerDisplayName",
     r.comment,
     r.status,
     r.verification_status AS "verificationStatus",
@@ -23,6 +27,7 @@ const REVIEW_SELECT_PROJECTION = `
     r.created_at AS "createdAt",
     r.updated_at AS "updatedAt"
   FROM reviews r
+  JOIN users u ON u.id = r.user_id
 `;
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -34,7 +39,7 @@ function toPublicReview(row) {
     id: row.id,
     restaurantId: row.restaurantId,
     branchId: row.branchId,
-    // Omit userId per OpenAPI spec for unauthenticated public listing
+    reviewerDisplayName: row.reviewerDisplayName ?? 'Người dùng TrustBite',
     foodRating: row.foodRating,
     priceRating: row.priceRating,
     serviceRating: row.serviceRating,
@@ -301,6 +306,120 @@ export async function createReviewForVerificationIntent({ userId, payload }) {
       reviewId: result.rows[0].id,
       status: result.rows[0].status,
       nextStep: 'UPLOAD_RECEIPT',
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function skipReviewReceiptVerification({ userId, reviewId, reason }) {
+  const details = [];
+  assertUuid(reviewId, 'reviewId', details);
+  if (reason !== 'USER_SKIPPED_RECEIPT') {
+    details.push(validationDetail(
+      'reason',
+      'INVALID_VALUE',
+      'reason must be USER_SKIPPED_RECEIPT.',
+    ));
+  }
+  if (details.length > 0) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Skip verification request is invalid.', details);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const reviewResult = await client.query(
+      `SELECT
+         id,
+         status,
+         verification_status AS "verificationStatus",
+         trust_label AS "trustLabel",
+         public_visibility AS "publicVisibility",
+         trust_weight_bucket AS "trustWeightBucket"
+       FROM reviews
+       WHERE id = $1
+         AND user_id = $2
+         AND status <> 'DELETED'
+       FOR UPDATE`,
+      [reviewId, userId],
+    );
+
+    if (reviewResult.rowCount === 0) {
+      throw createHttpError(404, 'NOT_FOUND', 'Review not found.');
+    }
+
+    const review = reviewResult.rows[0];
+    if (
+      review.status === 'REFERENCE_ONLY'
+      && review.verificationStatus === 'SKIPPED'
+      && review.publicVisibility === 'PUBLIC'
+    ) {
+      await client.query('COMMIT');
+      return {
+        reviewId: review.id,
+        status: review.status,
+        verificationStatus: review.verificationStatus,
+        trustLabel: review.trustLabel,
+        publicVisibility: review.publicVisibility,
+        trustWeightBucket: review.trustWeightBucket,
+      };
+    }
+
+    if (review.status !== 'SUBMITTED' || review.verificationStatus !== 'UNVERIFIED') {
+      throw createHttpError(
+        409,
+        'REVIEW_NOT_EDITABLE',
+        'Receipt verification can no longer be skipped for this review.',
+      );
+    }
+
+    const receiptResult = await client.query(
+      `SELECT 1
+       FROM receipt_verifications
+       WHERE review_id = $1
+       LIMIT 1`,
+      [reviewId],
+    );
+    if (receiptResult.rowCount > 0) {
+      throw createHttpError(
+        409,
+        'REVIEW_NOT_EDITABLE',
+        'Receipt verification has already started for this review.',
+      );
+    }
+
+    const updated = await client.query(
+      `UPDATE reviews
+       SET status = 'REFERENCE_ONLY',
+           verification_status = 'SKIPPED',
+           trust_label = 'REFERENCE_ONLY',
+           public_visibility = 'PUBLIC',
+           trust_weight_bucket = 'LOW',
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING
+         id,
+         status,
+         verification_status AS "verificationStatus",
+         trust_label AS "trustLabel",
+         public_visibility AS "publicVisibility",
+         trust_weight_bucket AS "trustWeightBucket"`,
+      [reviewId],
+    );
+
+    await client.query('COMMIT');
+    const result = updated.rows[0];
+    return {
+      reviewId: result.id,
+      status: result.status,
+      verificationStatus: result.verificationStatus,
+      trustLabel: result.trustLabel,
+      publicVisibility: result.publicVisibility,
+      trustWeightBucket: result.trustWeightBucket,
     };
   } catch (err) {
     await client.query('ROLLBACK');

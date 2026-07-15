@@ -9,9 +9,19 @@ let createUser;
 let query;
 let requestApp;
 
-async function cleanup({ reviewIds = [], claimIds = [], merchantIds = [], restaurantIds = [], userIds = [] }) {
+async function cleanup({
+  reviewIds = [],
+  claimIds = [],
+  menuItemIds = [],
+  merchantIds = [],
+  restaurantIds = [],
+  userIds = [],
+}) {
   if (reviewIds.length > 0) {
     await query('DELETE FROM reviews WHERE id = ANY($1::uuid[])', [reviewIds]);
+  }
+  if (menuItemIds.length > 0) {
+    await query('DELETE FROM menu_items WHERE id = ANY($1::uuid[])', [menuItemIds]);
   }
   if (claimIds.length > 0) {
     await query('DELETE FROM restaurant_claims WHERE id = ANY($1::uuid[])', [claimIds]);
@@ -64,6 +74,22 @@ async function createDetailRestaurant(overrides = {}) {
     ...overrides,
     slug: overrides.slug ?? `detail-restaurant-${Date.now()}-${crypto.randomInt(1_000_000)}`,
   });
+}
+
+async function createMenuItem(restaurantId, overrides = {}) {
+  const result = await query(
+    `INSERT INTO menu_items (restaurant_id, name, price_default, currency, status)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [
+      restaurantId,
+      overrides.name ?? `Menu ${Date.now()}-${crypto.randomInt(1_000_000)}`,
+      overrides.price ?? 50000,
+      overrides.currency ?? 'VND',
+      overrides.status ?? 'ACTIVE',
+    ],
+  );
+  return result.rows[0];
 }
 
 describe('restaurant detail and public reviews API', () => {
@@ -195,7 +221,7 @@ describe('restaurant detail and public reviews API', () => {
     }
   });
 
-  it('lists only public verified and reference-only reviews while omitting reviewer userId', async () => {
+  it('lists public reviews with reviewer display name but no private identity fields', async () => {
     const restaurant = await createDetailRestaurant({ name: `Public Reviews ${Date.now()}` });
     const reviewer = await createUser({ displayName: 'Public Review Reader' });
     const reviewIds = [];
@@ -237,7 +263,14 @@ describe('restaurant detail and public reviews API', () => {
       const allIds = allResponse.body.items.map((item) => item.id);
       expect(allIds).toEqual(expect.arrayContaining([verified.id, referenceOnly.id]));
       expect(allIds).not.toEqual(expect.arrayContaining([rejected.id, privateReview.id]));
-      expect(allResponse.body.items.every((item) => !Object.prototype.hasOwnProperty.call(item, 'userId'))).toBe(true);
+      expect(allResponse.body.items.every((item) => item.reviewerDisplayName === 'Public Review Reader')).toBe(true);
+      for (const item of allResponse.body.items) {
+        expect(item).not.toHaveProperty('userId');
+        expect(item).not.toHaveProperty('email');
+        expect(item).not.toHaveProperty('phoneNumber');
+        expect(item).not.toHaveProperty('cognitoSubject');
+        expect(item).not.toHaveProperty('receipt');
+      }
       expect(allResponse.body.total).toBe(2);
 
       const verifiedResponse = await requestApp()
@@ -260,6 +293,46 @@ describe('restaurant detail and public reviews API', () => {
     }
   });
 
+  it('uses an anonymous fallback for reviews from deleted users', async () => {
+    const restaurant = await createDetailRestaurant({ name: `Deleted Reviewer ${Date.now()}` });
+    const reviewer = await createUser({ displayName: 'Must Not Leak' });
+    const review = await createReview({
+      userId: reviewer.id,
+      restaurantId: restaurant.id,
+      comment: 'Review remains public after account deletion starts',
+      status: 'REFERENCE_ONLY',
+      publicVisibility: 'PUBLIC',
+    });
+
+    try {
+      await query(
+        `UPDATE users
+         SET status = 'DELETED',
+             display_name = 'Must Not Leak'
+         WHERE id = $1`,
+        [reviewer.id],
+      );
+
+      const response = await requestApp()
+        .get(`/api/v1/restaurants/${restaurant.id}/reviews`)
+        .expect(200);
+
+      expect(response.body.items).toEqual([
+        expect.objectContaining({
+          id: review.id,
+          reviewerDisplayName: 'Người dùng TrustBite',
+        }),
+      ]);
+      expect(JSON.stringify(response.body)).not.toContain('Must Not Leak');
+    } finally {
+      await cleanup({
+        reviewIds: [review.id],
+        restaurantIds: [restaurant.id],
+        userIds: [reviewer.id],
+      });
+    }
+  });
+
   it('rejects public review pageSize values above 100', async () => {
     const restaurant = await createDetailRestaurant({ name: `Review Page Size ${Date.now()}` });
 
@@ -275,6 +348,67 @@ describe('restaurant detail and public reviews API', () => {
       });
     } finally {
       await cleanup({ restaurantIds: [restaurant.id] });
+    }
+  });
+
+  it('lists active menu items in stable order with default prices', async () => {
+    const restaurant = await createDetailRestaurant({ name: `Public Menu ${Date.now()}` });
+    const menuItemIds = [];
+
+    try {
+      const second = await createMenuItem(restaurant.id, {
+        name: 'Bún bò',
+        price: 65000,
+      });
+      const first = await createMenuItem(restaurant.id, {
+        name: 'Bánh cuốn',
+        price: 45000,
+      });
+      const archived = await createMenuItem(restaurant.id, {
+        name: 'Món đã ẩn',
+        price: 10000,
+        status: 'ARCHIVED',
+      });
+      menuItemIds.push(second.id, first.id, archived.id);
+
+      const response = await requestApp()
+        .get(`/api/v1/restaurants/${restaurant.id}/menu`)
+        .expect(200);
+
+      expect(response.body).toEqual({
+        items: [
+          { id: first.id, name: 'Bánh cuốn', price: 45000, currency: 'VND' },
+          { id: second.id, name: 'Bún bò', price: 65000, currency: 'VND' },
+        ],
+        page: 1,
+        pageSize: 50,
+        total: 2,
+      });
+    } finally {
+      await cleanup({ menuItemIds, restaurantIds: [restaurant.id] });
+    }
+  });
+
+  it('returns an empty menu and rejects menus for non-public restaurants', async () => {
+    const active = await createDetailRestaurant({ name: `Empty Menu ${Date.now()}` });
+    const draft = await createDetailRestaurant({
+      name: `Draft Menu ${Date.now()}`,
+      status: 'DRAFT',
+    });
+
+    try {
+      const emptyResponse = await requestApp()
+        .get(`/api/v1/restaurants/${active.id}/menu`)
+        .expect(200);
+      expect(emptyResponse.body.items).toEqual([]);
+      expect(emptyResponse.body.total).toBe(0);
+
+      const hiddenResponse = await requestApp()
+        .get(`/api/v1/restaurants/${draft.id}/menu`)
+        .expect(404);
+      expect(hiddenResponse.body.error.code).toBe('NOT_FOUND');
+    } finally {
+      await cleanup({ restaurantIds: [active.id, draft.id] });
     }
   });
 });

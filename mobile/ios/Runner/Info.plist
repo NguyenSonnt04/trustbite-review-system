@@ -45,5 +45,9 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>TrustBite cần camera để chụp hóa đơn xác thực đánh giá.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>TrustBite cần truy cập thư viện ảnh để chọn hóa đơn xác thực đánh giá.</string>
 </dict>
 </plist>

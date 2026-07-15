@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { pool } from '../config/db.js';
+import { resolveRestaurantImageUrl } from './s3RestaurantImageStorageService.js';
 
 // ---------------------------------------------------------------------------
 // Domain errors
@@ -103,6 +104,15 @@ function normalizeVietnameseSearchText(value) {
 const RESTAURANT_SELECT_PROJECTION = `
   SELECT
     r.*,
+    (
+      SELECT ri.image_url
+      FROM restaurant_images ri
+      WHERE ri.restaurant_id = r.id
+        AND ri.branch_id IS NULL
+        AND ri.is_primary = TRUE
+      ORDER BY ri.created_at DESC, ri.id DESC
+      LIMIT 1
+    ) AS primary_image_url,
     COALESCE(
       ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
       '{}'::integer[]
@@ -119,7 +129,7 @@ const PUBLIC_RESTAURANT_CONDITION = `
 /**
  * Map a DB row to a camelCase public-facing object.
  */
-function toPublic(row) {
+async function toPublic(row) {
   return {
     id: row.id,
     name: row.name,
@@ -133,14 +143,15 @@ function toPublic(row) {
     trustScore: row.trust_score !== null ? parseFloat(row.trust_score) : null,
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
-      categoryIds: row.category_ids ?? [],
-      ...(row.distance_meters !== undefined && row.distance_meters !== null
-        ? { distanceMeters: parseFloat(row.distance_meters) }
-        : {}),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
-  }
+    categoryIds: row.category_ids ?? [],
+    primaryImageUrl: await resolveRestaurantImageUrl(row.primary_image_url),
+    ...(row.distance_meters !== undefined && row.distance_meters !== null
+      ? { distanceMeters: parseFloat(row.distance_meters) }
+      : {}),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
 async function validateCategoryIds(client, categoryIds) {
   const ids = uniqueIds(categoryIds);
@@ -269,6 +280,15 @@ export async function listRestaurants({
   const dataQuery = `
       SELECT
         r.*,
+        (
+          SELECT ri.image_url
+          FROM restaurant_images ri
+          WHERE ri.restaurant_id = r.id
+            AND ri.branch_id IS NULL
+            AND ri.is_primary = TRUE
+          ORDER BY ri.created_at DESC, ri.id DESC
+          LIMIT 1
+        ) AS primary_image_url,
         COALESCE(
           ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
           '{}'::integer[]
@@ -298,7 +318,7 @@ export async function listRestaurants({
   ]);
 
   return {
-    items: dataResult.rows.map(toPublic),
+    items: await Promise.all(dataResult.rows.map(toPublic)),
     page: safePage,
     pageSize: safeSize,
     total: parseInt(countResult.rows[0].total, 10),
@@ -362,7 +382,7 @@ export async function listNearbyRestaurants({
   ]);
 
   return {
-    items: dataResult.rows.map(toPublic),
+    items: await Promise.all(dataResult.rows.map(toPublic)),
     page: safePage,
     pageSize: safeSize,
     total: parseInt(countResult.rows[0].total, 10),
@@ -386,7 +406,7 @@ export async function getRestaurantById(restaurantId) {
     [restaurantId],
   );
 
-  return result.rows.length > 0 ? toPublic(result.rows[0]) : null;
+  return result.rows.length > 0 ? await toPublic(result.rows[0]) : null;
 }
 
 export async function publicRestaurantExists(restaurantId) {
@@ -402,6 +422,51 @@ export async function publicRestaurantExists(restaurantId) {
   );
 
   return result.rows.length > 0;
+}
+
+export async function listPublicMenuItems(
+  restaurantId,
+  { page = 1, pageSize = 50 } = {},
+) {
+  const safePage = Math.max(1, parseInt(page, 10) || 1);
+  const safeSize = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 50));
+  const offset = (safePage - 1) * safeSize;
+
+  const [dataResult, countResult] = await Promise.all([
+    pool.query(
+      `
+      SELECT id, name, price_default, currency
+      FROM menu_items
+      WHERE restaurant_id = $1
+        AND status = 'ACTIVE'
+      ORDER BY name ASC, id ASC
+      LIMIT $2
+      OFFSET $3
+      `,
+      [restaurantId, safeSize, offset],
+    ),
+    pool.query(
+      `
+      SELECT COUNT(*) AS total
+      FROM menu_items
+      WHERE restaurant_id = $1
+        AND status = 'ACTIVE'
+      `,
+      [restaurantId],
+    ),
+  ]);
+
+  return {
+    items: dataResult.rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      price: parseFloat(row.price_default),
+      currency: row.currency,
+    })),
+    page: safePage,
+    pageSize: safeSize,
+    total: parseInt(countResult.rows[0].total, 10),
+  };
 }
 
 async function createRestaurantAttempt({ name, description, address, phoneNumber, latitude, longitude, categoryIds = [] }) {
@@ -651,7 +716,7 @@ export async function getRestaurantDetail(restaurantId) {
     ),
   ]);
 
-  const restaurant = toPublic(restaurantResult.rows[0]);
+  const restaurant = await toPublic(restaurantResult.rows[0]);
   const rRow = ratingResult.rows[0];
   const ratingBreakdown = {
     avgFood: rRow.avg_food !== null ? parseFloat(rRow.avg_food) : null,

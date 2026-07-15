@@ -307,6 +307,46 @@ export const getRestaurantHandler = async (req, res, next) => {
 };
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/restaurants/:restaurantId/menu
+// ---------------------------------------------------------------------------
+
+export const listRestaurantMenuHandler = async (req, res, next) => {
+  try {
+    const { restaurantId } = req.params;
+    const { page, pageSize } = req.query;
+    const requestId = buildRequestId(req);
+
+    if (!isValidUUID(restaurantId)) {
+      return errorResponse(res, 400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.', requestId);
+    }
+
+    const parsedPage = parsePositiveInt(page);
+    if (parsedPage.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'page must be a positive integer.', requestId);
+    }
+    const parsedSize = parsePositiveInt(pageSize);
+    if (parsedSize.error) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be a positive integer.', requestId);
+    }
+    if (parsedSize.value !== undefined && parsedSize.value > 100) {
+      return errorResponse(res, 422, 'VALIDATION_ERROR', 'pageSize must be at most 100.', requestId);
+    }
+
+    if (!await restaurantService.publicRestaurantExists(restaurantId)) {
+      return errorResponse(res, 404, 'NOT_FOUND', 'Restaurant not found.', requestId);
+    }
+
+    const result = await restaurantService.listPublicMenuItems(restaurantId, {
+      page: parsedPage.value ?? 1,
+      pageSize: parsedSize.value ?? 50,
+    });
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ---------------------------------------------------------------------------
 // GET /api/v1/restaurants/:restaurantId/reviews
 // ---------------------------------------------------------------------------
 

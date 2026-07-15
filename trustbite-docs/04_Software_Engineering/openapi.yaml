@@ -357,7 +357,7 @@ paths:
       - Reviews
       security: []
       summary: List public reviews for restaurant
-      description: Unauthenticated public listing. Responses must omit reviewer userId values; userId is populated only for the review owner and ADMIN/SUPER_ADMIN callers on authenticated endpoints.
+      description: Unauthenticated public listing. Responses include reviewerDisplayName with a deleted/blank-profile fallback, but omit reviewer userId and all private identity fields.
       operationId: listRestaurantReviews
       parameters:
       - $ref: '#/components/parameters/RestaurantId'
@@ -2098,6 +2098,9 @@ components:
             type: string
             format: uuid
             description: Omit on unauthenticated/public responses. Populate only for the review owner and ADMIN/SUPER_ADMIN callers.
+          reviewerDisplayName:
+            type: string
+            description: Public review author name. Uses `Người dùng TrustBite` when the author is deleted or has no display name.
           foodRating:
             type: integer
           priceRating:

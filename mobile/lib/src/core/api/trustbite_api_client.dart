@@ -11,12 +11,14 @@ class ApiTransportRequest {
     required this.uri,
     required this.headers,
     this.body,
+    this.bodyBytes,
   });
 
   final String method;
   final Uri uri;
   final Map<String, String> headers;
   final String? body;
+  final List<int>? bodyBytes;
 }
 
 class ApiTransportResponse {
@@ -43,9 +45,10 @@ class HttpApiTransport implements ApiTransport {
       httpRequest.headers.set(header.key, header.value);
     }
 
-    final body = request.body;
-    if (body != null) {
-      httpRequest.write(body);
+    if (request.bodyBytes != null) {
+      httpRequest.add(request.bodyBytes!);
+    } else if (request.body != null) {
+      httpRequest.add(utf8.encode(request.body!));
     }
 
     final response = await httpRequest.close();
@@ -68,6 +71,20 @@ class ApiException implements Exception {
 
 class AuthRequiredException extends ApiException {
   const AuthRequiredException(super.statusCode, super.message);
+}
+
+class ApiMultipartFile {
+  const ApiMultipartFile({
+    required this.fieldName,
+    required this.fileName,
+    required this.contentType,
+    required this.bytes,
+  });
+
+  final String fieldName;
+  final String fileName;
+  final String contentType;
+  final List<int> bytes;
 }
 
 class TrustBiteApiClient {
@@ -111,11 +128,52 @@ class TrustBiteApiClient {
     return _requestJson(method: 'PATCH', path: path, body: jsonEncode(body));
   }
 
+  Future<Map<String, dynamic>> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required ApiMultipartFile file,
+    Map<String, String>? headers,
+  }) async {
+    final boundary =
+        'trustbite-${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}';
+    final bytes = <int>[];
+
+    void addText(String value) {
+      bytes.addAll(utf8.encode(value));
+    }
+
+    for (final field in fields.entries) {
+      addText('--$boundary\r\n');
+      addText('Content-Disposition: form-data; name="${field.key}"\r\n\r\n');
+      addText('${field.value}\r\n');
+    }
+
+    addText('--$boundary\r\n');
+    addText(
+      'Content-Disposition: form-data; name="${file.fieldName}"; '
+      'filename="${file.fileName}"\r\n',
+    );
+    addText('Content-Type: ${file.contentType}\r\n\r\n');
+    bytes.addAll(file.bytes);
+    addText('\r\n--$boundary--\r\n');
+
+    return _requestJson(
+      method: 'POST',
+      path: path,
+      bodyBytes: bytes,
+      contentType: 'multipart/form-data; boundary=$boundary',
+      extraHeaders: headers,
+    );
+  }
+
   Future<Map<String, dynamic>> _requestJson({
     required String method,
     required String path,
     Map<String, String?>? queryParameters,
     String? body,
+    List<int>? bodyBytes,
+    String contentType = 'application/json',
+    Map<String, String>? extraHeaders,
   }) async {
     late final ApiTransportResponse response;
     try {
@@ -123,8 +181,12 @@ class TrustBiteApiClient {
         ApiTransportRequest(
           method: method,
           uri: _config.apiUri(path, queryParameters),
-          headers: await _buildHeaders(),
+          headers: {
+            ...await _buildHeaders(contentType: contentType),
+            ...?extraHeaders,
+          },
           body: body,
+          bodyBytes: bodyBytes,
         ),
       );
     } on SocketException {
@@ -173,10 +235,12 @@ class TrustBiteApiClient {
     );
   }
 
-  Future<Map<String, String>> _buildHeaders() async {
+  Future<Map<String, String>> _buildHeaders({
+    String contentType = 'application/json',
+  }) async {
     final headers = <String, String>{
       'Accept': 'application/json',
-      'Content-Type': 'application/json',
+      'Content-Type': contentType,
     };
 
     final session = await _sessionStore.read();

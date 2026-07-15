@@ -13,6 +13,10 @@ Mobile users must complete these fields before entering the signed-in product:
 - `phoneNumber`: a unique E.164 number. Vietnamese ten-digit local numbers are
   normalized from `0xxxxxxxxx` to `+84xxxxxxxxx` by Express.
 
+The trimmed `displayName` is public on the user's public restaurant reviews.
+Public review APIs never expose the associated user ID, email, phone number, or
+Cognito subject. Deleted users are shown as `Người dùng TrustBite`.
+
 TrustBite stores date of birth rather than numeric age because age changes over
 time. `profileComplete` is derived by Express from the three required fields
 and is not persisted as a second source of truth. Avatar remains optional.

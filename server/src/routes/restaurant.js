@@ -17,6 +17,7 @@ import {
   listNearbyRestaurantsHandler,
   createRestaurantHandler,
   getRestaurantHandler,
+  listRestaurantMenuHandler,
   listRestaurantReviewsHandler,
   updateRestaurantHandler,
   deleteRestaurantHandler,
@@ -28,6 +29,7 @@ const router = Router();
 // Public endpoints — no auth required
 router.get('/', listRestaurantsHandler);
 router.get('/nearby', listNearbyRestaurantsHandler);
+router.get('/:restaurantId/menu', listRestaurantMenuHandler);
 router.get('/:restaurantId/reviews', listRestaurantReviewsHandler);
 router.get('/:restaurantId', getRestaurantHandler);
 

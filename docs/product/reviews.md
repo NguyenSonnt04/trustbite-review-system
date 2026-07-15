@@ -4,6 +4,11 @@ Reviews are authenticated user submissions tied to a restaurant and optional
 branch. A review becomes trusted only after backend receipt/OCR verification
 finishes; clients may show progress, but must not decide trust outcomes.
 
+Public review responses include only the author's privacy-safe
+`reviewerDisplayName`. Deleted or unnamed authors use `Người dùng TrustBite`;
+user IDs, Cognito subjects, email addresses, phone numbers, and receipt data
+remain private.
+
 ## Create Review
 
 `POST /api/v1/reviews` is protected by Cognito-backed Express auth plus local
@@ -28,6 +33,23 @@ Rules:
   `public_visibility=PRIVATE_UNTIL_DECISION`, and `trust_weight_bucket=NONE`.
 - Success returns `201` with `reviewId`, `status`, and
   `nextStep=UPLOAD_RECEIPT`.
+
+## Skip Receipt Verification
+
+`POST /api/v1/reviews/:reviewId/skip-verification` lets the authenticated owner
+publish a review without waiting for a receipt upload. The request body must be
+`{"reason":"USER_SKIPPED_RECEIPT"}`.
+
+Rules:
+
+- The review must still be `SUBMITTED/UNVERIFIED` and have no receipt
+  verification record.
+- The transition is serialized against receipt upload and is idempotent only
+  for an already skipped review.
+- A skipped review becomes `REFERENCE_ONLY/SKIPPED`, public with
+  `trust_label=REFERENCE_ONLY` and `trust_weight_bucket=LOW`.
+- A skipped review is never labeled receipt-verified and creates no receipt,
+  OCR job, receipt decision, or fraud evidence.
 
 ## Receipt Upload
 
@@ -74,6 +96,7 @@ by the backend:
 | Verified | `VERIFIED` | `VERIFIED` | `PUBLIC` | high/full bucket from verification |
 | Rejected | `REJECTED` | `REJECTED` or `DUPLICATE_REJECTED` | `PRIVATE` | `NONE` |
 | Reference only | `REFERENCE_ONLY` | `REFERENCE_ONLY` | `PUBLIC` | low/reference bucket from verification |
+| Receipt skipped | `REFERENCE_ONLY` | `SKIPPED` | `PUBLIC` | `LOW` |
 | Admin review | `PENDING_ADMIN_REVIEW` | `PENDING_ADMIN_REVIEW` | `PRIVATE` | `NONE` |
 
 ## Status API

@@ -15,6 +15,7 @@ function mockReviewRow(overrides = {}) {
   return {
     id: '22222222-2222-4222-8222-222222222222',
     userId: '33333333-3333-4333-8333-333333333333',
+    reviewerDisplayName: 'Nguyễn An',
     restaurantId: RESTAURANT_ID,
     branchId: null,
     foodRating: 5,
@@ -90,9 +91,22 @@ describe('listPublicReviewsByRestaurant', () => {
     expect(result.items[0]).toMatchObject({
       id: '22222222-2222-4222-8222-222222222222',
       restaurantId: RESTAURANT_ID,
+      reviewerDisplayName: 'Nguyễn An',
       averageRating: 4.5,
       status: 'VERIFIED',
     });
+  });
+
+  it('joins only the public display name and uses a safe fallback', async () => {
+    mockQueryResults([mockReviewRow({ reviewerDisplayName: null })]);
+
+    const result = await listPublicReviewsByRestaurant(RESTAURANT_ID);
+    const dataSql = pool.query.mock.calls[0][0];
+
+    expect(dataSql).toContain('JOIN users u ON u.id = r.user_id');
+    expect(dataSql).toContain("u.status = 'DELETED'");
+    expect(result.items[0].reviewerDisplayName).toBe('Người dùng TrustBite');
+    expect(result.items[0]).not.toHaveProperty('userId');
   });
 
   it('uses default pagination and returns numeric totals', async () => {
