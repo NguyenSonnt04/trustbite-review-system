@@ -18,6 +18,7 @@ async function loadAppConfig(caseName) {
     'trust-proxy-false': () => import('../../../src/config/app.js?trust-proxy-false'),
     'trust-proxy-hops': () => import('../../../src/config/app.js?trust-proxy-hops'),
     'trust-proxy-subnet': () => import('../../../src/config/app.js?trust-proxy-subnet'),
+    'admin-web': () => import('../../../src/config/app.js?admin-web'),
   };
   return (await imports[caseName]()).default;
 }
@@ -147,5 +148,38 @@ describe('app trust proxy config', () => {
     setBaseEnv();
     process.env.TRUST_PROXY = '10.0.0.0/8';
     await expect(loadAppConfig('trust-proxy-subnet')).resolves.toMatchObject({ trustProxy: '10.0.0.0/8' });
+  });
+});
+
+describe('admin web auth config', () => {
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it('parses admin web provider, session, and throttle settings', async () => {
+    setBaseEnv();
+    process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_ID = 'admin-client';
+    process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET = 'admin-secret';
+    process.env.ADMIN_WEB_BFF_SECRET = 'bff-secret';
+    process.env.ADMIN_WEB_SESSION_KEY_SECRET = 'session-secret';
+    process.env.ADMIN_WEB_SESSION_MAX_SECONDS = '600';
+    process.env.ADMIN_LOGIN_RATE_LIMIT_MAX = '4';
+    process.env.ADMIN_LOGIN_EMAIL_RATE_LIMIT_MAX = '15';
+    process.env.ADMIN_LOGIN_RATE_LIMIT_WINDOW_SECONDS = '240';
+
+    await expect(loadAppConfig('admin-web')).resolves.toMatchObject({
+      auth: {
+        adminWeb: {
+          cognitoClientId: 'admin-client',
+          cognitoClientSecret: 'admin-secret',
+          bffSecret: 'bff-secret',
+          sessionKeySecret: 'session-secret',
+          sessionMaxSeconds: 600,
+          loginRateLimitMax: 4,
+          loginEmailRateLimitMax: 15,
+          loginRateLimitWindowSeconds: 240,
+        },
+      },
+    });
   });
 });

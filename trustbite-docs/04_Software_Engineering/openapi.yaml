@@ -988,6 +988,543 @@ paths:
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
+  /auth/admin/web-session:
+    post:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+      summary: Create an opaque administrator web session
+      operationId: createAdminWebSession
+      parameters:
+      - name: x-trustbite-client-address
+        in: header
+        required: false
+        schema:
+          type: string
+        description: Validated client IP forwarded only by a trusted Next.js deployment.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminWebLoginRequest'
+      responses:
+        '201':
+          description: Opaque administrator session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWebSessionCreated'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    get:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Validate and refresh administrator authorization state
+      operationId: getAdminWebSession
+      responses:
+        '200':
+          description: Active administrator session
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminWebSession'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Admin
+      - Authentication
+      security:
+      - adminBffSecret: []
+      summary: Revoke an administrator web session
+      operationId: deleteAdminWebSession
+      responses:
+        '204':
+          description: Administrator session revoked
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /admin-web/users:
+    get:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: List users through the admin web BFF
+      operationId: adminWebListUsers
+      parameters:
+      - name: page
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+      - name: keyword
+        in: query
+        schema:
+          type: string
+          maxLength: 120
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [ACTIVE, SUSPENDED, DELETED]
+      - name: role
+        in: query
+        schema:
+          type: string
+          enum: [USER, ADMIN, SUPER_ADMIN]
+      responses:
+        '200':
+          description: Paginated users with masked contact data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Pre-provision a confirmed Cognito user and local profile
+      description: Provider messaging is suppressed. Express sets a generated permanent Cognito password that is never returned, logged, or persisted by TrustBite so the identity is CONFIRMED for the existing custom-auth flow.
+      operationId: adminWebCreateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminCreateUserRequest'
+      responses:
+        '201':
+          description: User created with USER role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /admin-web/users/{userId}:
+    get:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Get an admin-editable user profile
+      operationId: adminWebGetUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Update a user profile or roles
+      operationId: adminWebUpdateUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUpdateUserRequest'
+      responses:
+        '200':
+          description: Updated user detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserDetail'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin-web/users/{userId}/suspend:
+    post:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Suspend a user through the admin web BFF
+      operationId: adminWebSuspendUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserStatusChangeRequest'
+      responses:
+        '200':
+          description: User suspended
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminSuspendUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin-web/users/{userId}/reactivate:
+    post:
+      tags:
+      - Admin
+      - Users
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Reactivate a user through the admin web BFF
+      operationId: adminWebReactivateUser
+      parameters:
+      - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserStatusChangeRequest'
+      responses:
+        '200':
+          description: User reactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminReactivateUserResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin-web/restaurants:
+    get:
+      tags: [Admin, Restaurants]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: List non-deleted restaurants for administration
+      operationId: adminWebListRestaurants
+      parameters:
+      - name: keyword
+        in: query
+        schema:
+          type: string
+          maxLength: 200
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Administrative restaurant page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRestaurantPage'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin-web/restaurants/{restaurantId}:
+    parameters:
+    - $ref: '#/components/parameters/RestaurantId'
+    get:
+      tags: [Admin, Restaurants]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Get an editable restaurant detail and image gallery
+      operationId: adminWebGetRestaurant
+      responses:
+        '200':
+          description: Editable restaurant detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRestaurantDetail'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Admin, Restaurants]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Update restaurant profile and status
+      operationId: adminWebUpdateRestaurant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRestaurantUpdateRequest'
+      responses:
+        '200':
+          description: Updated restaurant detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRestaurantDetail'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin-web/restaurants/{restaurantId}/images:
+    post:
+      tags: [Admin, Restaurants, Media]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Upload a restaurant image
+      operationId: adminWebUploadRestaurantImage
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminRestaurantImageUpload'
+      responses:
+        '201':
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantImage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /admin-web/restaurants/{restaurantId}/images/{imageId}:
+    parameters:
+    - $ref: '#/components/parameters/RestaurantId'
+    - name: imageId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    patch:
+      tags: [Admin, Restaurants, Media]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Update a restaurant image caption or make it primary
+      operationId: adminWebUpdateRestaurantImage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRestaurantImageUpdate'
+      responses:
+        '200':
+          description: Image updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantImage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Admin, Restaurants, Media]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Remove a restaurant image
+      operationId: adminWebDeleteRestaurantImage
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200':
+          description: Image removed and primary replacement reported
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /admin-web/restaurants/{restaurantId}/images/{imageId}/replace:
+    post:
+      tags: [Admin, Restaurants, Media]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Replace a restaurant image
+      operationId: adminWebReplaceRestaurantImage
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminRestaurantImageUpload'
+      responses:
+        '200':
+          description: Replacement image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantImage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
   /admin/users/{userId}/suspend:
     post:
       tags:
@@ -1149,7 +1686,14 @@ paths:
       tags:
       - Reviews
       summary: Translate a review comment on demand
-      description: Requires authentication and review visibility. The original review comment remains canonical; translated text is derived display data and must not affect trust score, fraud scoring, receipt verification, or moderation decisions. Rate limits: 30 translation requests/hour/user with 5 requests/minute burst, secondary 120 requests/hour/IP. If Google returns timeout or 5xx five times within five minutes, backend opens a 60-second circuit breaker; cache miss returns 503 while cache hit still serves normally.
+      description: >-
+        Requires authentication and review visibility. The original review comment remains
+        canonical; translated text is derived display data and must not affect trust score,
+        fraud scoring, receipt verification, or moderation decisions. Rate limits are 30
+        translation requests/hour/user with a 5 requests/minute burst and a secondary 120
+        requests/hour/IP limit. If Google returns timeout or 5xx five times within five
+        minutes, the backend opens a 60-second circuit breaker; cache miss returns 503 while
+        cache hit still serves normally.
       operationId: translateReviewComment
       parameters:
       - $ref: '#/components/parameters/ReviewId'
@@ -1189,7 +1733,32 @@ components:
       in: cookie
       name: refresh_token
       description: HttpOnly Secure SameSite=Strict refresh token cookie issued by auth endpoints; raw token values must not be exposed to JavaScript or stored in localStorage.
+    adminBffSecret:
+      type: apiKey
+      in: header
+      name: x-trustbite-bff-secret
+      description: Server-only credential used only between Next.js and Express.
+    adminWebSession:
+      type: apiKey
+      in: header
+      name: x-trustbite-admin-session
+      description: Opaque admin session marker forwarded by the Next.js BFF; never exposed to browser JavaScript.
   parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
     RestaurantId:
       name: restaurantId
       in: path
@@ -1311,7 +1880,7 @@ components:
           nullable: true
           description: Mask in admin/public contexts.
         displayName:
-          type: string
+          type: [string, 'null']
           nullable: true
         dateOfBirth:
           type: string
@@ -1911,6 +2480,23 @@ components:
               - CANNOT_SUSPEND_DELETED_USER
               - CANNOT_REACTIVATE_SELF
               - CANNOT_REACTIVATE_DELETED_USER
+              - ADMIN_SESSION_INVALID
+              - ADMIN_SESSION_EXPIRED
+              - ADMIN_ACCESS_REQUIRED
+              - DELETION_REQUEST_ACTIVE
+              - USER_NOT_FOUND
+              - EMAIL_IN_USE
+              - PHONE_NUMBER_IN_USE
+              - IDENTITY_ALREADY_MAPPED
+              - PROVIDER_INVALID_RESPONSE
+              - PROVIDER_RATE_LIMITED
+              - USER_PROVISIONING_COMPENSATION_FAILED
+              - SUPER_ADMIN_REQUIRED
+              - INSUFFICIENT_ADMIN_TIER
+              - CANNOT_CHANGE_OWN_ROLES
+              - LAST_SUPER_ADMIN_REQUIRED
+              - RESTAURANT_NOT_FOUND
+              - RESTAURANT_IMAGE_NOT_FOUND
             message:
               type: string
             details:
@@ -1952,15 +2538,370 @@ components:
           type: string
           format: date-time
           nullable: true
+    AdminUserListItem:
+      type: object
+      required:
+      - id
+      - status
+      - roles
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: [string, 'null']
+        phoneNumberMasked:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED, DELETED]
+        roles:
+          type: array
+          items:
+            type: string
+            enum: [USER, ADMIN, SUPER_ADMIN]
+        rankCode:
+          type: string
+        expPoints:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminUserDetail:
+      allOf:
+      - $ref: '#/components/schemas/AdminUserListItem'
+      - type: object
+        properties:
+          phoneNumber:
+            type: [string, 'null']
+          dateOfBirth:
+            type: [string, 'null']
+            format: date
+          avatarUrl:
+            type: [string, 'null']
+            format: uri
+          reviewRestrictedUntil:
+            type: [string, 'null']
+            format: date-time
+          deletionRequestedAt:
+            type: [string, 'null']
+            format: date-time
+    AdminWebLoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          minLength: 1
+          maxLength: 1024
+    AdminWebSessionUser:
+      type: object
+      required: [id, displayName, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: [string, 'null']
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [ADMIN, SUPER_ADMIN]
+    AdminWebSession:
+      type: object
+      required: [expiresAt, user]
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/AdminWebSessionUser'
+    AdminWebSessionCreated:
+      allOf:
+      - $ref: '#/components/schemas/AdminWebSession'
+      - type: object
+        required: [sessionToken]
+        properties:
+          sessionToken:
+            type: string
+            minLength: 1
+            description: Opaque token returned only to the trusted Next.js BFF and stored in an HttpOnly cookie.
+    AdminUserListResponse:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUserListItem'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    AdminCreateUserRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - email
+      - displayName
+      - phoneNumber
+      - dateOfBirth
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phoneNumber:
+          type: string
+          minLength: 8
+          maxLength: 20
+        dateOfBirth:
+          type: string
+          format: date
+    AdminUpdateUserRequest:
+      type: object
+      additionalProperties: false
+      anyOf:
+      - required: [displayName]
+      - required: [phoneNumber]
+      - required: [dateOfBirth]
+      - required: [roles, reason]
+      dependentRequired:
+        roles: [reason]
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        phoneNumber:
+          type: string
+          minLength: 8
+          maxLength: 20
+        dateOfBirth:
+          type: string
+          format: date
+        roles:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          contains:
+            const: USER
+          items:
+            type: string
+            enum: [USER, ADMIN, SUPER_ADMIN]
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    AdminRestaurantListItem:
+      type: object
+      required: [id, name, slug, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        address:
+          type: [string, 'null']
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
+        trustScore:
+          type: [number, 'null']
+          minimum: 1
+          maximum: 5
+        primaryImageUrl:
+          type: [string, 'null']
+          format: uri
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminRestaurantPage:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminRestaurantListItem'
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total:
+          type: integer
+          minimum: 0
+    RestaurantImage:
+      type: object
+      required: [id, restaurantId, imageUrl, isPrimary, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+          format: uuid
+        branchId:
+          type: [string, 'null']
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+          description: Short-lived signed URL or a validated legacy HTTPS URL.
+        caption:
+          type: [string, 'null']
+          maxLength: 255
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    AdminRestaurantDetail:
+      allOf:
+      - $ref: '#/components/schemas/AdminRestaurantListItem'
+      - type: object
+        required: [images, availableCategories]
+        properties:
+          description:
+            type: [string, 'null']
+          phoneNumber:
+            type: [string, 'null']
+          latitude:
+            type: [number, 'null']
+          longitude:
+            type: [number, 'null']
+          categoryIds:
+            type: array
+            items:
+              type: integer
+          images:
+            type: array
+            items:
+              $ref: '#/components/schemas/RestaurantImage'
+          availableCategories:
+            type: array
+            items:
+              type: object
+              required: [id, code, label]
+              properties:
+                id:
+                  type: integer
+                code:
+                  type: string
+                label:
+                  type: string
+    AdminRestaurantUpdateRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      anyOf:
+      - required: [name]
+      - required: [description]
+      - required: [address]
+      - required: [phoneNumber]
+      - required: [latitude, longitude]
+      - required: [categoryIds]
+      - required: [status]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: [string, 'null']
+          maxLength: 5000
+        address:
+          type: [string, 'null']
+          maxLength: 1000
+        phoneNumber:
+          type: [string, 'null']
+          maxLength: 30
+        latitude:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        categoryIds:
+          type: array
+          uniqueItems: true
+          items:
+            type: integer
+            minimum: 1
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, SUSPENDED, CLOSED]
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    AdminRestaurantImageUpload:
+      type: object
+      required: [restaurantImage]
+      properties:
+        restaurantImage:
+          type: string
+          format: binary
+        caption:
+          type: string
+          maxLength: 255
+        isPrimary:
+          type: boolean
+    AdminRestaurantImageUpdate:
+      type: object
+      additionalProperties: false
+      anyOf:
+      - required: [caption]
+      - required: [isPrimary]
+      properties:
+        caption:
+          type: [string, 'null']
+          maxLength: 255
+        isPrimary:
+          type: boolean
+          const: true
     AdminUserStatusChangeRequest:
       type: object
+      additionalProperties: false
       required:
       - reason
       properties:
         reason:
           type: string
           minLength: 10
-          maxLength: 1000
+          maxLength: 500
           description: Must be at least 10 characters long so admin actions always include an actionable audit reason.
     AdminSuspendUserResponse:
       type: object

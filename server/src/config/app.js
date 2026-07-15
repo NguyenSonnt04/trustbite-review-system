@@ -24,6 +24,11 @@ const parseBoolean = (value, defaultValue = false) => {
   return value.trim().toLowerCase() === 'true';
 };
 
+const parseInteger = (value, defaultValue) => Number.parseInt(
+  value === undefined || value === '' ? String(defaultValue) : value,
+  10,
+);
+
 // Express `trust proxy` setting. Deployments behind a reverse proxy / load
 // balancer (Nginx, AWS ALB) must set TRUST_PROXY so req.ip reflects the real
 // client IP (used by the MULTI_ACCOUNT_SAME_DEVICE anti-fraud signal) instead of
@@ -71,6 +76,19 @@ export default {
       region: cognitoRegion,
       issuer: `https://cognito-idp.${cognitoRegion}.amazonaws.com/${cognitoUserPoolId}`,
       jwksUri: `https://cognito-idp.${cognitoRegion}.amazonaws.com/${cognitoUserPoolId}/.well-known/jwks.json`
+    },
+    adminWeb: {
+      cognitoClientId: process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_ID || '',
+      cognitoClientSecret: process.env.AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET || '',
+      bffSecret: process.env.ADMIN_WEB_BFF_SECRET || '',
+      sessionKeySecret: process.env.ADMIN_WEB_SESSION_KEY_SECRET || '',
+      sessionMaxSeconds: parseInteger(process.env.ADMIN_WEB_SESSION_MAX_SECONDS, 900),
+      loginRateLimitMax: parseInteger(process.env.ADMIN_LOGIN_RATE_LIMIT_MAX, 5),
+      loginEmailRateLimitMax: parseInteger(process.env.ADMIN_LOGIN_EMAIL_RATE_LIMIT_MAX, 20),
+      loginRateLimitWindowSeconds: parseInteger(
+        process.env.ADMIN_LOGIN_RATE_LIMIT_WINDOW_SECONDS,
+        300,
+      ),
     }
   }
 };

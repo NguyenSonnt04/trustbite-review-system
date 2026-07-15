@@ -1,8 +1,34 @@
+'use client';
+
 import Link from 'next/link';
+import { useState } from 'react';
 import AdminIcon from '@/components/admin/AdminIcon';
 import styles from '@/app/page.module.css';
+import { authService } from '@/services/auth.service';
 
 export default function AdminHome() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError('');
+    try {
+      await authService.login({ email, password });
+      window.location.assign('/admin');
+    } catch (loginError) {
+      setError(loginError.message || 'Dịch vụ đăng nhập đang tạm thời gián đoạn.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -40,12 +66,22 @@ export default function AdminHome() {
             </div>
           </div>
 
-          <div className={styles.form}>
+          <form className={styles.form} onSubmit={handleSubmit}>
             <label>
               Email quản trị
               <span className={styles.inputShell}>
                 <AdminIcon name="mail" size={16} />
-                <input disabled name="email" placeholder="Đăng nhập chưa khả dụng" type="email" />
+                <input
+                  autoComplete="username"
+                  disabled={submitting}
+                  maxLength={254}
+                  name="email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="admin@trustbite.com"
+                  required
+                  type="email"
+                  value={email}
+                />
               </span>
             </label>
             <label>
@@ -53,33 +89,48 @@ export default function AdminHome() {
               <span className={styles.inputShell}>
                 <AdminIcon name="key" size={16} />
                 <input
-                  disabled
+                  autoComplete="current-password"
+                  disabled={submitting}
+                  maxLength={1024}
                   name="password"
-                  placeholder="Đăng nhập chưa khả dụng"
-                  type="password"
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Nhập mật khẩu"
+                  required
+                  type={passwordVisible ? 'text' : 'password'}
+                  value={password}
                 />
+                <button
+                  aria-label={passwordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  disabled={submitting}
+                  onClick={() => setPasswordVisible((visible) => !visible)}
+                  type="button"
+                >
+                  <AdminIcon name={passwordVisible ? 'eyeOff' : 'eye'} size={16} />
+                </button>
               </span>
             </label>
 
-            <div className={styles.formNotice} role="status">
-              <AdminIcon name="info" size={17} />
-              <p>Đăng nhập web chưa sẵn sàng. Các trường bên dưới được khóa để không thu thập thông tin đăng nhập khi chưa có luồng xác thực an toàn.</p>
-            </div>
+            {error && (
+              <div className={`${styles.formNotice} ${styles.formError}`} role="alert">
+                <AdminIcon name="info" size={17} />
+                <p>{error}</p>
+              </div>
+            )}
 
-            <button className={styles.loginButton} disabled type="button">
-              <span>Đăng nhập chưa khả dụng</span>
+            <button className={styles.loginButton} disabled={submitting} type="submit">
+              <span>{submitting ? 'Đang xác minh...' : 'Đăng nhập quản trị'}</span>
               <AdminIcon name="arrow" size={16} />
             </button>
-          </div>
+          </form>
 
           <div className={styles.preview}>
-            <span>Bản xem quản trị đã được khóa.</span>
-            <strong>Cần phiên quản trị hợp lệ để truy cập.</strong>
+            <span>Workspace quản trị được bảo vệ.</span>
+            <strong>Cognito và quyền cục bộ đều được xác minh.</strong>
           </div>
 
           <p className={styles.securityCopy}>
-            Không có đường xem công khai vào workspace quản trị. Khi đăng nhập được triển khai,
-            cookie phiên phải do server đặt với HttpOnly và mọi quyền vẫn phải được server xác minh.
+            Mật khẩu và token Cognito không được lưu trong trình duyệt. Phiên web dùng cookie
+            HttpOnly và quyền quản trị được server kiểm tra lại trên mỗi lần truy cập.
           </p>
         </aside>
       </section>

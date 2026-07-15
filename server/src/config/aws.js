@@ -11,6 +11,17 @@ const parseCsv = (value = '') => value
   .map((item) => item.trim())
   .filter(Boolean);
 
+const parseBoundedInteger = (value, {
+  defaultValue,
+  min,
+  max,
+}) => {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= min && parsed <= max
+    ? parsed
+    : defaultValue;
+};
+
 const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
   ? {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -32,6 +43,18 @@ export default {
     allowedHosts: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_HOSTS),
     allowedPrefixes: parseCsv(process.env.TRUSTBITE_S3_ALLOWED_PREFIXES),
     forcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, Boolean(endpointUrl)),
+  },
+  restaurantImages: {
+    bucketName: process.env.AWS_RESTAURANT_IMAGES_BUCKET_NAME
+      || process.env.AWS_S3_BUCKET_NAME,
+    signedUrlTtlSeconds: parseBoundedInteger(
+      process.env.TRUSTBITE_RESTAURANT_IMAGE_SIGNED_URL_TTL_SECONDS,
+      {
+        defaultValue: 900,
+        min: 60,
+        max: 3600,
+      },
+    ),
   },
   cognito: {
     userPoolId: process.env.AWS_COGNITO_USER_POOL_ID,

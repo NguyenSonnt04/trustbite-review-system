@@ -5,6 +5,7 @@
 
 import { Router } from 'express';
 import adminRoutes from './admin.js';
+import adminWebRoutes from './adminWeb.js';
 import authRoutes from './auth.js';
 import awsRoutes from './aws.js';
 import moderationRoutes from './moderation.js';
@@ -16,6 +17,7 @@ import userRoutes from './user.js';
 const router = Router();
 
 router.use('/admin', adminRoutes);
+router.use('/admin-web', adminWebRoutes);
 router.use('/auth', authRoutes);
 router.use('/aws', awsRoutes);
 // Restaurant CRUD — Task 3.1 (PHASE 3 — Restaurant & Search)

@@ -7,6 +7,7 @@ export class UserModel {
     this.id = data.id ?? null;
     this.phone_number = data.phone_number ?? null;
     this.display_name = data.display_name ?? null;
+    this.date_of_birth = data.date_of_birth == null ? null : String(data.date_of_birth).slice(0, 10);
     this.avatar_url = data.avatar_url ?? null;
     this.cognito_sub = data.cognito_sub ?? null;
     this.status = data.status ?? 'ACTIVE'; // 'ACTIVE' | 'SUSPENDED' | 'DELETED'

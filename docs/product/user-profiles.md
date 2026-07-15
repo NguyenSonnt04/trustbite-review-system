@@ -38,6 +38,18 @@ Invalid fields return `422 VALIDATION_ERROR`. A number assigned to another
 user returns `409 PHONE_NUMBER_IN_USE`. Existing authentication, account
 status, and active deletion-request guards remain unchanged.
 
+## Admin Management
+
+`ADMIN` and `SUPER_ADMIN` may read user lists/details and update display name,
+date of birth, and phone number through the server-side admin BFF. List
+responses mask phone numbers. `ADMIN` cannot modify a `SUPER_ADMIN`.
+
+Only `SUPER_ADMIN` may change `USER`, `ADMIN`, or `SUPER_ADMIN` assignments.
+Role changes require a 10-to-500-character reason, preserve the mandatory
+`USER` role, cannot target the actor's own roles, and write audit evidence.
+Account status changes continue to use the separate audited
+suspend/reactivate contract. No admin delete action is available.
+
 ## Mobile Flow
 
 1. Cognito authenticates and issues an access token.

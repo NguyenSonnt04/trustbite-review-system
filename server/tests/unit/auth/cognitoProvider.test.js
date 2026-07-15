@@ -118,6 +118,321 @@ describe('CognitoIdentityProvider', () => {
     });
   });
 
+  it('authenticates an admin password with the dedicated client and revokes the refresh token', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: signAccessToken({
+                  client_id: 'admin-web-client',
+                  exp: Math.floor(Date.now() / 1000) + 600,
+                }),
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).resolves.toMatchObject({
+      identity: {
+        provider: 'cognito',
+        subject: 'cognito-sub-1',
+        tokenUse: 'access',
+      },
+      accessTokenExpiresAt: expect.any(Date),
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+    expect(sentCommands[0].input).toMatchObject({
+      AuthFlow: 'USER_PASSWORD_AUTH',
+      ClientId: 'admin-web-client',
+      AuthParameters: {
+        USERNAME: 'admin@example.com',
+        PASSWORD: 'correct-password',
+        SECRET_HASH: expect.any(String),
+      },
+    });
+    expect(sentCommands[1].input).toEqual({
+      Token: 'provider-refresh-token',
+      ClientId: 'admin-web-client',
+      ClientSecret: 'client-secret',
+    });
+  });
+
+  it('pre-provisions a confirmed email user for the existing custom-auth flow', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          return {
+            Username: 'provider-user-1',
+            User: {
+              Attributes: [
+                { Name: 'sub', Value: 'new-cognito-sub' },
+                { Name: 'email', Value: 'new.user@example.com' },
+              ],
+            },
+          };
+        }),
+      },
+    });
+
+    await expect(provider.createUser({
+      email: 'new.user@example.com',
+    })).resolves.toEqual({
+      username: 'provider-user-1',
+      subject: 'new-cognito-sub',
+    });
+
+    expect(sentCommands).toHaveLength(2);
+    expect(sentCommands[0].constructor.name).toBe('AdminCreateUserCommand');
+    expect(sentCommands[0].input).toEqual({
+      UserPoolId: 'pool-1',
+      Username: 'new.user@example.com',
+      MessageAction: 'SUPPRESS',
+      UserAttributes: [
+        { Name: 'email', Value: 'new.user@example.com' },
+        { Name: 'email_verified', Value: 'true' },
+      ],
+    });
+    expect(sentCommands[1].constructor.name).toBe('AdminSetUserPasswordCommand');
+    expect(sentCommands[1].input).toMatchObject({
+      UserPoolId: 'pool-1',
+      Username: 'provider-user-1',
+      Password: expect.any(String),
+      Permanent: true,
+    });
+    expect(sentCommands[1].input.Password.length).toBeGreaterThanOrEqual(20);
+  });
+
+  it('surfaces a failed rollback when Cognito password confirmation fails', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      userPoolId: 'pool-1',
+      adminClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          if (command.constructor.name === 'AdminCreateUserCommand') {
+            return {
+              Username: 'provider-user-1',
+              User: {
+                Attributes: [{ Name: 'sub', Value: 'new-cognito-sub' }],
+              },
+            };
+          }
+          if (command.constructor.name === 'AdminSetUserPasswordCommand') {
+            throw new Error('password confirmation failed');
+          }
+          if (command.constructor.name === 'AdminDeleteUserCommand') {
+            throw new Error('compensation failed');
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.createUser({
+      email: 'new.user@example.com',
+    })).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'PROVIDER_COMPENSATION_FAILED',
+    });
+  });
+
+  it('keeps valid authentication available when refresh-token revocation fails', async () => {
+    const sentCommands = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: signAccessToken({
+                  client_id: 'admin-web-client',
+                  exp: Math.floor(Date.now() / 1000) + 600,
+                }),
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          throw new Error('sensitive provider failure');
+        }),
+      },
+    });
+
+    try {
+      const result = await provider.authenticatePassword({
+        username: 'admin@example.com',
+        password: 'correct-password',
+        clientId: 'admin-web-client',
+        clientSecret: 'client-secret',
+      });
+
+      expect(result).toMatchObject({
+        identity: {
+          provider: 'cognito',
+          subject: 'cognito-sub-1',
+          tokenUse: 'access',
+        },
+        accessTokenExpiresAt: expect.any(Date),
+      });
+      expect(result).not.toHaveProperty('accessToken');
+      expect(result).not.toHaveProperty('refreshToken');
+      expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+        'InitiateAuthCommand',
+        'RevokeTokenCommand',
+      ]);
+      expect(warn).toHaveBeenCalledWith(
+        '[Auth] Cognito refresh-token revocation failed after access-token verification',
+      );
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('provider-refresh-token');
+      expect(JSON.stringify(warn.mock.calls)).not.toContain('sensitive provider failure');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('maps password failures to a generic credential error', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockRejectedValue(Object.assign(new Error('user does not exist'), {
+          name: 'UserNotFoundException',
+        })),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'unknown@example.com',
+      password: 'wrong-password',
+      clientId: 'admin-web-client',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_CREDENTIALS',
+    });
+  });
+
+  it('rejects unresolved Cognito challenges without creating a web session', async () => {
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockResolvedValue({
+          ChallengeName: 'SOFTWARE_TOKEN_MFA',
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+    })).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'AUTH_CHALLENGE_REQUIRED',
+    });
+  });
+
+  it('revokes a returned refresh token when access-token verification fails', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: 'malformed-access-token',
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          return {};
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+  });
+
+  it('preserves the verification error when refresh-token revocation fails', async () => {
+    const sentCommands = [];
+    const provider = new (await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    )).CognitoIdentityProvider({
+      authClient: {
+        send: vi.fn().mockImplementation(async (command) => {
+          sentCommands.push(command);
+          if (command.constructor.name === 'InitiateAuthCommand') {
+            return {
+              AuthenticationResult: {
+                AccessToken: 'malformed-access-token',
+                RefreshToken: 'provider-refresh-token',
+              },
+            };
+          }
+          throw new Error('Cognito unavailable');
+        }),
+      },
+    });
+
+    await expect(provider.authenticatePassword({
+      username: 'admin@example.com',
+      password: 'correct-password',
+      clientId: 'admin-web-client',
+      clientSecret: 'client-secret',
+    })).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_TOKEN',
+    });
+
+    expect(sentCommands.map((command) => command.constructor.name)).toEqual([
+      'InitiateAuthCommand',
+      'RevokeTokenCommand',
+    ]);
+  });
+
   it.each([
     ['issuer', { iss: 'https://invalid.example.test/pool' }, 'INVALID_TOKEN'],
     ['client id', { client_id: 'wrong-client' }, 'INVALID_TOKEN'],
@@ -341,6 +656,22 @@ describe('CognitoIdentityProvider', () => {
       UserPoolId: 'pool-1',
       Username: 'local-sub-1',
     });
+  });
+
+  it('fails closed when global sign-out fails during normal account deletion', async () => {
+    const { CognitoIdentityProvider: ProviderClass } = await import(
+      '../../../src/services/identityProviders/cognitoProvider.js'
+    );
+    const send = vi.fn().mockRejectedValue(new Error('sign-out failed'));
+    const provider = new ProviderClass({
+      userPoolId: 'pool-1',
+      adminClient: { send },
+    });
+
+    await expect(provider.deleteUser({ username: 'local-sub-1' })).rejects.toThrow(
+      'sign-out failed',
+    );
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('treats an already-missing Cognito user as idempotent cleanup', async () => {

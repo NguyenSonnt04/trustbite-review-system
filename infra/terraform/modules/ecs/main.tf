@@ -25,6 +25,11 @@ locals {
     { name = "OCR_QUEUE_NAME", value = "receipt-ocr" },
   ]
 
+  api_environment = concat(local.common_environment, [
+    { name = "AWS_COGNITO_ADMIN_WEB_CLIENT_ID", value = var.cognito_admin_web_client_id == null ? "" : var.cognito_admin_web_client_id },
+    { name = "TRUST_PROXY", value = "1" },
+  ])
+
   database_secrets = var.database_secret_arn == null ? [] : [
     { name = "DATABASE_USER", valueFrom = "${var.database_secret_arn}:username::" },
     { name = "DATABASE_PASSWORD", valueFrom = "${var.database_secret_arn}:password::" },
@@ -32,6 +37,23 @@ locals {
 
   redis_secrets = var.redis_auth_secret_arn == null ? [] : [
     { name = "REDIS_PASSWORD", valueFrom = var.redis_auth_secret_arn },
+  ]
+
+  admin_web_secrets = [
+    for secret in [
+      {
+        name      = "AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET"
+        valueFrom = var.cognito_admin_web_client_secret_arn
+      },
+      {
+        name      = "ADMIN_WEB_BFF_SECRET"
+        valueFrom = var.admin_web_bff_secret_arn
+      },
+      {
+        name      = "ADMIN_WEB_SESSION_KEY_SECRET"
+        valueFrom = var.admin_web_session_key_secret_arn
+      },
+    ] : secret if secret.valueFrom != null
   ]
 
   contract = {
@@ -187,7 +209,7 @@ resource "aws_ecs_task_definition" "api" {
     {
       command     = ["node", "src/server.js"]
       cpu         = var.api_cpu
-      environment = concat(local.common_environment, [{ name = "PORT", value = tostring(var.api_container_port) }, { name = "OCR_WORKER_ENABLED", value = "false" }])
+      environment = concat(local.api_environment, [{ name = "PORT", value = tostring(var.api_container_port) }, { name = "OCR_WORKER_ENABLED", value = "false" }])
       essential   = true
       image       = local.api_image
       logConfiguration = {
@@ -207,7 +229,7 @@ resource "aws_ecs_task_definition" "api" {
           protocol      = "tcp"
         }
       ]
-      secrets = concat(local.database_secrets, local.redis_secrets)
+      secrets = concat(local.database_secrets, local.redis_secrets, local.admin_web_secrets)
     }
   ])
   cpu                      = var.api_cpu
@@ -244,8 +266,33 @@ resource "aws_ecs_task_definition" "api" {
     }
 
     precondition {
+      condition     = try(trimspace(var.cognito_user_pool_arn) != "", false)
+      error_message = "API ECS tasks require a Cognito user pool ARN for administrator provisioning permissions."
+    }
+
+    precondition {
       condition     = try(trimspace(var.cognito_client_id) != "", false)
       error_message = "API ECS tasks require AWS_COGNITO_CLIENT_ID before live resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.cognito_admin_web_client_id) != "", false)
+      error_message = "API ECS tasks require AWS_COGNITO_ADMIN_WEB_CLIENT_ID before live resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.cognito_admin_web_client_secret_arn) != "", false)
+      error_message = "API ECS tasks require cognito_admin_web_client_secret_arn before live resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.admin_web_bff_secret_arn) != "", false)
+      error_message = "API ECS tasks require admin_web_bff_secret_arn before live resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.admin_web_session_key_secret_arn) != "", false)
+      error_message = "API ECS tasks require admin_web_session_key_secret_arn before live resources can be created."
     }
 
     precondition {

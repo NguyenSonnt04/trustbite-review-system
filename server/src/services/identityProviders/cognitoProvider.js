@@ -1,8 +1,12 @@
 import crypto from 'node:crypto';
 import {
+  AdminCreateUserCommand,
   AdminDeleteUserCommand,
+  AdminSetUserPasswordCommand,
   AdminUserGlobalSignOutCommand,
   CognitoIdentityProviderClient,
+  InitiateAuthCommand,
+  RevokeTokenCommand,
 } from '@aws-sdk/client-cognito-identity-provider';
 import appConfig from '../../config/app.js';
 import awsConfig from '../../config/aws.js';
@@ -148,7 +152,7 @@ const verifySignature = async (token, header) => {
   }
 };
 
-const validateAccessTokenClaims = (payload) => {
+const validateAccessTokenClaims = (payload, expectedClientId = appConfig.auth.cognito.clientId) => {
   const now = Math.floor(Date.now() / 1000);
   const config = appConfig.auth.cognito;
 
@@ -161,7 +165,7 @@ const validateAccessTokenClaims = (payload) => {
   if (payload.token_use !== 'access') {
     throw createHttpError(401, 'INVALID_TOKEN', 'JWT token_use is invalid');
   }
-  if (payload.client_id !== config.clientId) {
+  if (payload.client_id !== expectedClientId) {
     throw createHttpError(401, 'INVALID_TOKEN', 'JWT client_id is invalid');
   }
   if (typeof payload.exp !== 'number' || payload.exp <= now) {
@@ -180,8 +184,13 @@ const validateAccessTokenClaims = (payload) => {
 export class CognitoIdentityProvider {
   provider = 'cognito';
 
-  constructor({ adminClient = null, userPoolId = appConfig.auth.cognito.userPoolId } = {}) {
+  constructor({
+    adminClient = null,
+    authClient = null,
+    userPoolId = appConfig.auth.cognito.userPoolId,
+  } = {}) {
     this.adminClient = adminClient;
+    this.authClient = authClient;
     this.userPoolId = userPoolId;
   }
 
@@ -197,7 +206,19 @@ export class CognitoIdentityProvider {
     return this.adminClient;
   }
 
-  async verifyAccessToken(token) {
+  getAuthClient() {
+    if (!this.authClient) {
+      this.authClient = new CognitoIdentityProviderClient({
+        region: awsConfig.region,
+        endpoint: awsConfig.endpointUrl,
+        credentials: awsConfig.credentials,
+      });
+    }
+
+    return this.authClient;
+  }
+
+  async verifyAccessToken(token, { clientId } = {}) {
     const parts = token.split('.');
     if (parts.length !== 3) {
       throw createHttpError(401, 'INVALID_TOKEN', 'Malformed JWT');
@@ -207,7 +228,7 @@ export class CognitoIdentityProvider {
     const payload = parseJsonPart(parts[1], 'payload');
 
     await verifySignature(token, header);
-    validateAccessTokenClaims(payload);
+    validateAccessTokenClaims(payload, clientId);
 
     return {
       provider: this.provider,
@@ -221,7 +242,158 @@ export class CognitoIdentityProvider {
     };
   }
 
-  async deleteUser({ username }) {
+  async authenticatePassword({
+    username,
+    password,
+    clientId,
+    clientSecret = '',
+  }) {
+    if (!clientId) {
+      throw createHttpError(503, 'AUTH_NOT_CONFIGURED', 'Admin authentication is not configured');
+    }
+
+    const authParameters = {
+      USERNAME: username,
+      PASSWORD: password,
+    };
+    if (clientSecret) {
+      authParameters.SECRET_HASH = crypto
+        .createHmac('sha256', clientSecret)
+        .update(`${username}${clientId}`)
+        .digest('base64');
+    }
+
+    let response;
+    try {
+      response = await this.getAuthClient().send(new InitiateAuthCommand({
+        AuthFlow: 'USER_PASSWORD_AUTH',
+        ClientId: clientId,
+        AuthParameters: authParameters,
+      }));
+    } catch (err) {
+      if (['NotAuthorizedException', 'UserNotFoundException'].includes(err?.name)) {
+        throw createHttpError(401, 'INVALID_CREDENTIALS', 'Email or password is invalid');
+      }
+      if (err?.name === 'TooManyRequestsException') {
+        throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Authentication is temporarily unavailable');
+      }
+      if (err?.name === 'PasswordResetRequiredException') {
+        throw createHttpError(409, 'PASSWORD_RESET_REQUIRED', 'A password reset is required');
+      }
+      throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Authentication provider is unavailable');
+    }
+
+    if (response.ChallengeName) {
+      throw createHttpError(409, 'AUTH_CHALLENGE_REQUIRED', 'Additional authentication is required');
+    }
+
+    const accessToken = response.AuthenticationResult?.AccessToken;
+    const refreshToken = response.AuthenticationResult?.RefreshToken;
+    const revokeRefreshToken = async () => {
+      if (!refreshToken) return;
+      const revokeInput = {
+        Token: refreshToken,
+        ClientId: clientId,
+      };
+      if (clientSecret) {
+        revokeInput.ClientSecret = clientSecret;
+      }
+      try {
+        await this.getAuthClient().send(new RevokeTokenCommand(revokeInput));
+      } catch {
+        throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Unable to close the Cognito provider session');
+      }
+    };
+
+    if (!accessToken) {
+      await revokeRefreshToken();
+      throw createHttpError(503, 'PROVIDER_INVALID_RESPONSE', 'Authentication provider returned an invalid response');
+    }
+
+    let identity;
+    try {
+      identity = await this.verifyAccessToken(accessToken, { clientId });
+    } catch (err) {
+      await revokeRefreshToken().catch(() => undefined);
+      throw err;
+    }
+    await revokeRefreshToken().catch(() => {
+      console.warn(
+        '[Auth] Cognito refresh-token revocation failed after access-token verification',
+      );
+    });
+
+    return {
+      identity,
+      accessTokenExpiresAt: new Date(identity.claims.exp * 1000),
+    };
+  }
+
+  async createUser({ email }) {
+    let response;
+    const client = this.getAdminClient();
+    const compensateCreatedUser = async (username) => {
+      try {
+        await this.deleteUser({ username, deleteAfterSignOutFailure: true });
+      } catch {
+        throw createHttpError(
+          503,
+          'PROVIDER_COMPENSATION_FAILED',
+          'Identity provider user creation could not be rolled back safely',
+        );
+      }
+    };
+    try {
+      response = await client.send(new AdminCreateUserCommand({
+        UserPoolId: this.userPoolId,
+        Username: email,
+        MessageAction: 'SUPPRESS',
+        UserAttributes: [
+          { Name: 'email', Value: email },
+          { Name: 'email_verified', Value: 'true' },
+        ],
+      }));
+    } catch (err) {
+      if (err?.name === 'UsernameExistsException') {
+        throw createHttpError(409, 'EMAIL_IN_USE', 'Email is already in use');
+      }
+      if (err?.name === 'InvalidParameterException') {
+        throw createHttpError(422, 'VALIDATION_ERROR', 'Email cannot be provisioned');
+      }
+      if (err?.name === 'TooManyRequestsException') {
+        throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Identity provider is temporarily rate limited');
+      }
+      throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Identity provider is unavailable');
+    }
+
+    const subject = response.User?.Attributes?.find(({ Name }) => Name === 'sub')?.Value;
+    const username = response.User?.Username || response.Username || email;
+    if (!subject || !username) {
+      if (username) {
+        await compensateCreatedUser(username);
+      }
+      throw createHttpError(503, 'PROVIDER_INVALID_RESPONSE', 'Identity provider returned an invalid user');
+    }
+
+    try {
+      await client.send(new AdminSetUserPasswordCommand({
+        UserPoolId: this.userPoolId,
+        Username: username,
+        Password: `${crypto.randomBytes(32).toString('base64url')}Aa1!`,
+        Permanent: true,
+      }));
+    } catch (err) {
+      await compensateCreatedUser(username);
+      if (err?.name === 'TooManyRequestsException') {
+        throw createHttpError(429, 'PROVIDER_RATE_LIMITED', 'Identity provider is temporarily rate limited');
+      }
+      throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Identity provider could not confirm the user');
+    }
+
+    return { username, subject };
+  }
+
+  async deleteUser({ username, deleteAfterSignOutFailure = false }) {
     if (!username) {
       throw Object.assign(
         new Error('Cognito username is required before account deletion can complete'),
@@ -243,7 +415,7 @@ export class CognitoIdentityProvider {
       await client.send(new AdminUserGlobalSignOutCommand(input));
       signedOut = true;
     } catch (err) {
-      if (!isUserNotFoundError(err)) {
+      if (!isUserNotFoundError(err) && !deleteAfterSignOutFailure) {
         throw err;
       }
     }

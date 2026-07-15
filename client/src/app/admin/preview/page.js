@@ -1,13 +1,5 @@
-import AdminPortal from '@/components/admin/AdminPortal';
-
-export const metadata = {
-  title: 'Bản xem quản trị | TrustBite',
-  robots: {
-    index: false,
-    follow: false,
-  },
-};
+import { redirect } from 'next/navigation';
 
 export default function AdminPreviewPage() {
-  return <AdminPortal />;
+  redirect('/admin');
 }

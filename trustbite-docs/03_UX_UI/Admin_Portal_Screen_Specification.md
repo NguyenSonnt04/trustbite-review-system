@@ -213,7 +213,44 @@ Mọi action nghiệp vụ phải có reason và ghi audit log.
 
 ---
 
-## 9. Accessibility và vận hành
+## 9. ADM-007: Quản lý người dùng
+
+| Nhóm | Yêu cầu |
+|---|---|
+| Mục tiêu | Tìm, xem, tạo và cập nhật tài khoản người dùng theo đúng ranh giới Cognito/PostgreSQL. |
+| Thành phần | Summary count, search, filter trạng thái/vai trò, bảng phân trang, create modal, detail/edit modal, status action. |
+| Dữ liệu danh sách | Tên hiển thị, phone đã mask, vai trò, trạng thái, ngày tham gia, user id. |
+| Tạo tài khoản | Email, tên hiển thị, ngày sinh và phone; backend pre-provision Cognito confirmed user và map local profile. |
+| Cập nhật | Hồ sơ cho ADMIN/SUPER_ADMIN; vai trò chỉ SUPER_ADMIN và phải có reason. |
+| Trạng thái | Suspend/reactivate theo contract audit hiện có, reason tối thiểu 10 ký tự. |
+| Delete | Không hiển thị nút xóa; account deletion thuộc privacy workflow riêng. |
+| State | Loading, empty, API error/retry, validation, disabled, success và responsive mobile/tablet. |
+
+Ràng buộc:
+
+- `ADMIN` không được mở/chỉnh sửa chi tiết `SUPER_ADMIN`.
+- Không cho actor tự đổi vai trò hoặc tự khóa tài khoản.
+- Bảng không gọi Cognito theo từng dòng; dữ liệu email không được lưu thêm vào PostgreSQL chỉ để hiển thị.
+- Không hiển thị Cognito token, opaque session marker hoặc BFF secret.
+
+---
+
+## 10. ADM-008: Chi tiết và thư viện ảnh nhà hàng
+
+| Nhóm | Yêu cầu |
+|---|---|
+| Mục tiêu | Cho ADMIN/SUPER_ADMIN xem và cập nhật đầy đủ hồ sơ, trạng thái và ảnh nhà hàng. |
+| Mở chi tiết | Nút `Chi tiết` trong bảng mở modal lớn, không điều hướng khỏi admin portal. |
+| Hồ sơ | Tên, mô tả, địa chỉ, điện thoại, tọa độ, danh mục, trạng thái và reason audit. |
+| Gallery | Thumbnail, ảnh đại diện, chú thích, ngày tạo và nút xem ảnh kích thước đầy đủ. |
+| Thao tác ảnh | Thêm, thay, lưu chú thích, đặt ảnh chính và xóa có xác nhận. |
+| Upload | JPEG/PNG/WebP, tối đa 5 MB; hiển thị lỗi provider/validation rõ ràng. |
+| Responsive | Modal chuyển một cột; gallery một cột trên mobile. |
+| Delete | Chỉ xóa ảnh được chọn; không cung cấp hard-delete nhà hàng. |
+
+---
+
+## 11. Accessibility và vận hành
 
 - Bảng có keyboard navigation cơ bản.
 - Badge trạng thái có text, không chỉ màu.
@@ -224,7 +261,7 @@ Mọi action nghiệp vụ phải có reason và ghi audit log.
 
 ---
 
-## 10. Definition of Done cho admin MVP
+## 12. Definition of Done cho admin MVP
 
 - Admin đăng nhập và xem dashboard được.
 - Receipt queue lọc/mở case/decision hoạt động.

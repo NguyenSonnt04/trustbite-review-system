@@ -233,6 +233,11 @@
   color: var(--ink);
 }
 
+.inputShell button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .formNotice {
   display: flex;
   align-items: flex-start;
@@ -252,6 +257,12 @@
 .formNotice p {
   font-size: 12px;
   line-height: 1.55;
+}
+
+.formError {
+  border-color: oklch(0.63 0.15 28 / 0.32);
+  background: oklch(0.97 0.025 28);
+  color: oklch(0.43 0.14 28);
 }
 
 .loginButton {
@@ -276,20 +287,20 @@
   right: 20px;
 }
 
-.loginButton:hover {
+.loginButton:not(:disabled):hover {
   background: oklch(0.25 0.006 285);
   transform: translateY(-1px);
   box-shadow: 0 14px 28px oklch(0.2 0.008 285 / 0.18);
 }
 
-.loginButton:active {
+.loginButton:not(:disabled):active {
   transform: translateY(0);
   box-shadow: 0 6px 14px oklch(0.2 0.008 285 / 0.12);
 }
 
 .loginButton:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .preview {
