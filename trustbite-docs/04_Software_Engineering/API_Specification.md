@@ -722,6 +722,7 @@ Các route yêu cầu server-only BFF credential, opaque admin session hợp l�
 local role `ADMIN` hoặc `SUPER_ADMIN`:
 
 - `GET /admin-web/restaurants`
+- `POST /admin-web/restaurants/bulk-delete`
 - `GET /admin-web/restaurants/{restaurantId}`
 - `PATCH /admin-web/restaurants/{restaurantId}`
 - `POST /admin-web/restaurants/{restaurantId}/images`
@@ -734,6 +735,40 @@ public, nhưng không trả restaurant đã soft-delete. Update nhận các fiel
 hiện có: `name`, `description`, `address`, `phoneNumber`, cặp
 `latitude`/`longitude`, `categoryIds`, `status`; mọi update bắt buộc `reason`
 10-500 ký tự và ghi audit.
+
+Bulk delete yêu cầu header `Idempotency-Key` là UUID v4 và body:
+
+```json
+{
+  "restaurantIds": [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222"
+  ],
+  "reason": "Các quán trùng dữ liệu đã được xác minh."
+}
+```
+
+`restaurantIds` phải chứa 1-100 UUID duy nhất; `reason` dài 10-500 ký tự.
+Thao tác chỉ soft-delete (`is_deleted = true`, `deleted_at = NOW()`), thực hiện
+atomic cho toàn bộ danh sách và ghi một audit log cho từng quán. Nếu có quán
+không tồn tại hoặc đã bị xóa, toàn bộ thao tác rollback và trả `404`.
+
+Response `200`:
+
+```json
+{
+  "deletedIds": [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222"
+  ],
+  "deletedCount": 2
+}
+```
+
+Endpoint trả `400` cho body/field không hợp lệ, `401` khi thiếu BFF credential
+hoặc admin session, `403` khi role không phải `ADMIN`/`SUPER_ADMIN`, `409` khi
+idempotency key đang xử lý hoặc được tái sử dụng với payload khác, và `422` cho
+UUID, số lượng hoặc reason không hợp lệ. Kết quả idempotency được giữ 24 giờ.
 
 Upload/replace dùng `multipart/form-data`, file field `restaurantImage`, caption
 tối đa 255 ký tự và `isPrimary`. Chỉ nhận JPEG, PNG, WebP tối đa 5 MB sau khi

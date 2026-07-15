@@ -139,6 +139,14 @@ const updateRestaurant = (restaurantId, body) => requestAdminResource(
   `/${restaurantId}`,
   { method: 'PATCH', body },
 );
+const deleteRestaurants = (
+  body,
+  idempotencyKey = crypto.randomUUID(),
+) => requestAdminResource(
+  'restaurants',
+  '/bulk-delete',
+  { method: 'POST', body, idempotencyKey },
+);
 const uploadRestaurantImage = (
   restaurantId,
   formData,
@@ -205,6 +213,7 @@ export const adminService = {
   listRestaurants,
   getRestaurant,
   updateRestaurant,
+  deleteRestaurants,
   uploadRestaurantImage,
   updateRestaurantImage,
   replaceRestaurantImage,

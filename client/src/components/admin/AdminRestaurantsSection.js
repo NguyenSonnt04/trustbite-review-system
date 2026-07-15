@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { adminService } from '@/services/admin.service';
 import AdminIcon from './AdminIcon';
@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
   ['SUSPENDED', 'Tạm khóa'],
   ['CLOSED', 'Đã đóng'],
 ];
+const MAX_BULK_DELETE_RESTAURANTS = 100;
 
 const formatRestaurantStatus = (status) => {
   if (status === 'ACTIVE') return { label: 'Hoạt động', tone: 'success' };
@@ -31,6 +32,11 @@ const sameNumbers = (left = [], right = []) => (
   === [...right].map(Number).sort((a, b) => a - b).join('|')
 );
 
+const getOrCreateMutationKey = (keys, fingerprint) => {
+  if (!keys.has(fingerprint)) keys.set(fingerprint, crypto.randomUUID());
+  return keys.get(fingerprint);
+};
+
 function Badge({ tone = 'neutral', children }) {
   return <span className={`${styles.badge} ${styles[`badge_${tone}`]}`}>{children}</span>;
 }
@@ -44,10 +50,150 @@ function Field({ label, ...props }) {
   );
 }
 
+function FileField({ fileName, label, ...props }) {
+  const inputId = useId();
+  const labelId = `${inputId}-label`;
+
+  return (
+    <div className={styles.formField}>
+      <span id={labelId}>{label}</span>
+      <div className={styles.filePicker}>
+        <input
+          {...props}
+          aria-labelledby={labelId}
+          className={styles.filePickerInput}
+          id={inputId}
+          type="file"
+        />
+        <label className={styles.filePickerButton} htmlFor={inputId}>
+          <AdminIcon name="upload" size={15} />
+          Chọn tệp
+        </label>
+        <span className={styles.filePickerName} title={fileName || 'Chưa chọn tệp'}>
+          {fileName || 'Chưa chọn tệp'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SelectionCheckbox({ indeterminate = false, ...props }) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return <input {...props} ref={inputRef} type="checkbox" />;
+}
+
+function BulkDeleteConfirmationModal({
+  count,
+  deleting,
+  onCancel,
+  onConfirm,
+  reason,
+}) {
+  const dialogRef = useRef(null);
+  const cancelButtonRef = useRef(null);
+  const onCancelRef = useRef(onCancel);
+
+  useEffect(() => {
+    onCancelRef.current = onCancel;
+  }, [onCancel]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement;
+    cancelButtonRef.current?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && !deleting) {
+        event.preventDefault();
+        onCancelRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...(dialogRef.current?.querySelectorAll(
+        'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      ) || [])];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [deleting]);
+
+  return (
+    <div
+      className={styles.confirmationBackdrop}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !deleting) onCancel();
+      }}
+    >
+      <section
+        aria-describedby="bulk-delete-description"
+        aria-labelledby="bulk-delete-title"
+        aria-modal="true"
+        className={styles.confirmationDialog}
+        ref={dialogRef}
+        role="dialog"
+      >
+        <div className={styles.confirmationIcon}>
+          <AdminIcon name="trash" size={22} />
+        </div>
+        <div>
+          <h2 id="bulk-delete-title">Xóa {count} nhà hàng?</h2>
+          <p id="bulk-delete-description">
+            Các nhà hàng sẽ bị ẩn khỏi hệ thống. Dữ liệu liên quan vẫn được giữ lại để có thể khôi phục.
+          </p>
+        </div>
+        <div className={styles.confirmationReason}>
+          <span>Lý do xóa</span>
+          <strong>{reason}</strong>
+        </div>
+        <div className={styles.confirmationActions}>
+          <button
+            className={styles.secondaryButton}
+            disabled={deleting}
+            onClick={onCancel}
+            ref={cancelButtonRef}
+            type="button"
+          >
+            Hủy
+          </button>
+          <button
+            className={styles.dangerButton}
+            disabled={deleting}
+            onClick={onConfirm}
+            type="button"
+          >
+            <AdminIcon name="trash" size={16} />
+            {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
   const [restaurant, setRestaurant] = useState(null);
   const [form, setForm] = useState(null);
   const [reason, setReason] = useState('');
+  const [saveAttempted, setSaveAttempted] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -57,6 +203,7 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
   const [avatarCaption, setAvatarCaption] = useState('');
   const [captions, setCaptions] = useState({});
   const mutationKeys = useRef(new Map());
+  const reasonFieldRef = useRef(null);
 
   const imageMutationKey = (operation, file, payload = []) => {
     const fingerprint = [
@@ -67,12 +214,9 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
       file.lastModified,
       ...payload,
     ].join(':');
-    if (!mutationKeys.current.has(fingerprint)) {
-      mutationKeys.current.set(fingerprint, crypto.randomUUID());
-    }
     return {
       fingerprint,
-      idempotencyKey: mutationKeys.current.get(fingerprint),
+      idempotencyKey: getOrCreateMutationKey(mutationKeys.current, fingerprint),
     };
   };
 
@@ -136,10 +280,17 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
   const save = async (event) => {
     event.preventDefault();
     if (!changed) return;
+    const normalizedReason = reason.trim();
+    if (normalizedReason.length < 10) {
+      setSaveAttempted(true);
+      reasonFieldRef.current?.focus();
+      return;
+    }
     setSubmitting(true);
     setError('');
+    setSaveSuccess('');
     try {
-      const body = { reason };
+      const body = { reason: normalizedReason };
       if (form.name !== (restaurant.name || '')) body.name = form.name;
       if (form.description !== (restaurant.description || '')) body.description = form.description;
       if (form.address !== (restaurant.address || '')) body.address = form.address;
@@ -155,7 +306,9 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
       }
       await adminService.updateRestaurant(restaurantId, body);
       setReason('');
+      setSaveAttempted(false);
       await refreshAfterMutation();
+      setSaveSuccess('Thông tin nhà hàng đã được cập nhật.');
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -285,12 +438,18 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
 
   const toggleCategory = (categoryId) => {
     const exists = form.categoryIds.includes(categoryId);
+    setSaveSuccess('');
     setForm({
       ...form,
       categoryIds: exists
         ? form.categoryIds.filter((id) => id !== categoryId)
         : [...form.categoryIds, categoryId],
     });
+  };
+
+  const updateForm = (updates) => {
+    setSaveSuccess('');
+    setForm((current) => ({ ...current, ...updates }));
   };
 
   return (
@@ -308,19 +467,37 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
         role="dialog"
       >
         <header className={styles.modalHeader}>
-          <div>
+          <div className={styles.restaurantModalHeaderTitle}>
             <h2 id="restaurant-detail-title">Chi tiết nhà hàng</h2>
             <p>{restaurant ? `${restaurant.name} · ${restaurant.id}` : 'Đang tải dữ liệu'}</p>
           </div>
-          <button
-            aria-label="Đóng"
-            className={styles.iconButton}
-            disabled={submitting}
-            onClick={onClose}
-            type="button"
-          >
-            <AdminIcon name="close" size={18} />
-          </button>
+          <div className={styles.restaurantModalHeaderActions}>
+            <button
+              className={styles.secondaryButton}
+              disabled={submitting}
+              onClick={onClose}
+              type="button"
+            >
+              Đóng
+            </button>
+            <button
+              className={styles.primaryButton}
+              disabled={!changed || submitting}
+              form="restaurant-profile-form"
+              type="submit"
+            >
+              {submitting ? 'Đang lưu...' : 'Lưu thông tin'}
+            </button>
+            <button
+              aria-label="Đóng"
+              className={styles.iconButton}
+              disabled={submitting}
+              onClick={onClose}
+              type="button"
+            >
+              <AdminIcon name="close" size={18} />
+            </button>
+          </div>
         </header>
 
         <div className={styles.modalBody}>
@@ -328,7 +505,11 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
           {loading && <div className={styles.emptyInline}>Đang tải chi tiết nhà hàng...</div>}
           {!loading && restaurant && form && (
             <div className={styles.restaurantDetailLayout}>
-              <form className={styles.restaurantProfileForm} onSubmit={save}>
+              <form
+                className={styles.restaurantProfileForm}
+                id="restaurant-profile-form"
+                onSubmit={save}
+              >
                 <div className={styles.restaurantModalSectionHeader}>
                   <div>
                     <h3>Thông tin nhà hàng</h3>
@@ -343,14 +524,14 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                   <Field
                     label="Tên nhà hàng"
                     maxLength={200}
-                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                    onChange={(event) => updateForm({ name: event.target.value })}
                     required
                     value={form.name}
                   />
                   <label className={styles.formField}>
                     <span>Trạng thái</span>
                     <select
-                      onChange={(event) => setForm({ ...form, status: event.target.value })}
+                      onChange={(event) => updateForm({ status: event.target.value })}
                       value={form.status}
                     >
                       {STATUS_OPTIONS.map(([value, label]) => (
@@ -360,20 +541,20 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                   </label>
                   <Field
                     label="Địa chỉ"
-                    onChange={(event) => setForm({ ...form, address: event.target.value })}
+                    onChange={(event) => updateForm({ address: event.target.value })}
                     value={form.address}
                   />
                   <Field
                     label="Số điện thoại"
                     maxLength={30}
-                    onChange={(event) => setForm({ ...form, phoneNumber: event.target.value })}
+                    onChange={(event) => updateForm({ phoneNumber: event.target.value })}
                     value={form.phoneNumber}
                   />
                   <Field
                     label="Vĩ độ"
                     max="90"
                     min="-90"
-                    onChange={(event) => setForm({ ...form, latitude: event.target.value })}
+                    onChange={(event) => updateForm({ latitude: event.target.value })}
                     step="any"
                     type="number"
                     value={form.latitude}
@@ -382,7 +563,7 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                     label="Kinh độ"
                     max="180"
                     min="-180"
-                    onChange={(event) => setForm({ ...form, longitude: event.target.value })}
+                    onChange={(event) => updateForm({ longitude: event.target.value })}
                     step="any"
                     type="number"
                     value={form.longitude}
@@ -393,7 +574,7 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                   <span>Mô tả</span>
                   <textarea
                     maxLength={5000}
-                    onChange={(event) => setForm({ ...form, description: event.target.value })}
+                    onChange={(event) => updateForm({ description: event.target.value })}
                     value={form.description}
                   />
                 </label>
@@ -417,30 +598,28 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                 <label className={styles.formField}>
                   <span>Lý do chỉnh sửa (tối thiểu 10 ký tự)</span>
                   <textarea
+                    aria-describedby="restaurant-update-reason-help"
+                    aria-invalid={saveAttempted && reason.trim().length < 10}
                     maxLength={500}
                     onChange={(event) => setReason(event.target.value)}
                     placeholder="Mô tả lý do và căn cứ thay đổi"
+                    ref={reasonFieldRef}
                     value={reason}
                   />
+                  <span className={styles.formFieldHelp} id="restaurant-update-reason-help">
+                    {saveAttempted && reason.trim().length < 10
+                      ? `Cần nhập thêm ${10 - reason.trim().length} ký tự để lưu thay đổi.`
+                      : `${reason.trim().length}/500 ký tự`}
+                  </span>
                 </label>
 
-                <div className={styles.modalFooter}>
-                  <button
-                    className={styles.secondaryButton}
-                    disabled={submitting}
-                    onClick={onClose}
-                    type="button"
-                  >
-                    Đóng
-                  </button>
-                  <button
-                    className={styles.primaryButton}
-                    disabled={!changed || reason.trim().length < 10 || submitting}
-                    type="submit"
-                  >
-                    {submitting ? 'Đang lưu...' : 'Lưu thông tin'}
-                  </button>
-                </div>
+                {saveSuccess && (
+                  <div aria-live="polite" className={styles.successBanner} role="status">
+                    <AdminIcon name="check" size={16} />
+                    {saveSuccess}
+                  </div>
+                )}
+
               </form>
 
               <div className={styles.restaurantMediaColumn}>
@@ -518,12 +697,12 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                         <span>Chọn một ảnh vuông hoặc ngang, tối đa 5 MB.</span>
                       </div>
                       <div className={styles.restaurantAvatarUploadFields}>
-                        <Field
+                        <FileField
                           accept="image/jpeg,image/png,image/webp"
+                          fileName={avatarFile?.name}
                           label="Chọn ảnh đại diện"
                           onChange={(event) => setAvatarFile(event.target.files?.[0] || null)}
                           required
-                          type="file"
                         />
                         <Field
                           label="Chú thích"
@@ -553,12 +732,12 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                   </div>
 
                   <form className={styles.restaurantImageUpload} onSubmit={uploadImage}>
-                    <Field
+                    <FileField
                       accept="image/jpeg,image/png,image/webp"
+                      fileName={uploadFile?.name}
                       label="Chọn ảnh chi tiết"
                       onChange={(event) => setUploadFile(event.target.files?.[0] || null)}
                       required
-                      type="file"
                     />
                     <Field
                       label="Chú thích"
@@ -664,14 +843,22 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
 
 export default function AdminRestaurantsSection() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
+  const [selectedRestaurantIds, setSelectedRestaurantIds] = useState(() => new Set());
   const [restaurants, setRestaurants] = useState([]);
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteAttempted, setDeleteAttempted] = useState(false);
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false);
+  const [deleteSuccess, setDeleteSuccess] = useState('');
   const [error, setError] = useState('');
   const [reloadVersion, setReloadVersion] = useState(0);
   const requestSequence = useRef(0);
+  const bulkDeleteKeys = useRef(new Map());
+  const deleteReasonRef = useRef(null);
   const pageSize = 20;
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
@@ -707,6 +894,103 @@ export default function AdminRestaurantsSection() {
     setReloadVersion((current) => current + 1);
   };
 
+  const pageRestaurantIds = restaurants.map((restaurant) => restaurant.id);
+  const selectedOnPage = pageRestaurantIds.filter((id) => selectedRestaurantIds.has(id));
+  const allOnPageSelected = pageRestaurantIds.length > 0
+    && selectedOnPage.length === pageRestaurantIds.length;
+  const someOnPageSelected = selectedOnPage.length > 0 && !allOnPageSelected;
+
+  const toggleRestaurantSelection = (restaurantId) => {
+    setError('');
+    setDeleteSuccess('');
+    const next = new Set(selectedRestaurantIds);
+    if (next.has(restaurantId)) {
+      next.delete(restaurantId);
+    } else if (next.size >= MAX_BULK_DELETE_RESTAURANTS) {
+      setError(`Chỉ có thể xóa tối đa ${MAX_BULK_DELETE_RESTAURANTS} nhà hàng mỗi lần.`);
+      return;
+    } else {
+      next.add(restaurantId);
+    }
+    setSelectedRestaurantIds(next);
+  };
+
+  const togglePageSelection = () => {
+    setError('');
+    setDeleteSuccess('');
+    const next = new Set(selectedRestaurantIds);
+    if (allOnPageSelected) {
+      pageRestaurantIds.forEach((id) => next.delete(id));
+    } else {
+      const availableSlots = MAX_BULK_DELETE_RESTAURANTS - next.size;
+      const missingIds = pageRestaurantIds.filter((id) => !next.has(id));
+      missingIds.slice(0, availableSlots).forEach((id) => next.add(id));
+      if (missingIds.length > availableSlots) {
+        setError(`Chỉ có thể xóa tối đa ${MAX_BULK_DELETE_RESTAURANTS} nhà hàng mỗi lần.`);
+      }
+    }
+    setSelectedRestaurantIds(next);
+  };
+
+  const openDeleteConfirmation = () => {
+    const restaurantIds = [...selectedRestaurantIds].sort();
+    if (restaurantIds.length === 0) return;
+    const normalizedReason = deleteReason.trim();
+    if (normalizedReason.length < 10) {
+      setDeleteAttempted(true);
+      deleteReasonRef.current?.focus();
+      return;
+    }
+    setDeleteConfirmationOpen(true);
+  };
+
+  const deleteSelectedRestaurants = async () => {
+    const restaurantIds = [...selectedRestaurantIds].sort();
+    const normalizedReason = deleteReason.trim();
+    const fingerprint = `${restaurantIds.join('|')}:${normalizedReason}`;
+    if (!bulkDeleteKeys.current.has(fingerprint)) {
+      bulkDeleteKeys.current.clear();
+    }
+    const idempotencyKey = getOrCreateMutationKey(bulkDeleteKeys.current, fingerprint);
+    setDeleting(true);
+    setError('');
+    setDeleteSuccess('');
+    try {
+      const result = await adminService.deleteRestaurants(
+        { restaurantIds, reason: normalizedReason },
+        idempotencyKey,
+      );
+      bulkDeleteKeys.current.delete(fingerprint);
+      setSelectedRestaurantIds(new Set());
+      setDeleteReason('');
+      setDeleteAttempted(false);
+      setDeleteConfirmationOpen(false);
+      if (selectedRestaurantId && restaurantIds.includes(selectedRestaurantId)) {
+        setSelectedRestaurantId(null);
+      }
+      setDeleteSuccess(`Đã xóa mềm ${result.deletedCount} nhà hàng.`);
+      const remainingTotal = Math.max(0, total - result.deletedCount);
+      const remainingPageCount = Math.max(1, Math.ceil(remainingTotal / pageSize));
+      if (page > remainingPageCount) {
+        setPage(remainingPageCount);
+      } else {
+        await reload();
+      }
+    } catch (requestError) {
+      if (
+        requestError.status >= 400
+        && requestError.status < 500
+        && requestError.code !== 'REQUEST_IN_PROGRESS'
+      ) {
+        bulkDeleteKeys.current.delete(fingerprint);
+      }
+      setDeleteConfirmationOpen(false);
+      setError(requestError.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <>
       <section className={`${styles.panel} ${styles.restaurantSection}`}>
@@ -716,6 +1000,7 @@ export default function AdminRestaurantsSection() {
             <input
               aria-label="Tìm nhà hàng"
               onChange={(event) => {
+                setDeleteSuccess('');
                 setLoading(true);
                 setSearch(event.target.value);
                 setPage(1);
@@ -727,7 +1012,13 @@ export default function AdminRestaurantsSection() {
           </div>
           <div className={styles.toolbarActions}>
             <Badge>{total} nhà hàng</Badge>
-            <button aria-label="Tải lại dữ liệu" className={styles.iconButton} onClick={reload} type="button">
+            <button
+              aria-label="Tải lại dữ liệu"
+              className={styles.iconButton}
+              disabled={deleting}
+              onClick={reload}
+              type="button"
+            >
               <AdminIcon name="refresh" size={18} />
             </button>
           </div>
@@ -735,14 +1026,76 @@ export default function AdminRestaurantsSection() {
 
         <div className={styles.boundaryNotice}>
           <AdminIcon name="lock" size={18} />
-          <span>ADMIN và SUPER_ADMIN có thể chỉnh sửa hồ sơ, trạng thái và thư viện ảnh.</span>
+          <span>ADMIN và SUPER_ADMIN có thể chỉnh sửa hồ sơ, trạng thái, thư viện ảnh và xóa mềm nhà hàng.</span>
         </div>
+
+        {selectedRestaurantIds.size > 0 && (
+          <div className={styles.restaurantBulkActions}>
+            <div className={styles.restaurantBulkSummary}>
+              <strong>{selectedRestaurantIds.size} nhà hàng đã chọn</strong>
+              <span>Lựa chọn được giữ khi chuyển trang hoặc tìm kiếm, tối đa 100 nhà hàng.</span>
+            </div>
+            <label className={styles.restaurantBulkReason}>
+              <span>Lý do xóa</span>
+              <input
+                aria-invalid={deleteAttempted && deleteReason.trim().length < 10}
+                maxLength={500}
+                onChange={(event) => setDeleteReason(event.target.value)}
+                placeholder="Nhập lý do tối thiểu 10 ký tự"
+                ref={deleteReasonRef}
+                value={deleteReason}
+              />
+              {deleteAttempted && deleteReason.trim().length < 10 && (
+                <small>Cần nhập thêm {10 - deleteReason.trim().length} ký tự.</small>
+              )}
+            </label>
+            <div className={styles.restaurantBulkButtons}>
+              <button
+                className={styles.secondaryButton}
+                disabled={deleting}
+                onClick={() => {
+                  setSelectedRestaurantIds(new Set());
+                  setDeleteReason('');
+                  setDeleteAttempted(false);
+                }}
+                type="button"
+              >
+                Bỏ chọn
+              </button>
+              <button
+                className={styles.dangerButton}
+                disabled={deleting}
+                onClick={openDeleteConfirmation}
+                type="button"
+              >
+                <AdminIcon name="trash" size={16} />
+                {deleting ? 'Đang xóa...' : `Xóa ${selectedRestaurantIds.size} nhà hàng`}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {deleteSuccess && (
+          <div aria-live="polite" className={styles.restaurantBulkSuccess} role="status">
+            <AdminIcon name="check" size={16} />
+            {deleteSuccess}
+          </div>
+        )}
 
         {error && <div className={styles.errorBanner}>{error}</div>}
         <div className={styles.tableScroll}>
           <table className={styles.dataTable}>
             <thead>
               <tr>
+                <th className={styles.selectionCell}>
+                  <SelectionCheckbox
+                    aria-label="Chọn tất cả nhà hàng trên trang này"
+                    checked={allOnPageSelected}
+                    disabled={loading || deleting || restaurants.length === 0}
+                    indeterminate={someOnPageSelected}
+                    onChange={togglePageSelection}
+                  />
+                </th>
                 <th>Nhà hàng</th>
                 <th>Địa điểm</th>
                 <th>Điểm tin cậy</th>
@@ -752,10 +1105,21 @@ export default function AdminRestaurantsSection() {
             </thead>
             <tbody>
               {loading && (
-                <tr><td colSpan="5"><div className={styles.emptyInline}>Đang tải dữ liệu...</div></td></tr>
+                <tr><td colSpan="6"><div className={styles.emptyInline}>Đang tải dữ liệu...</div></td></tr>
               )}
               {!loading && restaurants.map((restaurant) => (
-                <tr key={restaurant.id}>
+                <tr
+                  className={selectedRestaurantIds.has(restaurant.id) ? styles.selectedTableRow : undefined}
+                  key={restaurant.id}
+                >
+                  <td className={styles.selectionCell}>
+                    <SelectionCheckbox
+                      aria-label={`Chọn ${restaurant.name}`}
+                      checked={selectedRestaurantIds.has(restaurant.id)}
+                      disabled={deleting}
+                      onChange={() => toggleRestaurantSelection(restaurant.id)}
+                    />
+                  </td>
                   <td>
                     <div className={styles.entityCell}>
                       {restaurant.primaryImageUrl ? (
@@ -796,7 +1160,7 @@ export default function AdminRestaurantsSection() {
                 </tr>
               ))}
               {!loading && restaurants.length === 0 && (
-                <tr><td colSpan="5"><div className={styles.emptyInline}>Không tìm thấy nhà hàng phù hợp.</div></td></tr>
+                <tr><td colSpan="6"><div className={styles.emptyInline}>Không tìm thấy nhà hàng phù hợp.</div></td></tr>
               )}
             </tbody>
           </table>
@@ -806,7 +1170,7 @@ export default function AdminRestaurantsSection() {
           <div>
             <button
               className={styles.secondaryButton}
-              disabled={loading || page <= 1}
+              disabled={loading || deleting || page <= 1}
               onClick={() => {
                 setLoading(true);
                 setPage((current) => current - 1);
@@ -817,7 +1181,7 @@ export default function AdminRestaurantsSection() {
             </button>
             <button
               className={styles.secondaryButton}
-              disabled={loading || page >= pageCount}
+              disabled={loading || deleting || page >= pageCount}
               onClick={() => {
                 setLoading(true);
                 setPage((current) => current + 1);
@@ -835,6 +1199,16 @@ export default function AdminRestaurantsSection() {
           onClose={() => setSelectedRestaurantId(null)}
           onUpdated={reload}
           restaurantId={selectedRestaurantId}
+        />
+      )}
+
+      {deleteConfirmationOpen && (
+        <BulkDeleteConfirmationModal
+          count={selectedRestaurantIds.size}
+          deleting={deleting}
+          onCancel={() => setDeleteConfirmationOpen(false)}
+          onConfirm={deleteSelectedRestaurants}
+          reason={deleteReason.trim()}
         />
       )}
     </>

@@ -116,6 +116,46 @@ describe('admin restaurant management', () => {
     });
   });
 
+  it('rejects invalid bulk deletion payloads before persistence', async () => {
+    const actor = { id: crypto.randomUUID(), roles: ['ADMIN'] };
+
+    await expect(adminRestaurantManagementService.deleteRestaurants(
+      actor,
+      {
+        restaurantIds: [],
+        reason: 'Valid deletion reason',
+      },
+      crypto.randomUUID(),
+    )).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    });
+
+    await expect(adminRestaurantManagementService.deleteRestaurants(
+      actor,
+      {
+        restaurantIds: [crypto.randomUUID()],
+        reason: 'short',
+      },
+      crypto.randomUUID(),
+    )).rejects.toMatchObject({
+      statusCode: 422,
+      code: 'ADMIN_REASON_REQUIRED',
+    });
+
+    await expect(adminRestaurantManagementService.deleteRestaurants(
+      actor,
+      {
+        restaurantIds: [crypto.randomUUID()],
+        reason: 'Valid deletion reason',
+      },
+      'not-a-key',
+    )).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'IDEMPOTENCY_KEY_INVALID',
+    });
+  });
+
   it('lists draft restaurants and returns an editable detail to ADMIN', async () => {
     const actor = await createUser({ displayName: 'Restaurant Admin' });
     const restaurant = await createRestaurant({
@@ -198,6 +238,162 @@ describe('admin restaurant management', () => {
       ]);
     } finally {
       await cleanup({ userIds: [actor.id], restaurantIds: [restaurant.id] });
+    }
+  });
+
+  it('soft-deletes selected restaurants atomically with audit and idempotent replay', async () => {
+    const actor = await createUser({ displayName: 'Bulk Delete Admin' });
+    const first = await createRestaurant({ name: 'Bulk Delete First' });
+    const second = await createRestaurant({ name: 'Bulk Delete Second' });
+    const idempotencyKey = crypto.randomUUID();
+    const request = {
+      restaurantIds: [second.id, first.id],
+      reason: 'Confirmed duplicate restaurant records',
+    };
+
+    try {
+      const deleted = await adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['ADMIN'] },
+        request,
+        idempotencyKey,
+      );
+      expect(deleted).toMatchObject({
+        statusCode: 200,
+        replayed: false,
+        body: {
+          deletedCount: 2,
+          deletedIds: [first.id, second.id].sort(),
+        },
+      });
+
+      const rows = await query(
+        `SELECT id, is_deleted, deleted_at
+         FROM restaurants
+         WHERE id = ANY($1::uuid[])
+         ORDER BY id`,
+        [[first.id, second.id]],
+      );
+      expect(rows.rows).toEqual([
+        expect.objectContaining({ id: [first.id, second.id].sort()[0], is_deleted: true }),
+        expect.objectContaining({ id: [first.id, second.id].sort()[1], is_deleted: true }),
+      ]);
+      expect(rows.rows.every((row) => row.deleted_at)).toBe(true);
+
+      const audits = await query(
+        `SELECT entity_id, action, previous_status, new_status, reason, metadata
+         FROM audit_logs
+         WHERE actor_id = $1
+         ORDER BY entity_id`,
+        [actor.id],
+      );
+      expect(audits.rows).toHaveLength(2);
+      expect(audits.rows).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          action: 'RESTAURANT_DELETE',
+          previous_status: 'ACTIVE',
+          new_status: null,
+          reason: request.reason,
+          metadata: expect.objectContaining({ bulkSize: 2 }),
+        }),
+      ]));
+
+      const replayed = await adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['ADMIN'] },
+        request,
+        idempotencyKey,
+      );
+      expect(replayed).toMatchObject({
+        replayed: true,
+        body: deleted.body,
+      });
+
+      const auditCount = await query(
+        'SELECT count(*)::integer AS count FROM audit_logs WHERE actor_id = $1',
+        [actor.id],
+      );
+      expect(auditCount.rows[0].count).toBe(2);
+
+      await expect(adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['ADMIN'] },
+        { ...request, reason: 'Different confirmed deletion reason' },
+        idempotencyKey,
+      )).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'IDEMPOTENCY_CONFLICT',
+      });
+
+      await query(
+        `UPDATE idempotency_keys
+         SET expires_at = NOW() - interval '1 minute'
+         WHERE user_id = $1
+           AND endpoint = 'POST /api/v1/admin-web/restaurants/bulk-delete'
+           AND idempotency_key = $2`,
+        [actor.id, idempotencyKey],
+      );
+      await expect(adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['ADMIN'] },
+        { ...request, reason: 'Expired keys may accept a new payload' },
+        idempotencyKey,
+      )).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'RESTAURANT_NOT_FOUND',
+      });
+    } finally {
+      await cleanup({
+        userIds: [actor.id],
+        restaurantIds: [first.id, second.id],
+      });
+    }
+  });
+
+  it('rejects unauthorized or incomplete bulk deletion without database residue', async () => {
+    const actor = await createUser({ displayName: 'Rejected Delete Actor' });
+    const first = await createRestaurant({ name: 'Rollback Delete First' });
+    const second = await createRestaurant({ name: 'Rollback Delete Second' });
+
+    try {
+      await expect(adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['USER'] },
+        {
+          restaurantIds: [first.id],
+          reason: 'Unauthorized restaurant deletion attempt',
+        },
+        crypto.randomUUID(),
+      )).rejects.toMatchObject({
+        statusCode: 403,
+        code: 'FORBIDDEN',
+      });
+
+      await expect(adminRestaurantManagementService.deleteRestaurants(
+        { id: actor.id, roles: ['SUPER_ADMIN'] },
+        {
+          restaurantIds: [first.id, crypto.randomUUID()],
+          reason: 'Atomic deletion must reject missing records',
+        },
+        crypto.randomUUID(),
+      )).rejects.toMatchObject({
+        statusCode: 404,
+        code: 'RESTAURANT_NOT_FOUND',
+      });
+
+      const rows = await query(
+        `SELECT id, is_deleted
+         FROM restaurants
+         WHERE id = ANY($1::uuid[])`,
+        [[first.id, second.id]],
+      );
+      expect(rows.rows.every((row) => row.is_deleted === false)).toBe(true);
+
+      const auditCount = await query(
+        'SELECT count(*)::integer AS count FROM audit_logs WHERE actor_id = $1',
+        [actor.id],
+      );
+      expect(auditCount.rows[0].count).toBe(0);
+    } finally {
+      await cleanup({
+        userIds: [actor.id],
+        restaurantIds: [first.id, second.id],
+      });
     }
   });
 
