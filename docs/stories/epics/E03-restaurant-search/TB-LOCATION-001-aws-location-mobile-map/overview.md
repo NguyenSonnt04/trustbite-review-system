@@ -51,7 +51,8 @@ build and restricted at the AWS resource boundary.
   summary, empty/error guidance, and nearby restaurant results.
 - The map discovery UI uses Vietnamese copy, keeps its default sheet compact,
   exposes a clear search action, and keeps map attribution visible above
-  persistent navigation.
+  persistent navigation. The collapsed sheet sits behind navigation and shows
+  only a neutral drag handle until the user expands it.
 - Nearby markers expose trust scores, selected restaurants receive a distinct
   marker/card state, and a successful route fits its geometry in the remaining
   map viewport.

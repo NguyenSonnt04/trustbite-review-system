@@ -37,7 +37,7 @@ git -c core.whitespace=cr-at-eol diff --check
 | Dependency audit | pass | npm audit found 0 vulnerabilities. |
 | Docker config | pass with warning | Compose parses with `location` declared; existing top-level `version` key is obsolete. |
 | Mobile analyze | pass | Flutter 3.44.6 / Dart 3.12.2 reported no issues. |
-| Mobile unit/widget | pass | All 47 Flutter tests passed, including the compact Vietnamese map sheet and typed-search clear-action contract. |
+| Mobile unit/widget | pass | All 47 Flutter tests passed, including the 12/16/82-percent map sheet, collapsed-content visibility, and typed-search clear-action contract. |
 | Map-first UI | pass | Emulator smoke confirmed Vietnamese search/sheet copy, the compact empty state, visible attribution, responsive recenter control, and opaque navigation without sheet overlap. |
 | Live map style | pass | The configured map API key returned HTTP 200 with an application/json style descriptor. |
 | Credential isolation | pass | Location now prefers dedicated `AWS_LOCATION_*` credentials, including an optional session token, and falls back to shared/default-role credentials; focused config/service proof passed 14/14 tests. |

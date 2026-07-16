@@ -107,6 +107,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _loadingNearby = false;
   bool _routing = false;
   String? _error;
+  double _sheetExtent = 0.16;
 
   @override
   void initState() {
@@ -115,15 +116,25 @@ class _MapScreenState extends State<MapScreen> {
     _locationApi = widget.locationApi ?? LocationApi(apiClient: appApiClient);
     _locationGateway =
         widget.locationGateway ?? const DeviceMapLocationGateway();
+    _sheetController.addListener(_syncSheetExtent);
     _loadLocation();
   }
 
   @override
   void dispose() {
     _cameraDebounce?.cancel();
+    _sheetController.removeListener(_syncSheetExtent);
     _sheetController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _syncSheetExtent() {
+    if (!mounted || !_sheetController.isAttached) return;
+    final nextExtent = _sheetController.size;
+    if ((nextExtent - _sheetExtent).abs() > 0.005) {
+      setState(() => _sheetExtent = nextExtent);
+    }
   }
 
   Future<void> _loadLocation() async {
@@ -458,10 +469,12 @@ class _MapScreenState extends State<MapScreen> {
             ),
             Positioned(
               right: 16,
-              bottom: 112 + (constraints.maxHeight - 92) * 0.26,
+              bottom:
+                  104 +
+                  constraints.maxHeight * math.max(0, _sheetExtent - 0.16),
               child: _mapControls(),
             ),
-            Positioned.fill(bottom: 92, child: _nearbyBottomSheet()),
+            Positioned.fill(child: _nearbyBottomSheet()),
           ],
         );
       },
@@ -532,11 +545,11 @@ class _MapScreenState extends State<MapScreen> {
     return DraggableScrollableSheet(
       key: const ValueKey('map-bottom-sheet'),
       controller: _sheetController,
-      initialChildSize: 0.26,
-      minChildSize: 0.18,
-      maxChildSize: 0.76,
+      initialChildSize: 0.16,
+      minChildSize: 0.12,
+      maxChildSize: 0.82,
       snap: true,
-      snapSizes: const [0.26, 0.50, 0.76],
+      snapSizes: const [0.16, 0.50, 0.82],
       builder: (context, scrollController) {
         return Material(
           key: const ValueKey('nearby-sheet-surface'),
@@ -552,88 +565,90 @@ class _MapScreenState extends State<MapScreen> {
               Center(
                 child: Container(
                   key: const ValueKey('map-sheet-trust-rail'),
-                  width: 58,
-                  height: 5,
+                  width: 44,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: _brand,
+                    color: const Color(0xFF9CA3AF),
                     borderRadius: BorderRadius.circular(999),
                   ),
                 ),
               ),
               const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Nhà hàng đáng tin gần bạn',
-                          style: TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 20,
-                            height: 1.05,
+              if (_sheetExtent >= 0.22) ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Nhà hàng đáng tin gần bạn',
+                            style: TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 20,
+                              height: 1.05,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            _restaurants.isEmpty
+                                ? 'Di chuyển bản đồ để khám phá khu vực này.'
+                                : '${_restaurants.length} nhà hàng trong vùng bản đồ',
+                            style: const TextStyle(
+                              color: Color(0xFF6B7280),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (_loadingNearby)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.4,
+                            color: _brand,
+                          ),
+                        ),
+                      )
+                    else if (_restaurants.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEEE4),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          '${_restaurants.length}',
+                          style: const TextStyle(
+                            color: _brand,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        const SizedBox(height: 5),
-                        Text(
-                          _restaurants.isEmpty
-                              ? 'Di chuyển bản đồ để khám phá khu vực này.'
-                              : '${_restaurants.length} nhà hàng trong vùng bản đồ',
-                          style: const TextStyle(
-                            color: Color(0xFF6B7280),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_loadingNearby)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 4),
-                      child: SizedBox.square(
-                        dimension: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.4,
-                          color: _brand,
-                        ),
                       ),
-                    )
-                  else
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFEEE4),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        '${_restaurants.length}',
-                        style: const TextStyle(
-                          color: _brand,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              if (_initializing) _locationProgress(),
-              if (_locationIssue != null) _locationBanner(_locationIssue!),
-              if (_error != null) _errorNotice(_error!),
-              if (_route != null) _routeSummary(_route!),
-              const SizedBox(height: 12),
-              if (_restaurants.isEmpty && !_loadingNearby)
-                _emptyNearbyState()
-              else
-                for (final item in _restaurants) ...[
-                  _restaurantTile(item),
-                  const SizedBox(height: 10),
-                ],
+                  ],
+                ),
+                if (_initializing) _locationProgress(),
+                if (_locationIssue != null) _locationBanner(_locationIssue!),
+                if (_error != null) _errorNotice(_error!),
+                if (_route != null) _routeSummary(_route!),
+                const SizedBox(height: 12),
+                if (_restaurants.isEmpty && !_loadingNearby)
+                  _emptyNearbyState()
+                else
+                  for (final item in _restaurants) ...[
+                    _restaurantTile(item),
+                    const SizedBox(height: 10),
+                  ],
+              ],
             ],
           ),
         );

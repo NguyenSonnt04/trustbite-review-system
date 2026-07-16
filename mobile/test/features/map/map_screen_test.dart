@@ -34,45 +34,49 @@ void main() {
     },
   );
 
-  testWidgets('uses a full-canvas map with a compact Vietnamese nearby sheet', (
-    tester,
-  ) async {
-    final gateway = _FakeLocationGateway();
-    await tester.pumpWidget(
-      MaterialApp(
-        home: MapScreen(
-          runtimeConfig: const MobileRuntimeConfig(
-            apiBaseUrl: 'http://localhost:5000',
-            awsRegion: 'ap-southeast-1',
-            cognitoUserPoolId: '',
-            cognitoClientId: '',
-            locationMapApiKey: 'test-map-key',
-            locationMapName: 'TrustBiteMap',
+  testWidgets(
+    'keeps the nearby sheet tucked behind the persistent navigation',
+    (tester) async {
+      final gateway = _FakeLocationGateway();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MapScreen(
+            runtimeConfig: const MobileRuntimeConfig(
+              apiBaseUrl: 'http://localhost:5000',
+              awsRegion: 'ap-southeast-1',
+              cognitoUserPoolId: '',
+              cognitoClientId: '',
+              locationMapApiKey: 'test-map-key',
+              locationMapName: 'TrustBiteMap',
+            ),
+            locationGateway: gateway,
+            mapSurfaceOverride: const ColoredBox(color: Color(0xFFE5E7EB)),
           ),
-          locationGateway: gateway,
-          mapSurfaceOverride: const ColoredBox(color: Color(0xFFE5E7EB)),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('map-first-page')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-surface')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-search-bar')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-bottom-sheet')), findsOneWidget);
-    expect(find.byKey(const ValueKey('map-sheet-trust-rail')), findsOneWidget);
-    expect(find.text('Nhà hàng đáng tin gần bạn'), findsOneWidget);
-    expect(find.text('Tìm địa điểm hoặc nhà hàng'), findsOneWidget);
+      expect(find.byKey(const ValueKey('map-first-page')), findsOneWidget);
+      expect(find.byKey(const ValueKey('map-surface')), findsOneWidget);
+      expect(find.byKey(const ValueKey('map-search-bar')), findsOneWidget);
+      expect(find.byKey(const ValueKey('map-bottom-sheet')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('map-sheet-trust-rail')),
+        findsOneWidget,
+      );
+      expect(find.text('Nhà hàng đáng tin gần bạn'), findsNothing);
+      expect(find.text('Tìm địa điểm hoặc nhà hàng'), findsOneWidget);
 
-    final sheet = tester.widget<DraggableScrollableSheet>(
-      find.byKey(const ValueKey('map-bottom-sheet')),
-    );
-    expect(sheet.minChildSize, 0.18);
-    expect(sheet.initialChildSize, 0.26);
-    expect(sheet.maxChildSize, 0.76);
-    expect(sheet.snap, isTrue);
-    expect(gateway.locationRequests, 1);
-  });
+      final sheet = tester.widget<DraggableScrollableSheet>(
+        find.byKey(const ValueKey('map-bottom-sheet')),
+      );
+      expect(sheet.minChildSize, 0.12);
+      expect(sheet.initialChildSize, 0.16);
+      expect(sheet.maxChildSize, 0.82);
+      expect(sheet.snap, isTrue);
+      expect(gateway.locationRequests, 1);
+    },
+  );
 
   testWidgets('replaces the search action with a clear action after typing', (
     tester,

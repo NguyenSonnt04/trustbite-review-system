@@ -97,13 +97,13 @@ Nearby restaurants continue to come from the existing PostGIS viewport API.
   states without blocking the rest of the app.
 - The map is the primary surface. Search remains pinned over the top edge while
   a draggable, snapping bottom sheet moves between compact, browse, and
-  expanded states without covering the persistent TrustBite navigation.
-- The sheet reuses the existing brand orange as a narrow trust rail and keeps
-  restaurant actions, route summaries, and recovery controls in one scrollable
-  interaction layer.
-- The compact sheet opens at 26 percent of the map canvas, uses Vietnamese
-  guidance and a retry-area action, and expands to 50 percent when a restaurant
-  is selected.
+  expanded states behind the persistent TrustBite navigation.
+- The sheet uses a neutral drag handle and keeps restaurant actions, route
+  summaries, and recovery controls in one scrollable interaction layer.
+- The compact sheet opens at 16 percent of the map canvas with a 12-percent
+  minimum. Its content becomes visible after expansion, preventing clipped
+  title/empty-state copy behind navigation. Restaurant selection expands the
+  sheet to 50 percent, and users may expand it to 82 percent.
 - Restaurant annotations show normalized trust scores inside TrustBite-orange
   markers. Selection changes the marker and card treatment before exposing the
   route action; route geometry is fitted with top and bottom UI padding.

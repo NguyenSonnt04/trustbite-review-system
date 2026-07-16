@@ -52,8 +52,9 @@ Backend and static integration proof on 2026-07-16:
 Mobile and live-provider proof on 2026-07-16:
 
 - Flutter 3.44.6 / Dart 3.12.2 are installed; `flutter analyze` reports no issues and all 47 mobile tests pass.
-- The focused map widget contract proves the compact 18/26/76-percent sheet
-  bounds, Vietnamese search/sheet copy, and the typed-search clear action.
+- The focused map widget contract proves the compact 12/16/82-percent sheet
+  bounds, collapsed-content visibility, Vietnamese search copy, and the
+  typed-search clear action.
 - The configured map API key returned the AWS map style descriptor with HTTP 200 and application/json.
 - Dedicated Location credentials returned live place search, reverse geocode, and route geometry through the backend boundary.
 - Android emulator smoke accepted foreground location, fixed GPS at `10.7769, 106.7009`, rendered the AWS map, and verified the map-first search plus snapping bottom-sheet layout.
