@@ -37,13 +37,13 @@ git -c core.whitespace=cr-at-eol diff --check
 | Dependency audit | pass | npm audit found 0 vulnerabilities. |
 | Docker config | pass with warning | Compose parses with `location` declared; existing top-level `version` key is obsolete. |
 | Mobile analyze | pass | Flutter 3.44.6 / Dart 3.12.2 reported no issues. |
-| Mobile unit/widget | pass | All 46 Flutter tests passed, including the map-first full-canvas/search/sheet contract. |
-| Map-first UI | pass | Emulator smoke confirmed the AWS map remains the full canvas, search floats above it, the responsive recenter control clears the sheet edge, and the sheet snaps from browse to expanded state without covering persistent navigation. |
+| Mobile unit/widget | pass | All 47 Flutter tests passed, including the compact Vietnamese map sheet and typed-search clear-action contract. |
+| Map-first UI | pass | Emulator smoke confirmed Vietnamese search/sheet copy, the compact empty state, visible attribution, responsive recenter control, and opaque navigation without sheet overlap. |
 | Live map style | pass | The configured map API key returned HTTP 200 with an application/json style descriptor. |
 | Credential isolation | pass | Location now prefers dedicated `AWS_LOCATION_*` credentials, including an optional session token, and falls back to shared/default-role credentials; focused config/service proof passed 14/14 tests. |
 | Live backend AWS | pass | Dedicated same-account Location credentials successfully returned place-search results, a reverse-geocode place, and a walking route with geometry; credential values and provider payloads were not logged. |
 | Android build/install | pass | Debug APK built and installed on the `sdk gphone16k x86_64` Android emulator (`emulator-5554`); the app launched successfully. |
-| E2E/device | partial | The Android emulator accepted the foreground-location permission and a Quận 1 GPS fix (`10.7769, 106.7009`). The AWS map rendered and centered on Ho Chi Minh City. Nearby-marker, place-search, and route-line interaction smoke remains open. |
+| E2E/device | partial | The Android emulator accepted the foreground-location permission and a Quận 1 GPS fix (`10.7769, 106.7009`). The AWS map rendered and centered on Ho Chi Minh City. The redesigned trust-score marker, selected card, place-search, and fitted route-line interaction smoke remains open because the current viewport returned no nearby restaurants. |
 | Diff hygiene | pass | The CRLF-aware diff check is clean; Git only reports line-ending conversion warnings. |
 
 ## Evidence
@@ -56,8 +56,8 @@ git -c core.whitespace=cr-at-eol diff --check
 
 ## Gaps
 
-- Perform the remaining nearby-marker, place-search, and route-line interaction
-  smoke with the scoped map API key and configured backend URL before moving the
-  story to `complete`.
+- Perform the remaining nearby-marker, selected-card, place-search, and fitted
+  route-line interaction smoke with nearby fixture data before moving the story
+  to `complete`.
 - Public place/route endpoints should receive an application-level cost/rate
   limit before production exposure.

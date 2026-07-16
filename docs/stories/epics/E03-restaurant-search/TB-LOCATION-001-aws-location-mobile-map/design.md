@@ -101,6 +101,14 @@ Nearby restaurants continue to come from the existing PostGIS viewport API.
 - The sheet reuses the existing brand orange as a narrow trust rail and keeps
   restaurant actions, route summaries, and recovery controls in one scrollable
   interaction layer.
+- The compact sheet opens at 26 percent of the map canvas, uses Vietnamese
+  guidance and a retry-area action, and expands to 50 percent when a restaurant
+  is selected.
+- Restaurant annotations show normalized trust scores inside TrustBite-orange
+  markers. Selection changes the marker and card treatment before exposing the
+  route action; route geometry is fitted with top and bottom UI padding.
+- MapLibre attribution and logo controls are positioned below the floating
+  search instead of underneath the sheet or persistent navigation.
 
 ## Observability
 
@@ -117,4 +125,3 @@ slice.
 3. Use the newer AWS Routes/Places APIs immediately. Deferred because the
    provisioned Place Index and Route Calculator are classic resources and the
    requested IAM contract names classic actions.
-

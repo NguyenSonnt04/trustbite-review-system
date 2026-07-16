@@ -34,7 +34,7 @@ void main() {
     },
   );
 
-  testWidgets('uses a full-canvas map with a snapping nearby sheet', (
+  testWidgets('uses a full-canvas map with a compact Vietnamese nearby sheet', (
     tester,
   ) async {
     final gateway = _FakeLocationGateway();
@@ -61,16 +61,57 @@ void main() {
     expect(find.byKey(const ValueKey('map-search-bar')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-bottom-sheet')), findsOneWidget);
     expect(find.byKey(const ValueKey('map-sheet-trust-rail')), findsOneWidget);
-    expect(find.text('Nearby, with confidence'), findsOneWidget);
+    expect(find.text('Nhà hàng đáng tin gần bạn'), findsOneWidget);
+    expect(find.text('Tìm địa điểm hoặc nhà hàng'), findsOneWidget);
 
     final sheet = tester.widget<DraggableScrollableSheet>(
       find.byKey(const ValueKey('map-bottom-sheet')),
     );
-    expect(sheet.minChildSize, 0.20);
-    expect(sheet.initialChildSize, 0.31);
+    expect(sheet.minChildSize, 0.18);
+    expect(sheet.initialChildSize, 0.26);
     expect(sheet.maxChildSize, 0.76);
     expect(sheet.snap, isTrue);
     expect(gateway.locationRequests, 1);
+  });
+
+  testWidgets('replaces the search action with a clear action after typing', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MapScreen(
+          runtimeConfig: const MobileRuntimeConfig(
+            apiBaseUrl: 'http://localhost:5000',
+            awsRegion: 'ap-southeast-1',
+            cognitoUserPoolId: '',
+            cognitoClientId: '',
+            locationMapApiKey: 'test-map-key',
+            locationMapName: 'TrustBiteMap',
+          ),
+          locationGateway: _FakeLocationGateway(),
+          mapSurfaceOverride: const ColoredBox(color: Color(0xFFE5E7EB)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('map-clear-search')), findsNothing);
+    await tester.enterText(
+      find.byKey(const ValueKey('map-search-field')),
+      'Bún bò',
+    );
+    await tester.pump();
+
+    expect(find.byKey(const ValueKey('map-clear-search')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('map-clear-search')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('map-search-field')))
+          .controller
+          ?.text,
+      isEmpty,
+    );
   });
 }
 

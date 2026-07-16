@@ -49,6 +49,12 @@ build and restricted at the AWS resource boundary.
 - The mobile discovery view is map-first: the map fills the available canvas,
   search floats above it, and a draggable bottom sheet owns GPS state, route
   summary, empty/error guidance, and nearby restaurant results.
+- The map discovery UI uses Vietnamese copy, keeps its default sheet compact,
+  exposes a clear search action, and keeps map attribution visible above
+  persistent navigation.
+- Nearby markers expose trust scores, selected restaurants receive a distinct
+  marker/card state, and a successful route fits its geometry in the remaining
+  map viewport.
 - Mobile requests only foreground location, handles denied/disabled services,
   loads `/restaurants/nearby` with viewport bounds, searches locations, and
   renders the selected route geometry.
@@ -61,4 +67,3 @@ build and restricted at the AWS resource boundary.
 - Turn-by-turn navigation or background tracking.
 - Mobile-side trust or distance decisions.
 - New tables, columns, indexes, or restaurant mutations.
-

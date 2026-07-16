@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -86,6 +87,8 @@ class _MapScreenState extends State<MapScreen> {
   );
 
   final TextEditingController _searchController = TextEditingController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
   Timer? _cameraDebounce;
   MapLibreMapController? _mapController;
   late final LocationApi _locationApi;
@@ -97,6 +100,7 @@ class _MapScreenState extends State<MapScreen> {
   MapLocationIssue? _locationIssue;
   List<LocationPlace> _places = const [];
   List<NearbyRestaurant> _restaurants = const [];
+  String? _selectedRestaurantId;
   bool _initializing = true;
   bool _styleLoaded = false;
   bool _searching = false;
@@ -117,6 +121,7 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _cameraDebounce?.cancel();
+    _sheetController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -160,6 +165,8 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
+    controller.onCircleTapped.add(_onRestaurantCircleTapped);
+    controller.onSymbolTapped.add(_onRestaurantSymbolTapped);
   }
 
   Future<void> _onStyleLoaded() async {
@@ -192,7 +199,7 @@ class _MapScreenState extends State<MapScreen> {
       if (bounds.northeast.latitude <= bounds.southwest.latitude ||
           bounds.northeast.longitude <= bounds.southwest.longitude) {
         if (mounted) {
-          setState(() => _error = 'This map area crosses the date line.');
+          setState(() => _error = 'Khu vực bản đồ này chưa được hỗ trợ.');
         }
         return;
       }
@@ -205,11 +212,16 @@ class _MapScreenState extends State<MapScreen> {
         pageSize: 100,
       );
       if (!mounted) return;
-      setState(() => _restaurants = items);
+      setState(() {
+        _restaurants = items;
+        if (!items.any((item) => item.id == _selectedRestaurantId)) {
+          _selectedRestaurantId = null;
+        }
+      });
       await _drawRestaurants();
     } on Exception {
       if (mounted) {
-        setState(() => _error = 'Could not load nearby restaurants.');
+        setState(() => _error = 'Không thể tải nhà hàng trong khu vực này.');
       }
     } finally {
       if (mounted) setState(() => _loadingNearby = false);
@@ -225,20 +237,82 @@ class _MapScreenState extends State<MapScreen> {
     final controller = _mapController;
     if (!_styleLoaded || controller == null) return;
     await controller.clearCircles();
+    await controller.clearSymbols();
     if (_restaurants.isEmpty) return;
+    final selectedId = _selectedRestaurantId;
     await controller.addCircles(
       _restaurants
-          .map(
-            (item) => CircleOptions(
+          .map((item) {
+            final selected = item.id == selectedId;
+            return CircleOptions(
               geometry: LatLng(item.latitude, item.longitude),
-              circleColor: '#FF5E00',
-              circleRadius: 8,
-              circleStrokeColor: '#FFFFFF',
-              circleStrokeWidth: 3,
+              circleColor: selected ? '#111827' : '#FF5E00',
+              circleRadius: selected ? 18 : 14,
+              circleStrokeColor: selected ? '#FF5E00' : '#FFFFFF',
+              circleStrokeWidth: selected ? 4 : 3,
+            );
+          })
+          .toList(growable: false),
+      _restaurantAnnotationData(),
+    );
+    await controller.addSymbols(
+      _restaurants
+          .map(
+            (item) => SymbolOptions(
+              geometry: LatLng(item.latitude, item.longitude),
+              textField: item.trustScore?.toStringAsFixed(1) ?? '✓',
+              textSize: item.id == selectedId ? 12 : 10,
+              textColor: '#FFFFFF',
+              textHaloColor: item.id == selectedId ? '#111827' : '#FF5E00',
+              textHaloWidth: 1,
+              zIndex: item.id == selectedId ? 2 : 1,
             ),
           )
           .toList(growable: false),
+      _restaurantAnnotationData(),
     );
+  }
+
+  List<Map<String, dynamic>> _restaurantAnnotationData() {
+    return _restaurants
+        .map((item) => <String, dynamic>{'restaurantId': item.id})
+        .toList(growable: false);
+  }
+
+  void _onRestaurantCircleTapped(Circle circle) {
+    _selectRestaurantById(circle.data?['restaurantId']);
+  }
+
+  void _onRestaurantSymbolTapped(Symbol symbol) {
+    _selectRestaurantById(symbol.data?['restaurantId']);
+  }
+
+  void _selectRestaurantById(Object? restaurantId) {
+    if (restaurantId is! String) return;
+    for (final restaurant in _restaurants) {
+      if (restaurant.id == restaurantId) {
+        _selectRestaurant(restaurant);
+        return;
+      }
+    }
+  }
+
+  Future<void> _selectRestaurant(NearbyRestaurant restaurant) async {
+    setState(() => _selectedRestaurantId = restaurant.id);
+    await _drawRestaurants();
+    await _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(restaurant.latitude, restaurant.longitude),
+        16,
+      ),
+    );
+    if (_sheetController.isAttached && _sheetController.size < 0.50) {
+      await _sheetController.animateTo(
+        0.50,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
   }
 
   Future<void> _drawRoute() async {
@@ -275,7 +349,7 @@ class _MapScreenState extends State<MapScreen> {
       );
       if (mounted) setState(() => _places = places);
     } on Exception {
-      if (mounted) setState(() => _error = 'Place search is unavailable.');
+      if (mounted) setState(() => _error = 'Tìm kiếm địa điểm đang gián đoạn.');
     } finally {
       if (mounted) setState(() => _searching = false);
     }
@@ -292,7 +366,7 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _routeTo(NearbyRestaurant restaurant) async {
     final origin = _userLocation;
     if (origin == null) {
-      _showMessage('Enable location access before requesting a route.');
+      _showMessage('Hãy bật quyền vị trí trước khi yêu cầu chỉ đường.');
       return;
     }
     setState(() => _routing = true);
@@ -305,13 +379,44 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
       if (!mounted) return;
-      setState(() => _route = route);
+      setState(() {
+        _selectedRestaurantId = restaurant.id;
+        _route = route;
+      });
       await _drawRoute();
+      await _fitRoute(route);
     } on Exception {
-      if (mounted) _showMessage('Could not calculate this route.');
+      if (mounted) _showMessage('Không thể tính tuyến đường này.');
     } finally {
       if (mounted) setState(() => _routing = false);
     }
+  }
+
+  Future<void> _fitRoute(LocationRoute route) async {
+    final controller = _mapController;
+    if (controller == null || route.geometry.length < 2) return;
+    var minLatitude = route.geometry.first.latitude;
+    var maxLatitude = minLatitude;
+    var minLongitude = route.geometry.first.longitude;
+    var maxLongitude = minLongitude;
+    for (final point in route.geometry.skip(1)) {
+      minLatitude = math.min(minLatitude, point.latitude);
+      maxLatitude = math.max(maxLatitude, point.latitude);
+      minLongitude = math.min(minLongitude, point.longitude);
+      maxLongitude = math.max(maxLongitude, point.longitude);
+    }
+    await controller.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLatitude, minLongitude),
+          northeast: LatLng(maxLatitude, maxLongitude),
+        ),
+        left: 40,
+        top: 110,
+        right: 40,
+        bottom: 280,
+      ),
+    );
   }
 
   void _showMessage(String message) {
@@ -353,7 +458,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
             Positioned(
               right: 16,
-              bottom: 112 + (constraints.maxHeight - 92) * 0.31,
+              bottom: 112 + (constraints.maxHeight - 92) * 0.26,
               child: _mapControls(),
             ),
             Positioned.fill(bottom: 92, child: _nearbyBottomSheet()),
@@ -380,6 +485,10 @@ class _MapScreenState extends State<MapScreen> {
             myLocationEnabled: _userLocation != null,
             trackCameraPosition: true,
             compassEnabled: true,
+            attributionButtonPosition: AttributionButtonPosition.topRight,
+            attributionButtonMargins: const math.Point<double>(12, 84),
+            logoViewPosition: LogoViewPosition.topLeft,
+            logoViewMargins: const math.Point<double>(12, 84),
           ),
     );
   }
@@ -392,7 +501,7 @@ class _MapScreenState extends State<MapScreen> {
       shape: const CircleBorder(),
       child: IconButton(
         key: const ValueKey('map-recenter-button'),
-        tooltip: 'Center on my location',
+        tooltip: 'Về vị trí của tôi',
         onPressed: _initializing ? null : _recenterMap,
         icon: Icon(
           _userLocation == null
@@ -422,11 +531,12 @@ class _MapScreenState extends State<MapScreen> {
   Widget _nearbyBottomSheet() {
     return DraggableScrollableSheet(
       key: const ValueKey('map-bottom-sheet'),
-      initialChildSize: 0.31,
-      minChildSize: 0.20,
+      controller: _sheetController,
+      initialChildSize: 0.26,
+      minChildSize: 0.18,
       maxChildSize: 0.76,
       snap: true,
-      snapSizes: const [0.31, 0.52, 0.76],
+      snapSizes: const [0.26, 0.50, 0.76],
       builder: (context, scrollController) {
         return Material(
           key: const ValueKey('nearby-sheet-surface'),
@@ -459,7 +569,7 @@ class _MapScreenState extends State<MapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          'Nearby, with confidence',
+                          'Nhà hàng đáng tin gần bạn',
                           style: TextStyle(
                             color: Color(0xFF111827),
                             fontSize: 20,
@@ -470,8 +580,8 @@ class _MapScreenState extends State<MapScreen> {
                         const SizedBox(height: 5),
                         Text(
                           _restaurants.isEmpty
-                              ? 'Move the map to discover trusted places.'
-                              : '${_restaurants.length} places in this map view',
+                              ? 'Di chuyển bản đồ để khám phá khu vực này.'
+                              : '${_restaurants.length} nhà hàng trong vùng bản đồ',
                           style: const TextStyle(
                             color: Color(0xFF6B7280),
                             fontSize: 12,
@@ -520,7 +630,10 @@ class _MapScreenState extends State<MapScreen> {
               if (_restaurants.isEmpty && !_loadingNearby)
                 _emptyNearbyState()
               else
-                for (final item in _restaurants) _restaurantTile(item),
+                for (final item in _restaurants) ...[
+                  _restaurantTile(item),
+                  const SizedBox(height: 10),
+                ],
             ],
           ),
         );
@@ -539,7 +652,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
           SizedBox(width: 10),
           Text(
-            'Finding your current location…',
+            'Đang xác định vị trí của bạn…',
             style: TextStyle(fontWeight: FontWeight.w700),
           ),
         ],
@@ -576,27 +689,41 @@ class _MapScreenState extends State<MapScreen> {
   Widget _emptyNearbyState() {
     return Container(
       key: const ValueKey('map-empty-nearby'),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF7F3EF),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFF0E4DA)),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          CircleAvatar(
+          const CircleAvatar(
+            radius: 18,
             backgroundColor: Color(0xFFFFE4D4),
-            child: Icon(Icons.travel_explore_rounded, color: _brand),
+            child: Icon(Icons.travel_explore_rounded, color: _brand, size: 20),
           ),
-          SizedBox(width: 12),
-          Expanded(
+          const SizedBox(width: 10),
+          const Expanded(
             child: Text(
-              'No restaurants in this view yet. Pan or zoom the map to look nearby.',
+              'Chưa có nhà hàng. Di chuyển bản đồ rồi thử lại.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: Color(0xFF4B5563),
+                fontSize: 12,
                 fontWeight: FontWeight.w700,
-                height: 1.3,
+                height: 1.25,
               ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('map-reload-area'),
+            tooltip: 'Tìm lại khu vực này',
+            onPressed: _loadingNearby ? null : _loadNearby,
+            color: _brand,
+            icon: const Icon(Icons.refresh_rounded),
+            style: IconButton.styleFrom(
+              backgroundColor: const Color(0xFFFFE4D4),
             ),
           ),
         ],
@@ -615,14 +742,14 @@ class _MapScreenState extends State<MapScreen> {
             Icon(Icons.map_outlined, color: _brand, size: 48),
             SizedBox(height: 14),
             Text(
-              'Map configuration is missing.',
+              'Thiếu cấu hình bản đồ.',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
             ),
             SizedBox(height: 8),
             Text(
-              'Provide TRUSTBITE_LOCATION_MAP_API_KEY, '
-              'TRUSTBITE_LOCATION_MAP_NAME, and TRUSTBITE_AWS_REGION '
-              'at build time.',
+              'Hãy cung cấp TRUSTBITE_LOCATION_MAP_API_KEY, '
+              'TRUSTBITE_LOCATION_MAP_NAME và TRUSTBITE_AWS_REGION '
+              'khi build ứng dụng.',
               textAlign: TextAlign.center,
             ),
           ],
@@ -637,42 +764,52 @@ class _MapScreenState extends State<MapScreen> {
       color: Colors.white,
       elevation: 12,
       shadowColor: Colors.black.withValues(alpha: 0.20),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
-      child: TextField(
-        key: const ValueKey('map-search-field'),
-        controller: _searchController,
-        textInputAction: TextInputAction.search,
-        onSubmitted: (_) => _search(),
-        decoration: InputDecoration(
-          hintText: 'Search a place or neighborhood',
-          hintStyle: const TextStyle(
-            color: Color(0xFF7C8491),
-            fontWeight: FontWeight.w600,
-          ),
-          prefixIcon: const Icon(Icons.search_rounded, color: _brand),
-          suffixIcon: _searching
-              ? const Padding(
-                  padding: EdgeInsets.all(14),
-                  child: SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _brand,
+      child: SizedBox(
+        height: 56,
+        child: TextField(
+          key: const ValueKey('map-search-field'),
+          controller: _searchController,
+          textInputAction: TextInputAction.search,
+          onChanged: (_) => setState(() => _places = const []),
+          onSubmitted: (_) => _search(),
+          decoration: InputDecoration(
+            hintText: 'Tìm địa điểm hoặc nhà hàng',
+            hintStyle: const TextStyle(
+              color: Color(0xFF7C8491),
+              fontWeight: FontWeight.w600,
+            ),
+            prefixIcon: const Icon(Icons.search_rounded, color: _brand),
+            suffixIcon: _searching
+                ? const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: SizedBox.square(
+                      dimension: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: _brand,
+                      ),
                     ),
+                  )
+                : _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    key: const ValueKey('map-clear-search'),
+                    tooltip: 'Xóa tìm kiếm',
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _places = const []);
+                    },
+                    icon: const Icon(Icons.close_rounded),
                   ),
-                )
-              : IconButton(
-                  tooltip: 'Search',
-                  onPressed: _search,
-                  icon: const Icon(Icons.arrow_forward_rounded, color: _brand),
-                ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 17),
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: InputBorder.none,
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(vertical: 15),
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+          ),
         ),
       ),
     );
@@ -720,10 +857,10 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _locationBanner(MapLocationIssue issue) {
     final message = switch (issue) {
-      MapLocationIssue.serviceDisabled => 'Location services are disabled.',
+      MapLocationIssue.serviceDisabled => 'Dịch vụ vị trí đang tắt.',
       MapLocationIssue.deniedForever =>
-        'Location access is blocked in settings.',
-      MapLocationIssue.denied => 'Location permission was not granted.',
+        'Quyền vị trí đang bị chặn trong cài đặt.',
+      MapLocationIssue.denied => 'Bạn chưa cấp quyền vị trí.',
     };
     return Container(
       margin: const EdgeInsets.only(top: 12),
@@ -739,7 +876,7 @@ class _MapScreenState extends State<MapScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '$message Using the default map area.',
+              '$message Bản đồ đang dùng khu vực mặc định.',
               style: const TextStyle(
                 color: Color(0xFF7C2D12),
                 fontWeight: FontWeight.w700,
@@ -755,7 +892,7 @@ class _MapScreenState extends State<MapScreen> {
                   }
                 : () => _locationGateway.openSettings(issue),
             child: Text(
-              issue == MapLocationIssue.denied ? 'Retry' : 'Settings',
+              issue == MapLocationIssue.denied ? 'Thử lại' : 'Cài đặt',
             ),
           ),
         ],
@@ -787,7 +924,7 @@ class _MapScreenState extends State<MapScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Route ready',
+                  'Đã có tuyến đường',
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -795,7 +932,7 @@ class _MapScreenState extends State<MapScreen> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${distanceKm.toStringAsFixed(1)} km - about $minutes min',
+                  '${distanceKm.toStringAsFixed(1)} km · khoảng $minutes phút',
                   style: const TextStyle(
                     color: Color(0xFFD1D5DB),
                     fontWeight: FontWeight.w600,
@@ -805,7 +942,7 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
           IconButton(
-            tooltip: 'Clear route',
+            tooltip: 'Xóa tuyến đường',
             onPressed: () async {
               setState(() => _route = null);
               await _drawRoute();
@@ -818,70 +955,132 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _restaurantTile(NearbyRestaurant item) {
+    final selected = item.id == _selectedRestaurantId;
     return Material(
       key: ValueKey('nearby-restaurant-${item.id}'),
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      color: selected ? const Color(0xFFFFF7F2) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: selected ? const Color(0xFFFFA46B) : const Color(0xFFECE8E4),
+          width: selected ? 1.5 : 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _mapController?.animateCamera(
-          CameraUpdate.newLatLngZoom(LatLng(item.latitude, item.longitude), 16),
-        ),
+        onTap: () => _selectRestaurant(item),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 6, 12),
-          child: Row(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE4D4),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.restaurant_rounded, color: _brand),
+              Row(
+                children: [
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? const Color(0xFFFF5E00)
+                          : const Color(0xFFFFE4D4),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(
+                      Icons.restaurant_rounded,
+                      color: selected ? Colors.white : _brand,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF111827),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            if (item.trustScore != null)
+                              _RestaurantMeta(
+                                icon: Icons.verified_rounded,
+                                label:
+                                    'Tin cậy ${item.trustScore!.toStringAsFixed(1)}',
+                                accent: true,
+                              ),
+                            if (item.address?.trim().isNotEmpty == true)
+                              _RestaurantMeta(
+                                icon: Icons.place_outlined,
+                                label: item.address!.trim(),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.chevron_right_rounded,
+                    color: selected ? _brand : const Color(0xFF98A2B3),
+                  ),
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              if (selected) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(height: 1, color: Color(0xFFF2D7C7)),
+                ),
+                Row(
                   children: [
-                    Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF111827),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
+                    Expanded(
+                      child: Text(
+                        item.verifiedReviewCount == null
+                            ? 'Nhà hàng đã được xác minh'
+                            : '${item.verifiedReviewCount} đánh giá đã xác minh',
+                        style: const TextStyle(
+                          color: Color(0xFF667085),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        if (item.trustScore != null)
-                          _RestaurantMeta(
-                            icon: Icons.verified_rounded,
-                            label:
-                                'Trust ${item.trustScore!.toStringAsFixed(1)}',
-                            accent: true,
-                          ),
-                        if (item.address?.trim().isNotEmpty == true)
-                          _RestaurantMeta(
-                            icon: Icons.place_outlined,
-                            label: item.address!.trim(),
-                          ),
-                      ],
+                    const SizedBox(width: 12),
+                    FilledButton.icon(
+                      key: ValueKey('route-to-${item.id}'),
+                      onPressed: _routing ? null : () => _routeTo(item),
+                      icon: _routing
+                          ? const SizedBox.square(
+                              dimension: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.near_me_rounded, size: 18),
+                      label: const Text('Chỉ đường'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: _brand,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, 44),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        textStyle: const TextStyle(fontWeight: FontWeight.w900),
+                      ),
                     ),
                   ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Route to ${item.name}',
-                onPressed: _routing ? null : () => _routeTo(item),
-                icon: const Icon(Icons.near_me_rounded, color: _brand),
-              ),
+              ],
             ],
           ),
         ),

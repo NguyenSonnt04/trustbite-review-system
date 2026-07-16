@@ -51,12 +51,20 @@ Backend and static integration proof on 2026-07-16:
 
 Mobile and live-provider proof on 2026-07-16:
 
-- Flutter 3.44.6 / Dart 3.12.2 are installed; `flutter analyze` reports no issues and all 46 mobile tests pass.
+- Flutter 3.44.6 / Dart 3.12.2 are installed; `flutter analyze` reports no issues and all 47 mobile tests pass.
+- The focused map widget contract proves the compact 18/26/76-percent sheet
+  bounds, Vietnamese search/sheet copy, and the typed-search clear action.
 - The configured map API key returned the AWS map style descriptor with HTTP 200 and application/json.
 - Dedicated Location credentials returned live place search, reverse geocode, and route geometry through the backend boundary.
 - Android emulator smoke accepted foreground location, fixed GPS at `10.7769, 106.7009`, rendered the AWS map, and verified the map-first search plus snapping bottom-sheet layout.
+- A second visual smoke verified the Vietnamese search/sheet copy, compact empty
+  state, opaque persistent navigation, responsive recenter control, and visible
+  MapLibre attribution below the search overlay.
 - LocalStack declaration is configuration proof only; no LocalStack Location API success is claimed.
 
 Remaining proof:
 
-- Nearby restaurant marker, place-search selection, and route-line interaction smoke remains required before marking the story complete.
+- The redesigned trust-score marker, restaurant selection/expanded card,
+  place-search selection, and fitted route-line interaction still require an
+  Android emulator smoke with nearby fixture data before marking the story
+  complete.
