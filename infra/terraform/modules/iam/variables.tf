@@ -3,6 +3,30 @@ variable "create_live_resources" {
   type        = bool
 }
 
+variable "admin_web_bff_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_BFF_SECRET."
+  type        = string
+  default     = null
+}
+
+variable "admin_web_session_key_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_SESSION_KEY_SECRET."
+  type        = string
+  default     = null
+}
+
+variable "cognito_admin_web_client_secret_arn" {
+  description = "Secrets Manager ARN containing AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET."
+  type        = string
+  default     = null
+}
+
+variable "cognito_user_pool_arn" {
+  description = "Cognito user pool ARN for scoped administrator provisioning permissions."
+  type        = string
+  default     = null
+}
+
 variable "environment" {
   description = "Environment name."
   type        = string

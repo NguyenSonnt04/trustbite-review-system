@@ -2,9 +2,11 @@ import {
   Activity,
   ArrowRight,
   Bell,
+  Check,
   Eye,
   EyeOff,
   Info,
+  ImagePlus,
   KeyRound,
   LayoutDashboard,
   LockKeyhole,
@@ -19,8 +21,10 @@ import {
   Search,
   ShieldCheck,
   Store,
+  Trash2,
   TrendingDown,
   TrendingUp,
+  Upload,
   UsersRound,
   X,
 } from 'lucide-react';
@@ -50,6 +54,10 @@ const icons = {
   eye: Eye,
   eyeOff: EyeOff,
   info: Info,
+  image: ImagePlus,
+  upload: Upload,
+  check: Check,
+  trash: Trash2,
 };
 
 export default function AdminIcon({ name, size = 20, strokeWidth = 1.8 }) {

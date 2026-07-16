@@ -488,14 +488,16 @@ export async function createRestaurant(data) {
  * @param {boolean}     [updates.clearGeo]
  * @param {string}      [updates.status]
  * @param {number[]}    [updates.categoryIds]
+ * @param {object}      [options]
+ * @param {Function}    [options.onBeforeCommit]
  * @returns {Promise<object|null>} Updated restaurant or null if not found.
  */
-export async function updateRestaurant(restaurantId, updates) {
+export async function updateRestaurant(restaurantId, updates, { onBeforeCommit } = {}) {
   const { name } = updates;
 
   for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt += 1) {
     try {
-      return await updateRestaurantAttempt(restaurantId, updates);
+      return await updateRestaurantAttempt(restaurantId, updates, { onBeforeCommit });
     } catch (err) {
       if (!isSlugConflict(err) || name === undefined) throw err;
       if (attempt === MAX_SLUG_ATTEMPTS) {
@@ -507,12 +509,25 @@ export async function updateRestaurant(restaurantId, updates) {
   throw new ConflictError('Could not allocate a unique restaurant slug after renaming. Please try again.');
 }
 
-async function updateRestaurantAttempt(restaurantId, updates) {
+async function updateRestaurantAttempt(restaurantId, updates, { onBeforeCommit } = {}) {
   const { name, description, address, phoneNumber, latitude, longitude, clearGeo, status, categoryIds } = updates;
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const previousResult = await client.query(
+      `SELECT *
+       FROM restaurants
+       WHERE id = $1
+         AND is_deleted = FALSE
+       FOR UPDATE`,
+      [restaurantId],
+    );
+    if (previousResult.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+    const previous = previousResult.rows[0];
 
     const setClauses = [];
     const params = [restaurantId]; // $1 = restaurantId
@@ -566,17 +581,13 @@ async function updateRestaurantAttempt(restaurantId, updates) {
         await client.query('ROLLBACK');
         return null;
       }
-    } else {
-      // Only categories changing — confirm restaurant exists and not deleted
-      const checkResult = await client.query('SELECT id FROM restaurants WHERE id = $1 AND is_deleted = FALSE', [restaurantId]);
-      if (checkResult.rows.length === 0) {
-        await client.query('ROLLBACK');
-        return null;
-      }
     }
 
     if (categoryIds !== undefined) {
       await replaceCategoryMappings(client, restaurantId, categoryIds);
+    }
+    if (onBeforeCommit) {
+      await onBeforeCommit(client, { previous });
     }
 
     await client.query('COMMIT');

@@ -16,7 +16,8 @@ Before `create_live_resources=true`, confirm:
   - Redis AUTH token plaintext-in-state exception, state access, and rotation
     handling are explicitly approved.
 - Production API config is available from the selected GitHub environment:
-  `AWS_COGNITO_USER_POOL_ID`, `AWS_COGNITO_CLIENT_ID`, and `ALLOWED_ORIGINS`.
+  Cognito user-pool identifiers, both app-client identifiers, the three admin
+  secret ARNs, and `ALLOWED_ORIGINS`.
 - Budget and cleanup owner are recorded.
 
 ## Cost Safety
@@ -59,8 +60,19 @@ Required environment variables:
   `REDIS_PASSWORD`.
 - `AWS_COGNITO_USER_POOL_ID`: Cognito user pool id injected into API and worker
   task definitions.
+- `AWS_COGNITO_USER_POOL_ARN`: Cognito user pool ARN used to scope API task
+  permissions for administrator identity provisioning.
 - `AWS_COGNITO_CLIENT_ID`: Cognito app client id injected into API and worker
   task definitions.
+- `AWS_COGNITO_ADMIN_WEB_CLIENT_ID`: confidential Cognito app client id used
+  only by the API administrator-login runtime.
+- `AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN`: Secrets Manager ARN containing
+  `AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET`.
+- `ADMIN_WEB_BFF_SECRET_ARN`: Secrets Manager ARN containing the shared
+  `ADMIN_WEB_BFF_SECRET` used by the API and the separately deployed Next.js
+  BFF.
+- `ADMIN_WEB_SESSION_KEY_SECRET_ARN`: Secrets Manager ARN containing
+  `ADMIN_WEB_SESSION_KEY_SECRET`.
 - `ALLOWED_ORIGINS`: comma-separated production CORS origins for the API task.
   The same value also configures receipt/avatar S3 bucket CORS for browser
   presigned PUT requests.

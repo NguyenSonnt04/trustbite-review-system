@@ -114,7 +114,7 @@ describe('restaurant detail and public reviews API', () => {
       const olderClaim = await createRestaurantClaim({
         merchantId: merchant.id,
         restaurantId: restaurant.id,
-        status: 'SUBMITTED',
+        status: 'REJECTED',
         createdAt: new Date(Date.now() - 60_000).toISOString(),
       });
       const latestClaim = await createRestaurantClaim({

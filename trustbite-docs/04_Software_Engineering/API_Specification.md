@@ -677,6 +677,108 @@ Yêu cầu:
 
 `reason` bắt buộc với mọi action trừ `CLOSE_REPORT` kỹ thuật sau khi đã có action trước đó.
 
+### Admin web user-management BFF
+
+Các route sau chỉ dành cho Next.js BFF, yêu cầu đồng thời server-only BFF
+credential và opaque admin session hợp lệ. Browser không gọi trực tiếp Express
+và không nhận Cognito token/session marker:
+
+- `GET /admin-web/users`
+- `POST /admin-web/users`
+- `GET /admin-web/users/{userId}`
+- `PATCH /admin-web/users/{userId}`
+- `POST /admin-web/users/{userId}/suspend`
+- `POST /admin-web/users/{userId}/reactivate`
+
+List hỗ trợ `page`, `pageSize`, `keyword`, `status`, `role`; `pageSize` tối đa
+100. Phone trong list phải mask. Sort cố định `created_at DESC, id DESC`.
+
+Tạo user:
+
+```json
+{
+  "email": "new.user@example.com",
+  "displayName": "Nguyen Van A",
+  "phoneNumber": "0912345678",
+  "dateOfBirth": "1995-05-20"
+}
+```
+
+Backend dùng Cognito `AdminCreateUser` với provider message bị suppress và
+`email_verified=true`, sau đó đặt một generated permanent provider password
+không được trả về, log hoặc lưu bởi TrustBite để identity chuyển sang
+`CONFIRMED`. Backend tiếp tục map `cognito_sub` vào local profile trong
+transaction. User mới luôn nhận role `USER`. Nếu local persistence thất bại,
+backend phải xóa bù identity vừa tạo hoặc trả lỗi compensation an toàn.
+
+Cập nhật profile nhận `displayName`, `phoneNumber`, `dateOfBirth`. Chỉ
+`SUPER_ADMIN` được gửi `roles`; roles phải chứa `USER`, chỉ gồm `USER`,
+`ADMIN`, `SUPER_ADMIN`, và thay đổi role bắt buộc `reason` 10-500 ký tự.
+Không cho actor tự đổi role. Admin portal không có route/nút delete.
+
+### Admin web restaurant-management BFF
+
+Các route yêu cầu server-only BFF credential, opaque admin session hợp lệ và
+local role `ADMIN` hoặc `SUPER_ADMIN`:
+
+- `GET /admin-web/restaurants`
+- `POST /admin-web/restaurants/bulk-delete`
+- `GET /admin-web/restaurants/{restaurantId}`
+- `PATCH /admin-web/restaurants/{restaurantId}`
+- `POST /admin-web/restaurants/{restaurantId}/images`
+- `PATCH /admin-web/restaurants/{restaurantId}/images/{imageId}`
+- `POST /admin-web/restaurants/{restaurantId}/images/{imageId}/replace`
+- `DELETE /admin-web/restaurants/{restaurantId}/images/{imageId}`
+
+List hỗ trợ `page`, `pageSize`, `keyword`, `status` và trả cả trạng thái không
+public, nhưng không trả restaurant đã soft-delete. Update nhận các field schema
+hiện có: `name`, `description`, `address`, `phoneNumber`, cặp
+`latitude`/`longitude`, `categoryIds`, `status`; mọi update bắt buộc `reason`
+10-500 ký tự và ghi audit.
+
+Bulk delete yêu cầu header `Idempotency-Key` là UUID v4 và body:
+
+```json
+{
+  "restaurantIds": [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222"
+  ],
+  "reason": "Các quán trùng dữ liệu đã được xác minh."
+}
+```
+
+`restaurantIds` phải chứa 1-100 UUID duy nhất; `reason` dài 10-500 ký tự.
+Thao tác chỉ soft-delete (`is_deleted = true`, `deleted_at = NOW()`), thực hiện
+atomic cho toàn bộ danh sách và ghi một audit log cho từng quán. Nếu có quán
+không tồn tại hoặc đã bị xóa, toàn bộ thao tác rollback và trả `404`.
+
+Response `200`:
+
+```json
+{
+  "deletedIds": [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222"
+  ],
+  "deletedCount": 2
+}
+```
+
+Endpoint trả `400` cho body/field không hợp lệ, `401` khi thiếu BFF credential
+hoặc admin session, `403` khi role không phải `ADMIN`/`SUPER_ADMIN`, `409` khi
+idempotency key đang xử lý hoặc được tái sử dụng với payload khác, và `422` cho
+UUID, số lượng hoặc reason không hợp lệ. Kết quả idempotency được giữ 24 giờ.
+
+Upload/replace dùng `multipart/form-data`, file field `restaurantImage`, caption
+tối đa 255 ký tự và `isPrimary`. Chỉ nhận JPEG, PNG, WebP tối đa 5 MB sau khi
+kiểm tra MIME, extension và magic bytes. Upload, replace và delete yêu cầu
+`Idempotency-Key` UUID v4.
+
+PostgreSQL lưu private `s3://` reference. Response trả signed `imageUrl` ngắn
+hạn. Xóa ảnh chính sẽ promote ảnh còn lại mới nhất. Backend chỉ xóa object thuộc
+bucket/prefix TrustBite được cấu hình; URL ngoài không được coi là object sở hữu.
+
 ### POST /admin/users/{userId}/suspend
 
 Auth: `ADMIN` hoặc `SUPER_ADMIN`.

@@ -423,6 +423,13 @@ describe('admin user suspension API', () => {
         .send({ reason: 'short' })
         .expect(422);
       expect(reasonReactivate.body.error.code).toBe('ADMIN_REASON_REQUIRED');
+
+      const unknownFieldSuspend = await requestApp()
+        .post(`/api/v1/admin/users/${activeTarget.id}/suspend`)
+        .set(authHeaders(admin.id))
+        .send({ reason: adminReason, unexpected: true })
+        .expect(422);
+      expect(unknownFieldSuspend.body.error.code).toBe('VALIDATION_ERROR');
     } finally {
       await cleanupUsers([admin.id, superTarget.id, deletedTarget.id, activeTarget.id, suspendedTarget.id]);
     }

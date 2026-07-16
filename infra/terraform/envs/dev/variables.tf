@@ -38,6 +38,56 @@ variable "aws_cognito_client_id" {
   default     = null
 }
 
+variable "aws_cognito_admin_web_client_id" {
+  description = "AWS_COGNITO_ADMIN_WEB_CLIENT_ID for the ECS administrator authentication runtime."
+  type        = string
+  default     = null
+}
+
+variable "aws_cognito_admin_web_client_secret_arn" {
+  description = "Secrets Manager ARN containing AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.aws_cognito_admin_web_client_secret_arn == null || can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+", var.aws_cognito_admin_web_client_secret_arn))
+    error_message = "aws_cognito_admin_web_client_secret_arn must be null or a Secrets Manager ARN."
+  }
+}
+
+variable "aws_cognito_user_pool_arn" {
+  description = "Cognito user pool ARN for scoped administrator provisioning permissions."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.aws_cognito_user_pool_arn == null || can(regex("^arn:aws[a-z-]*:cognito-idp:[a-z0-9-]+:[0-9]{12}:userpool/.+", var.aws_cognito_user_pool_arn))
+    error_message = "aws_cognito_user_pool_arn must be null or a Cognito user pool ARN."
+  }
+}
+
+variable "admin_web_bff_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_BFF_SECRET."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.admin_web_bff_secret_arn == null || can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+", var.admin_web_bff_secret_arn))
+    error_message = "admin_web_bff_secret_arn must be null or a Secrets Manager ARN."
+  }
+}
+
+variable "admin_web_session_key_secret_arn" {
+  description = "Secrets Manager ARN containing ADMIN_WEB_SESSION_KEY_SECRET."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.admin_web_session_key_secret_arn == null || can(regex("^arn:aws[a-z-]*:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:.+", var.admin_web_session_key_secret_arn))
+    error_message = "admin_web_session_key_secret_arn must be null or a Secrets Manager ARN."
+  }
+}
+
 variable "allowed_origins" {
   description = "Comma-separated ALLOWED_ORIGINS for the ECS production runtime. Required before live ECS resources are created."
   type        = string

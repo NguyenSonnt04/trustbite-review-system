@@ -114,7 +114,7 @@ const provisionCognitoUser = async (identity) => {
   }
 };
 
-const findUserByIdentity = async (identity) => {
+const findUserByIdentity = async (identity, { allowProvision = true } = {}) => {
   if (identity.localUserId) {
     if (!UUID_REGEX.test(identity.localUserId)) {
       throw createUnmappedIdentityError();
@@ -153,7 +153,7 @@ const findUserByIdentity = async (identity) => {
           return remappedResult;
         }
 
-        if (identity.provider === 'cognito') {
+        if (identity.provider === 'cognito' && allowProvision) {
           const provisionedResult = await insertCognitoUser(identity.subject, client);
           await client.query('COMMIT');
           return provisionedResult;
@@ -199,7 +199,7 @@ const findUserByIdentity = async (identity) => {
     }
   }
 
-  if (identity.provider === 'cognito' && identity.subject) {
+  if (identity.provider === 'cognito' && identity.subject && allowProvision) {
     return provisionCognitoUser(identity);
   }
 
@@ -272,8 +272,8 @@ export class AuthService {
     return this.mapIdentityToUser(identity, options);
   }
 
-  async mapIdentityToUser(identity, { enforceStatus = true } = {}) {
-    const userResult = await findUserByIdentity(identity);
+  async mapIdentityToUser(identity, { enforceStatus = true, allowProvision = true } = {}) {
+    const userResult = await findUserByIdentity(identity, { allowProvision });
     if (userResult.rowCount === 0) {
       throw createUnmappedIdentityError();
     }

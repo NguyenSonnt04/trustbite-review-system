@@ -14,6 +14,12 @@ const getValidatedUserIdParam = (req) => {
 };
 
 const getValidatedAdminReason = (body = {}) => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Request body must be an object');
+  }
+  if (Object.keys(body).some((field) => field !== 'reason')) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'Request body contains unsupported fields');
+  }
   const { reason } = body;
 
   if (typeof reason !== 'string') {
