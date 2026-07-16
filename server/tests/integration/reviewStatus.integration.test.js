@@ -73,6 +73,56 @@ describe('review verification status API', () => {
     await closeDbPool();
   });
 
+  it('publishes a receipt-free review as reference only', async () => {
+    const owner = await createUser({ displayName: 'Receipt Optional Owner' });
+    const restaurant = await createRestaurant();
+    const review = await createReview({
+      userId: owner.id,
+      restaurantId: restaurant.id,
+      status: 'SUBMITTED',
+      verificationStatus: 'UNVERIFIED',
+      trustLabel: 'PENDING_VERIFICATION',
+      publicVisibility: 'PRIVATE_UNTIL_DECISION',
+      trustWeightBucket: 'NONE',
+    });
+    created.users.push(owner.id);
+    created.restaurants.push(restaurant.id);
+    created.reviews.push(review.id);
+
+    const skipped = await requestApp()
+      .post(`/api/v1/reviews/${review.id}/skip-verification`)
+      .set(authHeaders(owner.id))
+      .send({ reason: 'USER_SKIPPED_RECEIPT' })
+      .expect(200);
+
+    expect(skipped.body).toMatchObject({
+      reviewId: review.id,
+      status: 'REFERENCE_ONLY',
+      verificationStatus: 'SKIPPED',
+      trustLabel: 'REFERENCE_ONLY',
+      publicVisibility: 'PUBLIC',
+      trustWeightBucket: 'LOW',
+    });
+
+    const status = await requestApp()
+      .get(`/api/v1/reviews/${review.id}/status`)
+      .set(authHeaders(owner.id))
+      .expect(200);
+    expect(status.body.receipt).toBeNull();
+
+    const publicReviews = await requestApp()
+      .get(`/api/v1/restaurants/${restaurant.id}/reviews?status=REFERENCE_ONLY`)
+      .expect(200);
+    expect(publicReviews.body.items).toEqual([
+      expect.objectContaining({
+        id: review.id,
+        status: 'REFERENCE_ONLY',
+        verificationStatus: 'SKIPPED',
+        trustLabel: 'REFERENCE_ONLY',
+      }),
+    ]);
+  });
+
   it('returns pending review and receipt state for the owning user without exposing storage fields', async () => {
     const owner = await createUser({ displayName: 'Review Status Owner' });
     created.users.push(owner.id);

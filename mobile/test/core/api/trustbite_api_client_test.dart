@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
@@ -16,6 +17,36 @@ void main() {
   );
 
   group('TrustBiteApiClient', () {
+    test('HttpApiTransport sends JSON request bodies as UTF-8', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final receivedBody = <String>[];
+      server.listen((request) async {
+        receivedBody.add(await utf8.decodeStream(request));
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..write('{}');
+        await request.response.close();
+      });
+
+      try {
+        final transport = HttpApiTransport();
+        await transport.send(
+          ApiTransportRequest(
+            method: 'POST',
+            uri: Uri.parse(
+              'http://${server.address.host}:${server.port}/reviews',
+            ),
+            headers: const {'Content-Type': 'application/json'},
+            body: '{"comment":"Tiếng Việt, AWS’s AI 🚀"}',
+          ),
+        );
+
+        expect(receivedBody, ['{"comment":"Tiếng Việt, AWS’s AI 🚀"}']);
+      } finally {
+        await server.close(force: true);
+      }
+    });
+
     test('sends Cognito access token as backend bearer auth', () async {
       final transport = _FakeApiTransport(
         response: const ApiTransportResponse(

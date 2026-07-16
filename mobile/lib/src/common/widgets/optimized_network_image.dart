@@ -12,7 +12,7 @@ class OptimizedNetworkImage extends StatelessWidget {
     this.fit = BoxFit.cover,
   });
 
-  final String imageUrl;
+  final String? imageUrl;
   final double width;
   final double height;
   final double borderRadius;
@@ -22,42 +22,46 @@ class OptimizedNetworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final normalizedImageUrl = imageUrl?.trim();
+
     return ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: SizedBox(
         width: width,
         height: height,
-        child: Image.network(
-          imageUrl,
-          width: width,
-          height: height,
-          fit: fit,
-          semanticLabel: semanticLabel,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) {
-              return child;
-            }
+        child: normalizedImageUrl == null || normalizedImageUrl.isEmpty
+            ? _ImageFallback(
+                icon: Icons.image_not_supported_outlined,
+                iconSize: fallbackIconSize,
+              )
+            : Image.network(
+                normalizedImageUrl,
+                width: width,
+                height: height,
+                fit: fit,
+                semanticLabel: semanticLabel,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) {
+                    return child;
+                  }
 
-            return _ImageFallback(
-              icon: Icons.image_outlined,
-              iconSize: fallbackIconSize,
-            );
-          },
-          errorBuilder: (context, error, stackTrace) => _ImageFallback(
-            icon: Icons.broken_image_outlined,
-            iconSize: fallbackIconSize,
-          ),
-        ),
+                  return _ImageFallback(
+                    icon: Icons.image_outlined,
+                    iconSize: fallbackIconSize,
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => _ImageFallback(
+                  icon: Icons.broken_image_outlined,
+                  iconSize: fallbackIconSize,
+                ),
+              ),
       ),
     );
   }
 }
 
 class _ImageFallback extends StatelessWidget {
-  const _ImageFallback({
-    required this.icon,
-    required this.iconSize,
-  });
+  const _ImageFallback({required this.icon, required this.iconSize});
 
   final IconData icon;
   final double iconSize;
@@ -67,11 +71,7 @@ class _ImageFallback extends StatelessWidget {
     return ColoredBox(
       color: const Color(0xFFE5E7EB),
       child: Center(
-        child: Icon(
-          icon,
-          size: iconSize,
-          color: const Color(0xFF8E8E9A),
-        ),
+        child: Icon(icon, size: iconSize, color: const Color(0xFF8E8E9A)),
       ),
     );
   }

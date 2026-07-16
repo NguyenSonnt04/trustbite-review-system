@@ -5,7 +5,9 @@ import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
+import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_screen.dart';
+import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/launch/brand_launch_screen.dart';
 
 void main() {
@@ -36,6 +38,7 @@ void main() {
         home: HomeScreen(
           authService: authService,
           cognitoAuthGateway: cognitoGateway,
+          restaurantRepository: const _FakeRestaurantRepository(),
         ),
       ),
     );
@@ -73,7 +76,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(authService: _FakeMobileAuthService())),
+      MaterialApp(
+        home: HomeScreen(
+          authService: _FakeMobileAuthService(),
+          restaurantRepository: const _FakeRestaurantRepository(),
+        ),
+      ),
     );
 
     await tester.tap(find.text('Tôi'));
@@ -93,6 +101,7 @@ void main() {
         home: HomeScreen(
           authService: authService,
           cognitoAuthGateway: cognitoGateway,
+          restaurantRepository: const _FakeRestaurantRepository(),
         ),
       ),
     );
@@ -134,7 +143,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(authService: _FakeMobileAuthService())),
+      MaterialApp(
+        home: HomeScreen(
+          authService: _FakeMobileAuthService(),
+          restaurantRepository: const _FakeRestaurantRepository(),
+        ),
+      ),
     );
 
     await tester.tap(find.text('Yêu thích'));
@@ -151,7 +165,12 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp(home: HomeScreen(authService: _FakeMobileAuthService())),
+      MaterialApp(
+        home: HomeScreen(
+          authService: _FakeMobileAuthService(),
+          restaurantRepository: const _FakeRestaurantRepository(),
+        ),
+      ),
     );
 
     await tester.tap(find.byIcon(Icons.notifications_rounded));
@@ -439,6 +458,7 @@ void main() {
         home: HomeScreen(
           authService: authService,
           cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
+          restaurantRepository: const _FakeRestaurantRepository(),
         ),
       ),
     );
@@ -460,6 +480,7 @@ void main() {
         home: HomeScreen(
           authService: authService,
           cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
+          restaurantRepository: const _FakeRestaurantRepository(),
         ),
       ),
     );
@@ -473,6 +494,66 @@ void main() {
     );
     expect(authService.cognitoSignInCalls, 1);
   });
+}
+
+class _FakeRestaurantRepository implements RestaurantDiscoveryRepository {
+  const _FakeRestaurantRepository();
+
+  @override
+  Future<List<HomeRestaurant>> fetchRestaurants() async {
+    return const [
+      HomeRestaurant(
+        id: 'restaurant-test',
+        name: 'Quán API thử nghiệm',
+        rating: '4.8',
+        distance: null,
+        status: '2 review xác thực',
+        image: null,
+        featured: false,
+      ),
+    ];
+  }
+
+  @override
+  Future<HomeRestaurantDetail> fetchRestaurantDetail(
+    String restaurantId,
+  ) async {
+    return const HomeRestaurantDetail(
+      id: 'restaurant-test',
+      name: 'Quán API thử nghiệm',
+      description: null,
+      address: null,
+      phoneNumber: null,
+      imageUrl: null,
+      trustScore: 4.8,
+      verifiedReviewCount: 2,
+      ratingBreakdown: RestaurantRatingBreakdown(
+        averageFood: null,
+        averagePrice: null,
+        averageService: null,
+        averageAmbience: null,
+        averageOverall: null,
+        reviewCount: 0,
+      ),
+    );
+  }
+
+  @override
+  Future<List<HomeMenuItem>> fetchRestaurantMenu(String restaurantId) async {
+    return const [];
+  }
+
+  @override
+  Future<HomeRestaurantReviewPage> fetchRestaurantReviews(
+    String restaurantId,
+  ) async {
+    return const HomeRestaurantReviewPage(
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+    );
+  }
 }
 
 class _FakeMobileAuthService implements MobileAuthService {

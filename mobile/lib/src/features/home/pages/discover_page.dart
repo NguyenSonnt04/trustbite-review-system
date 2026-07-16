@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
 import 'package:trustbite_mobile/src/features/home/data/home_mock_data.dart';
+import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
+import 'package:trustbite_mobile/src/features/home/pages/restaurant_detail_page.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/home_header.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/restaurant_card.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/see_all_chip.dart';
+import 'package:trustbite_mobile/src/features/reviews/review_reaction_service.dart';
 
 class DiscoverPage extends StatelessWidget {
   const DiscoverPage({
@@ -16,13 +19,17 @@ class DiscoverPage extends StatelessWidget {
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
+    required this.restaurantRepository,
+    this.reviewReactionRepository,
   });
 
   final int activeServiceIndex;
   final ValueChanged<int> onServiceSelected;
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
-  final VoidCallback onLogin;
+  final Future<bool> Function() onLogin;
+  final RestaurantDiscoveryRepository restaurantRepository;
+  final ReviewReactionRepository? reviewReactionRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -33,11 +40,18 @@ class DiscoverPage extends StatelessWidget {
         HomeHeader(
           isSignedIn: isSignedIn,
           currentUser: currentUser,
-          onLogin: onLogin,
+          onLogin: () {
+            onLogin();
+          },
         ),
         const _TitleAndSearch(),
         const SizedBox(height: 6),
-        const _NearbySection(),
+        _NearbySection(
+          repository: restaurantRepository,
+          isSignedIn: isSignedIn,
+          onLogin: onLogin,
+          reviewReactionRepository: reviewReactionRepository,
+        ),
         const SizedBox(height: 20),
         _ServicesSection(
           activeServiceIndex: activeServiceIndex,
@@ -60,12 +74,7 @@ class _TitleAndSearch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(
-        left: 20,
-        right: 20,
-        top: 16,
-        bottom: 3,
-      ),
+      padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 3),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -95,10 +104,7 @@ class _TitleAndSearch extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: const Color(0xFFE8E8E8),
-                width: 1.1,
-              ),
+              border: Border.all(color: const Color(0xFFE8E8E8), width: 1.1),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.09),
@@ -130,8 +136,47 @@ class _TitleAndSearch extends StatelessWidget {
   }
 }
 
-class _NearbySection extends StatelessWidget {
-  const _NearbySection();
+class _NearbySection extends StatefulWidget {
+  const _NearbySection({
+    required this.repository,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.reviewReactionRepository,
+  });
+
+  final RestaurantDiscoveryRepository repository;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository? reviewReactionRepository;
+
+  @override
+  State<_NearbySection> createState() => _NearbySectionState();
+}
+
+class _NearbySectionState extends State<_NearbySection> {
+  late Future<List<HomeRestaurant>> _restaurants;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRestaurants();
+  }
+
+  @override
+  void didUpdateWidget(covariant _NearbySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.repository != widget.repository) {
+      _loadRestaurants();
+    }
+  }
+
+  void _loadRestaurants() {
+    _restaurants = widget.repository.fetchRestaurants();
+  }
+
+  void _retry() {
+    setState(_loadRestaurants);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -173,18 +218,91 @@ class _NearbySection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 160,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: homeRestaurants.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemBuilder: (context, index) =>
-                RestaurantCard(restaurant: homeRestaurants[index]),
-          ),
+        FutureBuilder<List<HomeRestaurant>>(
+          future: _restaurants,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                key: ValueKey('nearby-restaurants-loading'),
+                height: 160,
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            if (snapshot.hasError) {
+              return _NearbyMessage(
+                message: 'Không thể tải danh sách quán.',
+                onRetry: _retry,
+              );
+            }
+
+            final restaurants = snapshot.data ?? const <HomeRestaurant>[];
+            if (restaurants.isEmpty) {
+              return _NearbyMessage(
+                message: 'Chưa có quán nào để hiển thị.',
+                onRetry: _retry,
+              );
+            }
+
+            return SizedBox(
+              key: const ValueKey('nearby-restaurants-list'),
+              height: 160,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: restaurants.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                itemBuilder: (context, index) {
+                  final restaurant = restaurants[index];
+                  return RestaurantCard(
+                    restaurant: restaurant,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => RestaurantDetailPage(
+                          restaurantId: restaurant.id!,
+                          repository: widget.repository,
+                          initialRestaurant: restaurant,
+                          isSignedIn: widget.isSignedIn,
+                          onLogin: widget.onLogin,
+                          reviewReactionRepository:
+                              widget.reviewReactionRepository,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         ),
       ],
+    );
+  }
+}
+
+class _NearbyMessage extends StatelessWidget {
+  const _NearbyMessage({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 160,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              message,
+              style: AppTypography.caption.copyWith(color: HomeColors.muted),
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: onRetry, child: const Text('Thử lại')),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -219,10 +337,7 @@ class _ServicesSection extends StatelessWidget {
                   ),
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(left: 12),
-                child: SeeAllChip(),
-              ),
+              Padding(padding: EdgeInsets.only(left: 12), child: SeeAllChip()),
             ],
           ),
           const SizedBox(height: 16),
@@ -437,7 +552,7 @@ class _RecentlyViewedCard extends StatelessWidget {
                     const SizedBox(width: 2),
                     Expanded(
                       child: Text(
-                        restaurant.distance,
+                        restaurant.distance ?? 'Chưa có khoảng cách',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.tiny.copyWith(
@@ -543,8 +658,10 @@ class _TrustedTodayCard extends StatelessWidget {
                 top: 8,
                 right: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.95),
                     borderRadius: BorderRadius.circular(14),

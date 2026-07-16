@@ -8,6 +8,56 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OBJECT_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('avatar upload storage service', () => {
+  it('creates a short-lived signed read URL for an owned avatar object', async () => {
+    const readSigner = vi.fn().mockResolvedValue(
+      'https://cdn.trustbite.test/signed-avatar-read',
+    );
+    const service = new AvatarUploadService({
+      bucketName: 'trustbite-test-media',
+      avatarAllowedHosts: ['cdn.trustbite.test'],
+      cleanupAllowedHosts: ['cdn.trustbite.test'],
+      readSigner,
+      client: { name: 's3-client' },
+    });
+
+    await expect(
+      service.resolveReadUrl(
+        `https://cdn.trustbite.test/trustbite-test-media/avatars/${USER_ID}/${OBJECT_ID}.png`,
+      ),
+    ).resolves.toBe('https://cdn.trustbite.test/signed-avatar-read');
+
+    expect(readSigner).toHaveBeenCalledWith({
+      client: { name: 's3-client' },
+      command: expect.objectContaining({
+        input: {
+          Bucket: 'trustbite-test-media',
+          Key: `avatars/${USER_ID}/${OBJECT_ID}.png`,
+        },
+      }),
+      expiresIn: 900,
+    });
+  });
+
+  it('returns null instead of exposing unowned or unavailable avatar URLs', async () => {
+    const readSigner = vi.fn().mockRejectedValue(new Error('provider unavailable'));
+    const service = new AvatarUploadService({
+      bucketName: 'trustbite-test-media',
+      avatarAllowedHosts: ['cdn.trustbite.test'],
+      cleanupAllowedHosts: ['cdn.trustbite.test'],
+      readSigner,
+      client: { name: 's3-client' },
+    });
+
+    await expect(
+      service.resolveReadUrl('https://untrusted.example/avatar.png'),
+    ).resolves.toBeNull();
+    await expect(
+      service.resolveReadUrl(
+        `https://cdn.trustbite.test/trustbite-test-media/avatars/${USER_ID}/${OBJECT_ID}.png`,
+      ),
+    ).resolves.toBeNull();
+  });
+
   it('creates a short-lived signed upload URL for an allowlisted avatar object', async () => {
     const signer = vi.fn().mockResolvedValue('https://upload.trustbite.test/signed-avatar-url');
     const service = new AvatarUploadService({
