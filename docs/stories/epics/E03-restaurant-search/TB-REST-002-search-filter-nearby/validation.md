@@ -37,6 +37,7 @@ Results:
 | Reject radius without coordinates | Integration |
 | Reject `distanceAsc` without coordinates | Integration |
 | Return active, non-deleted restaurants only | Integration |
+| Keep restaurant data available with `primaryImageUrl: null` when image signing fails | Unit |
 | Keyword search matches restaurant name | Integration |
 | Radius filter uses PostGIS and returns only restaurants within radius | Integration |
 | `minTrustScore` filters by trust score | Integration |
@@ -54,3 +55,7 @@ Closeout state:
 - `server:build` passed.
 - A real `verify_command` is attached to the Harness story.
 - Trace evidence includes commands and results.
+
+2026-07-16 degradation follow-up: `restaurantService.test.js` proves public list
+data remains available with a null image when the image signer/provider fails;
+the full server unit suite passed 45 files / 424 tests.

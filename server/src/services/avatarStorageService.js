@@ -163,16 +163,16 @@ export class AvatarUploadService {
   }
 
   async resolveReadUrl(avatarReference) {
-    const parsed = parseOwnedObjectUrl(avatarReference, {
-      bucketName: this.bucketName,
-      region: this.region,
-      allowedHosts: this.cleanupAllowedHosts,
-      allowedPrefixes: ['avatars/'],
-    });
-    if (!parsed.owned) return null;
-
-    const signer = this.readSigner ?? defaultSigner;
     try {
+      const parsed = parseOwnedObjectUrl(avatarReference, {
+        bucketName: this.bucketName,
+        region: this.region,
+        allowedHosts: this.cleanupAllowedHosts,
+        allowedPrefixes: ['avatars/'],
+      });
+      if (!parsed.owned) return null;
+
+      const signer = this.readSigner ?? defaultSigner;
       return await signer({
         client: this.getClient(),
         command: new GetObjectCommand({

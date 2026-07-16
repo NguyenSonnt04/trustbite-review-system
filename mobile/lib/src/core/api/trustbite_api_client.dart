@@ -145,6 +145,13 @@ class TrustBiteApiClient {
     final boundary =
         'trustbite-${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}';
     final bytes = <int>[];
+    final safeFileName = String.fromCharCodes(
+      file.fileName.runes.map((character) {
+        final isControlCharacter = character < 0x20 || character == 0x7f;
+        final breaksQuotedValue = character == 0x22 || character == 0x5c;
+        return isControlCharacter || breaksQuotedValue ? 0x5f : character;
+      }),
+    );
 
     void addText(String value) {
       bytes.addAll(utf8.encode(value));
@@ -159,7 +166,7 @@ class TrustBiteApiClient {
     addText('--$boundary\r\n');
     addText(
       'Content-Disposition: form-data; name="${file.fieldName}"; '
-      'filename="${file.fileName}"\r\n',
+      'filename="$safeFileName"\r\n',
     );
     addText('Content-Type: ${file.contentType}\r\n\r\n');
     bytes.addAll(file.bytes);

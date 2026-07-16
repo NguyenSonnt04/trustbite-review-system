@@ -130,6 +130,13 @@ const PUBLIC_RESTAURANT_CONDITION = `
  * Map a DB row to a camelCase public-facing object.
  */
 async function toPublic(row) {
+  let primaryImageUrl = null;
+  try {
+    primaryImageUrl = await resolveRestaurantImageUrl(row.primary_image_url);
+  } catch {
+    // Public restaurant reads remain available when image delivery is degraded.
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -144,7 +151,7 @@ async function toPublic(row) {
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
     categoryIds: row.category_ids ?? [],
-    primaryImageUrl: await resolveRestaurantImageUrl(row.primary_image_url),
+    primaryImageUrl,
     ...(row.distance_meters !== undefined && row.distance_meters !== null
       ? { distanceMeters: parseFloat(row.distance_meters) }
       : {}),

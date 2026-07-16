@@ -8,10 +8,12 @@ let createUser;
 let query;
 let requestApp;
 
+const originalTrustedAuthHeaders = process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
 const authHeaders = (userId) => ({ 'x-trustbite-user-id': userId });
 
 describe('authenticated review reactions API', () => {
   beforeAll(async () => {
+    process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
     ({ closeDbPool, query } = await import('../helpers/db.js'));
     ({ createRestaurant, createReview, createUser } = await import('../helpers/factories/index.js'));
     ({ requestApp } = await import('../helpers/http.js'));
@@ -19,6 +21,11 @@ describe('authenticated review reactions API', () => {
 
   afterAll(async () => {
     if (closeDbPool) await closeDbPool();
+    if (originalTrustedAuthHeaders === undefined) {
+      delete process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
+    } else {
+      process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = originalTrustedAuthHeaders;
+    }
   });
 
   it('creates, replaces, aggregates, and removes one reaction per authenticated user', async () => {

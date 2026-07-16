@@ -51,6 +51,7 @@ describe('avatar upload storage service', () => {
     await expect(
       service.resolveReadUrl('https://untrusted.example/avatar.png'),
     ).resolves.toBeNull();
+    await expect(service.resolveReadUrl('s3://[invalid')).resolves.toBeNull();
     await expect(
       service.resolveReadUrl(
         `https://cdn.trustbite.test/trustbite-test-media/avatars/${USER_ID}/${OBJECT_ID}.png`,

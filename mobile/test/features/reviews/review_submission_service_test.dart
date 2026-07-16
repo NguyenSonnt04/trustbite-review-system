@@ -77,7 +77,7 @@ void main() {
       reviewId: '11111111-1111-4111-8111-111111111111',
       restaurantId: '33333333-3333-4333-8333-333333333333',
       receipt: const ReceiptFileData(
-        fileName: 'receipt.jpg',
+        fileName: 'receipt"\r\nX-Injected: yes.jpg',
         contentType: 'image/jpeg',
         bytes: [255, 216, 255, 224, 1, 2, 3],
       ),
@@ -94,7 +94,11 @@ void main() {
     expect(body, contains('name="reviewId"'));
     expect(body, contains('11111111-1111-4111-8111-111111111111'));
     expect(body, contains('name="restaurantId"'));
-    expect(body, contains('name="receiptImage"; filename="receipt.jpg"'));
+    expect(
+      body,
+      contains('name="receiptImage"; filename="receipt___X-Injected: yes.jpg"'),
+    );
+    expect(body, isNot(contains('\r\nX-Injected:')));
   });
 
   test('skips receipt verification for a reference-only review', () async {

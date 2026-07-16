@@ -26,9 +26,21 @@ Split mirrors the verification engine (pure math + DB orchestrator):
   referenceReviewCount }`. `sum(rating*weight)/sum(weight)`, clamped and rounded;
   no qualifying reviews → `defaultTrustScore` (5.00).
 - `trustScoreService.js`: `recomputeRestaurantTrustScore(restaurantId, { client })`
-  loads HIGH/LOW reviews joined with `users.rank_code`, computes, and writes
-  `trust_score` + counts. Opens its own transaction, or joins a caller-supplied
-  client so a verification/admin/deletion flow can recompute atomically.
+  takes a `FOR UPDATE` lock on the restaurant before loading public
+  VERIFIED/REFERENCE_ONLY reviews in HIGH/LOW buckets joined with
+  `users.rank_code`, then computes and writes `trust_score` + counts.
+  Persisted legacy `FULL`/`PARTIAL` buckets are normalized to `HIGH`/`LOW` while
+  loading so account-deletion recomputation cannot drop pre-vocabulary reviews.
+  The lock serializes concurrent recomputes for the same restaurant so the waiter
+  reads review changes committed by the prior transaction. The service opens its
+  own transaction, or joins a caller-supplied client so a verification/admin/
+  deletion flow can recompute atomically.
+- `skipReviewReceiptVerification` recomputes before committing both new and
+  already-skipped reviews; the idempotent path repairs pre-trigger aggregates.
+- Account deletion captures affected restaurant IDs before anonymization, sorts
+  them, and calls the shared service after review state changes. This removes the
+  former duplicate formula and gives all wired aggregate writers the same lock,
+  eligibility, weighting, and neutral-default behavior.
 
 ## Interface Contract
 
@@ -41,13 +53,15 @@ No public route/DTO changes. Internal service API:
 No migration. Reads `reviews.average_rating`, `reviews.trust_weight_bucket`,
 `users.rank_code`; writes `restaurants.trust_score`,
 `restaurants.verified_review_count`, `restaurants.reference_review_count`,
-`updated_at`. NONE-bucket reviews are excluded at the query level, so hidden and
-deleted reviews never affect the score.
+`updated_at`. Only public VERIFIED/REFERENCE_ONLY reviews in HIGH/LOW buckets (or
+legacy aliases FULL/PARTIAL) are eligible, so hidden, private, rejected, deleted,
+and pending reviews never affect the score even if legacy data has an
+inconsistent bucket.
 
 ## UI / Platform Impact
 
-None. Search/detail already read `trust_score`; they now see recomputed values
-once recompute is wired to a trigger (follow-up).
+None. Search/detail already read `trust_score`; receipt-free publication and
+account deletion now refresh those values transactionally.
 
 ## Observability
 

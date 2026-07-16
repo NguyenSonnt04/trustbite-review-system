@@ -52,21 +52,27 @@ story flags the "trust-score calculator" as absent.
 
 in-progress
 
-Delivered in this slice (unit-proven):
+Delivered:
 
 - Pure `computeTrustScore` calculator + `weightForReview` (Anti-Fraud §10).
 - `recomputeRestaurantTrustScore(restaurantId, { client })` service that persists
   `trust_score` + counts, joining a caller transaction or opening its own.
 - Weights/default as frozen constants in `trustScoreRules.js`.
+- Receipt-free review publication recomputes before commit; retrying an already
+  skipped review repairs aggregates written before this trigger existed.
+- Account deletion uses the same rank-weighted service for affected restaurants,
+  in deterministic restaurant-id order, instead of maintaining a second formula.
+- Shared aggregate reads normalize persisted `FULL`/`PARTIAL` aliases to
+  `HIGH`/`LOW`, preserving pre-vocabulary review contributions without a schema
+  migration.
 
 Deferred (follow-up, not in this slice):
 
-- Wiring recompute into the verification decision, admin moderation decisions,
-  and the deletion/anonymization job so the score updates automatically. Kept out
-  here to avoid destabilizing the existing verification test path; the service is
-  ready to be called with a shared client.
-- Live DB apply proof (recompute against migrated PostgreSQL) — local Docker was
-  unavailable; no schema change is introduced by this story.
+- Wiring recompute into receipt-verification and admin-moderation decisions.
+
+PostgreSQL proof completed 2026-07-17: focused review-status and
+account-deletion integration coverage passed 2 files / 32 tests after applying
+pending migrations 009 and 010.
 
 ## Non-Goals
 
