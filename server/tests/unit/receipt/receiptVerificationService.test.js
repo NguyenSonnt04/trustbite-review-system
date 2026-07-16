@@ -73,7 +73,7 @@ function setupScenario({
   restaurant = restaurantRow(),
   branch = null,
   duplicateRows = [],
-  user = null,
+  user = { created_at: new Date('2026-06-01T00:00:00.000Z'), exp_points: 0 },
   earlierReviewRows = [],
   rejectedCount = 0,
   sameIpRows = [],
@@ -112,7 +112,19 @@ function setupScenario({
       return { rows: earlierReviewRows };
     }
     if (/FROM\s+reviews/i.test(text)) {
-      return { rows: [{ id: REVIEW_ID, user_id: USER_ID, restaurant_id: RESTAURANT_ID, created_at: reviewCreatedAt }] };
+      return {
+        rows: [{
+          id: REVIEW_ID,
+          user_id: USER_ID,
+          restaurant_id: RESTAURANT_ID,
+          status: 'SUBMITTED',
+          verification_status: 'PROCESSING',
+          trust_label: 'PROCESSING',
+          public_visibility: 'PRIVATE_UNTIL_DECISION',
+          trust_weight_bucket: 'NONE',
+          created_at: reviewCreatedAt,
+        }],
+      };
     }
     if (/FROM\s+users/i.test(text)) {
       return { rows: user ? [user] : [] };
@@ -168,6 +180,26 @@ describe('verifyReceipt orchestrator', () => {
     expect(calls.some((c) => /^\s*BEGIN/i.test(String(c.sql)))).toBe(true);
     expect(calls.some((c) => /^\s*COMMIT/i.test(String(c.sql)))).toBe(true);
     expect(client.release).toHaveBeenCalled();
+  });
+
+  it('returns an already processed terminal decision without rescoring', async () => {
+    const { calls } = setupScenario({
+      receipt: receiptRow({
+        status: 'VERIFIED',
+        decision: 'VERIFIED',
+        fraud_risk_score: 0,
+      }),
+    });
+
+    const result = await verifyReceipt(RECEIPT_ID, { now: NOW });
+
+    expect(result).toMatchObject({
+      decision: 'VERIFIED',
+      receiptStatus: 'VERIFIED',
+      alreadyProcessed: true,
+    });
+    expect(reviewUpdate(calls)).toBeNull();
+    expect(receiptUpdate(calls)).toBeNull();
   });
 
   it('rolls back and releases when a write throws (no residue)', async () => {
@@ -249,6 +281,7 @@ describe('verifyReceipt orchestrator', () => {
     expect(result.reviewStatus).toBe('REFERENCE_ONLY');
     const rev = reviewUpdate(calls);
     expect(rev.params).toEqual(expect.arrayContaining(['REFERENCE_ONLY', 'PUBLIC', 'LOW']));
+    expect(findWrite(calls, /UPDATE\s+restaurants/i)).toHaveLength(1);
   });
 
   it('risk >=100 → REJECTED + fraud flag created', async () => {

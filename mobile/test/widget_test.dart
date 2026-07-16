@@ -9,6 +9,8 @@ import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_ser
 import 'package:trustbite_mobile/src/features/home/home_screen.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/launch/brand_launch_screen.dart';
+import 'package:trustbite_mobile/src/features/notifications/notification_models.dart';
+import 'package:trustbite_mobile/src/features/notifications/notification_service.dart';
 
 void main() {
   testWidgets('shows branded launch screen before handing off', (tester) async {
@@ -161,14 +163,16 @@ void main() {
     expect(find.text('Có review xác thực'), findsWidgets);
   });
 
-  testWidgets('opens the mock notifications page from the home header', (
+  testWidgets('asks guests to sign in before opening notifications', (
     tester,
   ) async {
+    final notificationRepository = _FakeNotificationRepository();
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
           authService: _FakeMobileAuthService(),
           restaurantRepository: const _FakeRestaurantRepository(),
+          notificationRepository: notificationRepository,
         ),
       ),
     );
@@ -176,17 +180,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.notifications_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('Thông báo'), findsOneWidget);
-    expect(find.text('3 mới'), findsOneWidget);
-    expect(find.text('Bill đã được xác thực'), findsOneWidget);
-    expect(find.text('Có ưu đãi gần bạn'), findsOneWidget);
-    expect(find.text('Review được quan tâm'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('notifications-back-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('notifications-list')), findsNothing);
-    expect(find.byIcon(Icons.notifications_rounded), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(notificationRepository.fetchCalls, 0);
   });
 
   testWidgets('shows the separate TrustBite login entry screen', (
@@ -670,4 +665,31 @@ class _FakeCognitoAuthGateway implements CognitoAuthGateway {
 
   @override
   Future<void> signOut() async {}
+}
+
+class _FakeNotificationRepository implements NotificationRepository {
+  int fetchCalls = 0;
+
+  @override
+  Future<int> fetchUnreadCount() async => 0;
+
+  @override
+  Future<NotificationPageData> fetchNotifications({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    fetchCalls += 1;
+    return const NotificationPageData(
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      unreadCount: 0,
+    );
+  }
+
+  @override
+  Future<TrustBiteNotification> markRead(String notificationId) {
+    throw UnimplementedError();
+  }
 }

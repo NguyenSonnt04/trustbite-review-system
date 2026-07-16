@@ -21,6 +21,8 @@ class DiscoverPage extends StatelessWidget {
     required this.onLogin,
     required this.restaurantRepository,
     this.reviewReactionRepository,
+    this.notificationCount = 0,
+    this.onNotificationsPressed,
   });
 
   final int activeServiceIndex;
@@ -30,6 +32,8 @@ class DiscoverPage extends StatelessWidget {
   final Future<bool> Function() onLogin;
   final RestaurantDiscoveryRepository restaurantRepository;
   final ReviewReactionRepository? reviewReactionRepository;
+  final int notificationCount;
+  final VoidCallback? onNotificationsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,12 @@ class DiscoverPage extends StatelessWidget {
           onLogin: () {
             onLogin();
           },
+          notificationCount: notificationCount,
+          onNotificationsPressed:
+              onNotificationsPressed ??
+              () {
+                onLogin();
+              },
         ),
         const _TitleAndSearch(),
         const SizedBox(height: 6),

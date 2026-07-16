@@ -45,7 +45,11 @@ Accepted rule for `TB-TRUST-001` (Anti-Fraud §10, Status_Mapping §2). `restaur
 - A restaurant with no qualifying (HIGH/LOW) reviews resets to the neutral default `5.00`.
 - The same pass recomputes `verified_review_count` (HIGH) and `reference_review_count` (LOW).
 
-This is the restaurant trust score. TrustBite has no per-user trust score; user reputation is `exp_points`/`rank_code`. Auto-recompute triggers (verification decision, admin moderation, deletion) are a tracked follow-up.
+This is the restaurant trust score. TrustBite has no per-user trust score; user
+reputation is `exp_points`/`rank_code`. Automated verified-review decisions
+recompute the affected restaurant in the same transaction. A rank change also
+recomputes every restaurant containing that user's HIGH-weight reviews. Admin
+moderation and deletion triggers remain tracked follow-up work.
 
 ## Vietnam Receipt Parsing
 

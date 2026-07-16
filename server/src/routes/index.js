@@ -10,6 +10,7 @@ import authRoutes from './auth.js';
 import awsRoutes from './aws.js';
 import moderationRoutes from './moderation.js';
 import merchantRoutes from './merchant.js';
+import notificationRoutes from './notification.js';
 import receiptRoutes from './receipt.js';
 import restaurantRoutes from './restaurant.js';
 import reviewRoutes from './review.js';
@@ -29,5 +30,6 @@ router.use('/reviews', reviewRoutes);
 router.use('/users', userRoutes);
 // Moderation reports — Task 6.1 (PHASE 6 — Moderation & Compliance)
 router.use('/moderation', moderationRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

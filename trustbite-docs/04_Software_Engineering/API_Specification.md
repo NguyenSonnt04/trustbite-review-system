@@ -962,6 +962,12 @@ MVP ghi nhận claim/ownership tối thiểu để kiểm chứng vận hành ch
 
 Mức ưu tiên: **P1/feature flag**. MVP dùng polling/refetch `GET /receipts/{receiptVerificationId}` và `GET /reviews/{reviewId}`.
 
+Query:
+
+```text
+page=1&pageSize=20
+```
+
 Phản hồi:
 
 ```json
@@ -969,13 +975,31 @@ Phản hồi:
   "items": [
     {
       "id": "uuid",
-      "type": "RECEIPT_VERIFIED",
+      "type": "REVIEW_VERIFIED",
       "title": "Review của bạn đã được xác minh",
+      "body": "Review đã vượt qua kiểm tra độ tin cậy.",
+      "payload": {
+        "reviewId": "uuid"
+      },
       "readAt": null,
       "createdAt": "2026-06-07T12:30:00+07:00"
     }
-  ]
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 1,
+  "unreadCount": 1
 }
+```
+
+### GET /notifications/summary
+
+Mức ưu tiên: **P1/feature flag**.
+
+Phản hồi:
+
+```json
+{ "unreadCount": 1 }
 ```
 
 ### PATCH /notifications/{id}/read
@@ -984,9 +1008,7 @@ Mức ưu tiên: **P1/feature flag**.
 
 Phản hồi:
 
-```json
-{ "success": true }
-```
+Phản hồi trả về notification đã cập nhật với `readAt` khác `null`.
 
 ---
 
