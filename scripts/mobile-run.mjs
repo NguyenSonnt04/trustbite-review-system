@@ -53,6 +53,11 @@ const mobileConfig = {
     clientEnv.NEXT_PUBLIC_COGNITO_CLIENT_ID,
   TRUSTBITE_API_BASE_URL:
     process.env.TRUSTBITE_API_BASE_URL ?? clientEnv.NEXT_PUBLIC_API_BASE_URL,
+  TRUSTBITE_LOCATION_MAP_NAME:
+    process.env.TRUSTBITE_LOCATION_MAP_NAME ?? serverEnv.AWS_LOCATION_MAP_NAME,
+  TRUSTBITE_LOCATION_MAP_API_KEY:
+    process.env.TRUSTBITE_LOCATION_MAP_API_KEY ??
+    serverEnv.AWS_LOCATION_MAP_API_KEY,
 };
 
 const dartDefines = Object.entries(mobileConfig)
@@ -73,6 +78,24 @@ if (missingCognitoConfig.length > 0) {
     [
       'Add AWS_COGNITO_USER_POOL_ID and AWS_COGNITO_CLIENT_ID to server/.env,',
       'or run flutter with matching --dart-define values.',
+    ].join(' '),
+  );
+}
+
+const missingLocationMapConfig = [
+  'TRUSTBITE_AWS_REGION',
+  'TRUSTBITE_LOCATION_MAP_NAME',
+  'TRUSTBITE_LOCATION_MAP_API_KEY',
+].filter((name) => !mobileConfig[name]?.trim());
+
+if (missingLocationMapConfig.length > 0) {
+  console.warn(
+    `Location map configuration is incomplete: ${missingLocationMapConfig.join(', ')}`,
+  );
+  console.warn(
+    [
+      'Add AWS_LOCATION_MAP_NAME and AWS_LOCATION_MAP_API_KEY to server/.env,',
+      'or run flutter with matching TRUSTBITE_* --dart-define values.',
     ].join(' '),
   );
 }

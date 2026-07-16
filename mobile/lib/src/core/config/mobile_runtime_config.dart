@@ -6,6 +6,8 @@ class MobileRuntimeConfig {
     required this.awsRegion,
     required this.cognitoUserPoolId,
     required this.cognitoClientId,
+    this.locationMapApiKey = '',
+    this.locationMapName = 'TrustBiteMap',
   });
 
   factory MobileRuntimeConfig.fromEnvironment() {
@@ -24,6 +26,12 @@ class MobileRuntimeConfig {
           const String.fromEnvironment('TRUSTBITE_COGNITO_USER_POOL_ID'),
       cognitoClientId:
           const String.fromEnvironment('TRUSTBITE_COGNITO_CLIENT_ID'),
+      locationMapApiKey:
+          const String.fromEnvironment('TRUSTBITE_LOCATION_MAP_API_KEY'),
+      locationMapName: const String.fromEnvironment(
+        'TRUSTBITE_LOCATION_MAP_NAME',
+        defaultValue: 'TrustBiteMap',
+      ),
     );
   }
 
@@ -31,11 +39,28 @@ class MobileRuntimeConfig {
   final String awsRegion;
   final String cognitoUserPoolId;
   final String cognitoClientId;
+  final String locationMapApiKey;
+  final String locationMapName;
 
   bool get hasCognitoConfig =>
       awsRegion.trim().isNotEmpty &&
       cognitoUserPoolId.trim().isNotEmpty &&
       cognitoClientId.trim().isNotEmpty;
+
+  bool get hasLocationMapConfig =>
+      awsRegion.trim().isNotEmpty &&
+      locationMapName.trim().isNotEmpty &&
+      locationMapApiKey.trim().isNotEmpty;
+
+  Uri? get locationMapStyleUri {
+    if (!hasLocationMapConfig) return null;
+
+    return Uri.https(
+      'maps.geo.${awsRegion.trim()}.amazonaws.com',
+      '/maps/v0/maps/${locationMapName.trim()}/style-descriptor',
+      {'key': locationMapApiKey.trim()},
+    );
+  }
 
   Uri apiUri(String path, [Map<String, String?>? queryParameters]) {
     final base = _apiV1BaseUri();
