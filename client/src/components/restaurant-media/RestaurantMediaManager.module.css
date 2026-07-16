@@ -1,0 +1,207 @@
+.manager {
+  margin-top: 20px;
+  border: 1px solid #d9d9dc;
+  border-radius: 12px;
+  background: #fff;
+  padding: 22px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header div {
+  min-width: 0;
+}
+
+.header span,
+.header p,
+.uploadForm small {
+  color: #74757c;
+  font-size: 11px;
+}
+
+.header h2 {
+  margin-top: 3px;
+  color: #202124;
+  font-size: 18px;
+}
+
+.header p {
+  margin-top: 4px;
+}
+
+.closeButton,
+.primaryButton,
+.imageMeta button {
+  min-height: 34px;
+  border-radius: 7px;
+  cursor: pointer;
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.closeButton,
+.imageMeta button {
+  border: 1px solid #d9d9dc;
+  background: #fff;
+  color: #2b2c30;
+}
+
+.primaryButton {
+  align-self: end;
+  border: 1px solid #202124;
+  background: #202124;
+  color: #fff;
+}
+
+.primaryButton:disabled,
+.imageMeta button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.error {
+  margin-top: 16px;
+  border-radius: 8px;
+  background: #fff0f0;
+  color: #a32d2d;
+  padding: 10px 12px;
+  font-size: 11px;
+}
+
+.uploadForm {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.1fr) minmax(180px, 1fr) auto auto;
+  align-items: end;
+  gap: 12px;
+  margin-top: 20px;
+  border-radius: 10px;
+  background: #f7f7f8;
+  padding: 16px;
+}
+
+.uploadForm label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+  color: #3f4045;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.uploadForm input[type="file"],
+.uploadForm input[type="text"] {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid #d1d1d5;
+  border-radius: 7px;
+  background: #fff;
+  color: #2c2d31;
+  padding: 8px 10px;
+  font-size: 11px;
+}
+
+.checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  align-self: center;
+  white-space: nowrap;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.imageCard {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dedee1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.imageFrame {
+  position: relative;
+  display: grid;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #f0f0f2;
+  color: #74757c;
+  place-items: center;
+  font-size: 10px;
+}
+
+.imageFrame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imageFrame strong {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  border-radius: 999px;
+  background: rgba(25, 25, 27, 0.88);
+  color: #fff;
+  padding: 4px 7px;
+  font-size: 9px;
+}
+
+.imageMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+}
+
+.imageMeta p {
+  overflow: hidden;
+  color: #515258;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imageMeta button {
+  min-height: 28px;
+  flex: 0 0 auto;
+  color: #a32d2d;
+  padding: 0 8px;
+  font-size: 9px;
+}
+
+.empty {
+  grid-column: 1 / -1;
+  padding: 30px;
+  color: #74757c;
+  font-size: 11px;
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .uploadForm {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .uploadForm,
+  .gallery {
+    grid-template-columns: 1fr;
+  }
+}
