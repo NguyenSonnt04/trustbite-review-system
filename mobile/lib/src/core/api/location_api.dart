@@ -18,7 +18,9 @@ class LocationCoordinate {
 
   factory LocationCoordinate.fromGeometry(List<dynamic> value) {
     if (value.length < 2) {
-      throw const FormatException('Route coordinate must contain longitude and latitude.');
+      throw const FormatException(
+        'Route coordinate must contain longitude and latitude.',
+      );
     }
     return LocationCoordinate(
       longitude: _requiredDouble(value[0], 'route longitude'),
@@ -77,7 +79,10 @@ class LocationRoute {
 
     return LocationRoute(
       distanceMeters: _requiredDouble(json['distanceMeters'], 'route distance'),
-      durationSeconds: _requiredDouble(json['durationSeconds'], 'route duration'),
+      durationSeconds: _requiredDouble(
+        json['durationSeconds'],
+        'route duration',
+      ),
       geometry: rawGeometry
           .map((item) {
             if (item is! List) {
@@ -86,46 +91,6 @@ class LocationRoute {
             return LocationCoordinate.fromGeometry(item);
           })
           .toList(growable: false),
-    );
-  }
-}
-
-class NearbyRestaurant {
-  const NearbyRestaurant({
-    required this.id,
-    required this.name,
-    required this.latitude,
-    required this.longitude,
-    this.address,
-    this.trustScore,
-    this.verifiedReviewCount,
-  });
-
-  final String id;
-  final String name;
-  final double latitude;
-  final double longitude;
-  final String? address;
-  final double? trustScore;
-  final int? verifiedReviewCount;
-
-  factory NearbyRestaurant.fromJson(Map<String, dynamic> json) {
-    final id = json['id'];
-    final name = json['name'];
-    if (id is! String || id.trim().isEmpty || name is! String || name.trim().isEmpty) {
-      throw const FormatException('Restaurant identity is missing.');
-    }
-
-    return NearbyRestaurant(
-      id: id,
-      name: name,
-      latitude: _requiredDouble(json['latitude'], 'restaurant latitude'),
-      longitude: _requiredDouble(json['longitude'], 'restaurant longitude'),
-      address: json['address'] is String ? json['address'] as String : null,
-      trustScore: _optionalDouble(json['trustScore']),
-      verifiedReviewCount: json['verifiedReviewCount'] is num
-          ? (json['verifiedReviewCount'] as num).toInt()
-          : null,
     );
   }
 }
@@ -144,7 +109,9 @@ class LocationApi {
     final query = text.trim();
     if (query.isEmpty) return const <LocationPlace>[];
     if ((latitude == null) != (longitude == null)) {
-      throw ArgumentError('Search latitude and longitude must be supplied together.');
+      throw ArgumentError(
+        'Search latitude and longitude must be supplied together.',
+      );
     }
 
     final body = await _apiClient.getJson('/location/search', {
@@ -155,7 +122,10 @@ class LocationApi {
     return _parseItems(body, LocationPlace.fromJson);
   }
 
-  Future<LocationPlace?> reverseGeocode(double latitude, double longitude) async {
+  Future<LocationPlace?> reverseGeocode(
+    double latitude,
+    double longitude,
+  ) async {
     final body = await _apiClient.getJson('/location/reverse-geocode', {
       'lat': latitude.toString(),
       'lng': longitude.toString(),
@@ -178,23 +148,6 @@ class LocationApi {
       'mode': mode.apiValue,
     });
     return LocationRoute.fromJson(_jsonMap(body['route'], 'route'));
-  }
-
-  Future<List<NearbyRestaurant>> nearbyRestaurants({
-    required double northEastLatitude,
-    required double northEastLongitude,
-    required double southWestLatitude,
-    required double southWestLongitude,
-    int pageSize = 100,
-  }) async {
-    final body = await _apiClient.getJson('/restaurants/nearby', {
-      'northEastLat': northEastLatitude.toString(),
-      'northEastLng': northEastLongitude.toString(),
-      'southWestLat': southWestLatitude.toString(),
-      'southWestLng': southWestLongitude.toString(),
-      'pageSize': pageSize.clamp(1, 250).toString(),
-    });
-    return _parseItems(body, NearbyRestaurant.fromJson);
   }
 }
 
@@ -219,12 +172,6 @@ Map<String, dynamic> _jsonMap(Object? value, String name) {
 double _requiredDouble(Object? value, String name) {
   if (value is num && value.isFinite) return value.toDouble();
   throw FormatException('Backend $name is malformed.');
-}
-
-double? _optionalDouble(Object? value) {
-  if (value == null) return null;
-  if (value is num && value.isFinite) return value.toDouble();
-  return null;
 }
 
 List<String> _stringList(Object? value) {

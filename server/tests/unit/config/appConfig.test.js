@@ -19,6 +19,7 @@ async function loadAppConfig(caseName) {
     'trust-proxy-hops': () => import('../../../src/config/app.js?trust-proxy-hops'),
     'trust-proxy-subnet': () => import('../../../src/config/app.js?trust-proxy-subnet'),
     'admin-web': () => import('../../../src/config/app.js?admin-web'),
+    'location-rate-limit': () => import('../../../src/config/app.js?location-rate-limit'),
   };
   return (await imports[caseName]()).default;
 }
@@ -179,6 +180,25 @@ describe('admin web auth config', () => {
           loginEmailRateLimitMax: 15,
           loginRateLimitWindowSeconds: 240,
         },
+      },
+    });
+  });
+});
+
+describe('Location API rate-limit config', () => {
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it('parses the shared per-IP Location quota', async () => {
+    setBaseEnv();
+    process.env.AWS_LOCATION_RATE_LIMIT_MAX = '24';
+    process.env.AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS = '120';
+
+    await expect(loadAppConfig('location-rate-limit')).resolves.toMatchObject({
+      location: {
+        rateLimitMax: 24,
+        rateLimitWindowMs: 120_000,
       },
     });
   });

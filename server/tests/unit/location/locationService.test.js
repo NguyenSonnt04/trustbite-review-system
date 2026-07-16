@@ -7,6 +7,21 @@ const configuredResources = {
 };
 
 describe('LocationService', () => {
+  it('does not retain the mobile map API key in service state', () => {
+    const service = new LocationService({
+      config: {
+        ...configuredResources,
+        region: 'ap-southeast-1',
+        mapName: 'mobile-map',
+        mapApiKey: 'mobile-map-secret',
+      },
+      aws: {},
+    });
+
+    expect(service.config).toEqual(configuredResources);
+    expect(JSON.stringify(service)).not.toContain('mobile-map-secret');
+  });
+
   it('prefers Location-specific credentials over shared AWS credentials', () => {
     const locationCredentials = {
       accessKeyId: 'location-access-key',

@@ -40,6 +40,10 @@ build and restricted at the AWS resource boundary.
   configuration with no source credential or API-key literal.
 - Express exposes validated public read-only search, reverse-geocode, and route
   endpoints under `/api/v1/location`.
+- Paid Location endpoints share a configurable per-IP quota and return
+  `429 LOCATION_RATE_LIMITED` before controller/provider execution when the
+  quota is exceeded.
+- Backend Location service state never retains the mobile map API key.
 - Controllers validate exact numeric coordinate strings, coordinate ranges,
   search length, and supported travel modes before services run.
 - Provider payloads are normalized so controllers and Flutter do not depend on
@@ -57,8 +61,8 @@ build and restricted at the AWS resource boundary.
   marker/card state, and a successful route fits its geometry in the remaining
   map viewport.
 - Mobile requests only foreground location, handles denied/disabled services,
-  loads `/restaurants/nearby` with viewport bounds, searches locations, and
-  renders the selected route geometry.
+  loads `/restaurants/nearby` through `RestaurantApi` with viewport bounds,
+  searches locations, and renders the selected route geometry.
 - Android and iOS foreground location usage strings are present.
 - LocalStack declares `location`, but validation distinguishes declaration
   from actual emulator support.

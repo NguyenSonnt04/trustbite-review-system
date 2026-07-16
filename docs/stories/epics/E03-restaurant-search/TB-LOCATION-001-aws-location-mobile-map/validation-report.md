@@ -1,6 +1,6 @@
 # Validation Report
 
-Date: 2026-07-16
+Date: 2026-07-17
 
 ## Scope
 
@@ -14,6 +14,7 @@ permission declarations, and LocalStack configuration.
 npm test --prefix server -- tests/unit/config/awsConfig.test.js tests/unit/location --reporter=dot
 npm test --prefix server -- tests/integration/locationRoutes.test.js --reporter=verbose
 npm run server:build
+npm test --prefix server -- --reporter=dot
 node scripts/audit-aws-provider-boundaries.mjs
 docker compose config --quiet
 node --check scripts/mobile-run.mjs
@@ -22,6 +23,7 @@ live AWS map style GET (key value redacted)
 live AWS SearchPlaceIndexForText diagnostic (credentials redacted)
 npm run mobile:test
 flutter test test/features/map/map_screen_test.dart
+flutter test test/core/api/location_api_test.dart test/core/api/restaurant_api_test.dart test/features/map/map_screen_test.dart
 flutter analyze
 git -c core.whitespace=cr-at-eol diff --check
 ```
@@ -30,9 +32,9 @@ git -c core.whitespace=cr-at-eol diff --check
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| Backend unit | pass | 4 files, 34 tests passed, including shared AWS config, strict controller validation, SDK commands, normalization, and safe provider errors. |
-| Backend integration | pass | 1 file, 3 route tests passed for mounting, validation envelope, and safe provider failure. |
-| Backend syntax | pass | `server:build` checked 137 files. |
+| Backend unit | pass | 3 focused config/location/middleware files, 23 tests passed, including quota config, state redaction, SDK normalization, and limiter rejection. |
+| Backend integration | pass | 1 file, 4 route tests passed for mounting, validation, safe provider failure, and pre-provider rate limiting. |
+| Backend syntax | pass | `server:build` checked 138 files. |
 | Provider boundary | pass | AWS SDK import/client audit passed. |
 | Dependency audit | pass | npm audit found 0 vulnerabilities. |
 | Docker config | pass with warning | Compose parses with `location` declared; existing top-level `version` key is obsolete. |
@@ -45,12 +47,15 @@ git -c core.whitespace=cr-at-eol diff --check
 | Android build/install | pass | Debug APK built and installed on the `sdk gphone16k x86_64` Android emulator (`emulator-5554`); the app launched successfully. |
 | E2E/device | partial | The Android emulator accepted the foreground-location permission and a Quận 1 GPS fix (`10.7769, 106.7009`). The AWS map rendered and centered on Ho Chi Minh City. The redesigned trust-score marker, selected card, place-search, and fitted route-line interaction smoke remains open because the current viewport returned no nearby restaurants. |
 | Diff hygiene | pass | The CRLF-aware diff check is clean; Git only reports line-ending conversion warnings. |
+| Review remediation | pass | Full server suite: 590 passed / 4 skipped; mobile: 47 passed and analyze clean. Paid routes return pre-provider 429, service state excludes the map key, and nearby lookup is owned by `RestaurantApi`. |
 
 ## Evidence
 
 - `server/tests/unit/location/`
+- `server/tests/unit/middlewares/rateLimit.test.js`
 - `server/tests/integration/locationRoutes.test.js`
 - `mobile/test/core/api/location_api_test.dart`
+- `mobile/test/core/api/restaurant_api_test.dart`
 - `mobile/test/features/map/map_screen_test.dart`
 - `docs/decisions/0026-aws-location-classic-provider-boundary.md`
 
@@ -59,5 +64,5 @@ git -c core.whitespace=cr-at-eol diff --check
 - Perform the remaining nearby-marker, selected-card, place-search, and fitted
   route-line interaction smoke with nearby fixture data before moving the story
   to `complete`.
-- Public place/route endpoints should receive an application-level cost/rate
-  limit before production exposure.
+- Replace or complement the in-process Location quota with a distributed/edge
+  quota before horizontally scaled production deployment.

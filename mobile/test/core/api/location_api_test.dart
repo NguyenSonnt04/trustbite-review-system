@@ -47,49 +47,30 @@ void main() {
       expect(await _api(config, transport).reverseGeocode(10, 106), isNull);
     });
 
-    test('route preserves AWS geometry order as longitude then latitude', () async {
-      final transport = _FakeTransport(
-        const ApiTransportResponse(
-          statusCode: 200,
-          body:
-              '{"route":{"distanceMeters":1200,"durationSeconds":420,"geometry":[[106.7,10.7],[106.8,10.8]],"legs":[]}}',
-        ),
-      );
+    test(
+      'route preserves AWS geometry order as longitude then latitude',
+      () async {
+        final transport = _FakeTransport(
+          const ApiTransportResponse(
+            statusCode: 200,
+            body:
+                '{"route":{"distanceMeters":1200,"durationSeconds":420,"geometry":[[106.7,10.7],[106.8,10.8]],"legs":[]}}',
+          ),
+        );
 
-      final route = await _api(config, transport).calculateRoute(
-        origin: const LocationCoordinate(latitude: 10.7, longitude: 106.7),
-        destination:
-            const LocationCoordinate(latitude: 10.8, longitude: 106.8),
-      );
+        final route = await _api(config, transport).calculateRoute(
+          origin: const LocationCoordinate(latitude: 10.7, longitude: 106.7),
+          destination: const LocationCoordinate(
+            latitude: 10.8,
+            longitude: 106.8,
+          ),
+        );
 
-      expect(route.geometry.first.longitude, 106.7);
-      expect(route.geometry.first.latitude, 10.7);
-      expect(transport.lastUri.queryParameters['mode'], 'car');
-    });
-
-    test('nearby uses viewport bounds and clamps the page size', () async {
-      final transport = _FakeTransport(
-        const ApiTransportResponse(
-          statusCode: 200,
-          body:
-              '{"items":[{"id":"restaurant-1","name":"Pho","latitude":10.78,"longitude":106.7,"trustScore":4.8}]}',
-        ),
-      );
-
-      final items = await _api(config, transport).nearbyRestaurants(
-        northEastLatitude: 10.9,
-        northEastLongitude: 106.9,
-        southWestLatitude: 10.6,
-        southWestLongitude: 106.5,
-        pageSize: 500,
-      );
-
-      expect(items.single.name, 'Pho');
-      expect(transport.lastUri.path, '/api/v1/restaurants/nearby');
-      expect(transport.lastUri.queryParameters['northEastLat'], '10.9');
-      expect(transport.lastUri.queryParameters['southWestLng'], '106.5');
-      expect(transport.lastUri.queryParameters['pageSize'], '250');
-    });
+        expect(route.geometry.first.longitude, 106.7);
+        expect(route.geometry.first.latitude, 10.7);
+        expect(transport.lastUri.queryParameters['mode'], 'car');
+      },
+    );
 
     test('rejects a one-sided search position bias before transport', () async {
       final transport = _FakeTransport(

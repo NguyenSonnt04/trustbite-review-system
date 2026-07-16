@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import express from 'express';
+import request from 'supertest';
 import { createHttpError } from '../../src/utils/httpErrors.js';
+import { errorMiddleware } from '../../src/middlewares/error.js';
+import { createFixedWindowRateLimiter } from '../../src/middlewares/rateLimit.js';
 
 vi.mock('../../src/services/locationService.js', () => ({
   searchPlaces: vi.fn(),
@@ -7,6 +11,7 @@ vi.mock('../../src/services/locationService.js', () => ({
   calculateRoute: vi.fn(),
 }));
 
+const { createLocationRouter } = await import('../../src/routes/location.js');
 const locationService = await import('../../src/services/locationService.js');
 const { requestApp } = await import('../helpers/http.js');
 
@@ -76,5 +81,38 @@ describe('location routes', () => {
       },
     });
     expect(JSON.stringify(response.body)).not.toContain('credential');
+  });
+
+  it('rate limits the shared paid-provider budget before calling the service', async () => {
+    const app = express();
+    app.use('/api/v1/location', createLocationRouter({
+      rateLimiter: createFixedWindowRateLimiter({
+        maxRequests: 1,
+        windowMs: 60_000,
+        code: 'LOCATION_RATE_LIMITED',
+        message: 'Too many location requests; try again later',
+      }),
+    }));
+    app.use(errorMiddleware);
+    locationService.searchPlaces.mockResolvedValue({ items: [] });
+
+    await request(app)
+      .get('/api/v1/location/search')
+      .query({ q: 'Pho' })
+      .expect(200);
+
+    const response = await request(app)
+      .get('/api/v1/location/search')
+      .query({ q: 'Pho' })
+      .expect(429);
+
+    expect(response.headers['retry-after']).toBe('60');
+    expect(response.body).toEqual({
+      error: {
+        code: 'LOCATION_RATE_LIMITED',
+        message: 'Too many location requests; try again later',
+      },
+    });
+    expect(locationService.searchPlaces).toHaveBeenCalledTimes(1);
   });
 });

@@ -103,12 +103,19 @@ const providerError = (err) => {
 
 export class LocationService {
   constructor({ client = null, config = awsConfig.location, aws = awsConfig } = {}) {
+    const {
+      region,
+      endpoint,
+      credentials,
+      placeIndexName,
+      routeCalculatorName,
+    } = config ?? {};
     this.client = client;
-    this.config = config ?? {};
+    this.config = { placeIndexName, routeCalculatorName };
     this.clientOptions = {
-      region: this.config.region || aws.region,
-      endpoint: this.config.endpoint || aws.endpointUrl,
-      credentials: this.config.credentials || aws.credentials,
+      region: region || aws.region,
+      endpoint: endpoint || aws.endpointUrl,
+      credentials: credentials || aws.credentials,
     };
   }
 

@@ -13,11 +13,11 @@ Amazon Location APIs.
 
 | Layer | Cases |
 | --- | --- |
-| Unit | Env parsing; AWS command inputs; normalization; controller negative coordinate/search/mode cases; Flutter API/runtime parsing. |
-| Integration | Express routes return normalized data with an injected provider boundary and structured failures. |
+| Unit | Env/rate-limit parsing; AWS command inputs; config redaction; normalization; controller negative cases; separate Flutter Location/Restaurant API parsing. |
+| Integration | Express routes return normalized data and reject over-quota requests before calling the provider service. |
 | E2E | Manual mobile search, viewport restaurants, GPS, and route line against configured real AWS resources. |
 | Platform | Android/iOS permissions; Flutter analyze/test/build; widget proof for full-canvas map, floating search, and draggable bottom-sheet bounds. |
-| Performance | Search input is submit/debounce controlled; viewport lookup remains bounded to 250 items. |
+| Performance | Search input is controlled; viewport lookup is bounded to 250 items; paid provider routes share a configurable per-IP quota. |
 | Logs/Audit | Errors do not expose API keys, credentials, search text, or coordinates. |
 
 ## Fixtures
@@ -62,6 +62,13 @@ Mobile and live-provider proof on 2026-07-16:
   state, opaque persistent navigation, responsive recenter control, and visible
   MapLibre attribution below the search overlay.
 - LocalStack declaration is configuration proof only; no LocalStack Location API success is claimed.
+
+Code-review remediation proof on 2026-07-17:
+
+- Full server suite passed: 66 files passed, 2 skipped; 590 tests passed, 4 skipped.
+- Server syntax check passed for 138 files.
+- All 47 mobile tests passed and `flutter analyze` reported no issues.
+- Focused proof covers pre-provider 429 limiting, map-key state exclusion, and the separate `RestaurantApi` viewport client.
 
 Remaining proof:
 

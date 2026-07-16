@@ -15,16 +15,23 @@ No GPS result from this UI changes verification or trust state.
 Flutter map -> TrustBiteApiClient -> Express location controller
             -> locationService -> AWS Location SDK
 
-Flutter map -> TrustBiteApiClient -> existing restaurants/nearby service
+Flutter map -> RestaurantApi -> TrustBiteApiClient -> restaurants/nearby
 ```
 
 Provider clients are created only in `server/src/services/` from configuration
 in `server/src/config/`. Controllers validate HTTP input and remain
 provider-neutral.
+`LocationService` copies only provider resource names into service state; the
+mobile map key/name are not part of the service instance configuration.
+
 
 ## Interface Contract
 
 All routes are public read-only routes.
+The three paid Location routes share one per-IP fixed-window quota. Exceeding
+the configured quota returns `429 LOCATION_RATE_LIMITED` before validation or
+provider execution.
+
 
 ### `GET /api/v1/location/search`
 

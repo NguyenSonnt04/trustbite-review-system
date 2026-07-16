@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:trustbite_mobile/src/core/api/location_api.dart';
+import 'package:trustbite_mobile/src/core/api/restaurant_api.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 
@@ -65,12 +66,14 @@ class MapScreen extends StatefulWidget {
   const MapScreen({
     super.key,
     this.locationApi,
+    this.restaurantApi,
     this.runtimeConfig,
     this.locationGateway,
     this.mapSurfaceOverride,
   });
 
   final LocationApi? locationApi;
+  final RestaurantApi? restaurantApi;
   final MobileRuntimeConfig? runtimeConfig;
   final MapLocationGateway? locationGateway;
   final Widget? mapSurfaceOverride;
@@ -92,6 +95,7 @@ class _MapScreenState extends State<MapScreen> {
   Timer? _cameraDebounce;
   MapLibreMapController? _mapController;
   late final LocationApi _locationApi;
+  late final RestaurantApi _restaurantApi;
   late final MobileRuntimeConfig _config;
   late final MapLocationGateway _locationGateway;
 
@@ -114,6 +118,8 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     _config = widget.runtimeConfig ?? appMobileRuntimeConfig;
     _locationApi = widget.locationApi ?? LocationApi(apiClient: appApiClient);
+    _restaurantApi =
+        widget.restaurantApi ?? RestaurantApi(apiClient: appApiClient);
     _locationGateway =
         widget.locationGateway ?? const DeviceMapLocationGateway();
     _sheetController.addListener(_syncSheetExtent);
@@ -215,7 +221,7 @@ class _MapScreenState extends State<MapScreen> {
         return;
       }
       if (!mounted) return;
-      final items = await _locationApi.nearbyRestaurants(
+      final items = await _restaurantApi.nearbyRestaurants(
         northEastLatitude: bounds.northeast.latitude,
         northEastLongitude: bounds.northeast.longitude,
         southWestLatitude: bounds.southwest.latitude,

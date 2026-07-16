@@ -29,6 +29,14 @@ const parseInteger = (value, defaultValue) => Number.parseInt(
   10,
 );
 
+const parsePositiveInteger = (name, defaultValue) => {
+  const value = parseInteger(process.env[name], defaultValue);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`[Config] ${name} must be a positive integer`);
+  }
+  return value;
+};
+
 // Express `trust proxy` setting. Deployments behind a reverse proxy / load
 // balancer (Nginx, AWS ALB) must set TRUST_PROXY so req.ip reflects the real
 // client IP (used by the MULTI_ACCOUNT_SAME_DEVICE anti-fraud signal) instead of
@@ -66,6 +74,13 @@ export default {
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   avatarAllowedHosts,
   trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
+  location: {
+    rateLimitMax: parsePositiveInteger('AWS_LOCATION_RATE_LIMIT_MAX', 60),
+    rateLimitWindowMs: parsePositiveInteger(
+      'AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS',
+      60,
+    ) * 1000,
+  },
   auth: {
     provider: 'cognito',
     phoneFallbackEnabled: parseBoolean(process.env.AUTH_PHONE_FALLBACK_ENABLED, phoneFallbackDefault),
