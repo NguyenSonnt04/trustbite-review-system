@@ -126,6 +126,14 @@ const PUBLIC_RESTAURANT_CONDITION = `
   AND r.is_deleted = FALSE
 `;
 
+async function resolvePublicRestaurantImageUrl(reference) {
+  try {
+    return await resolveRestaurantImageUrl(reference);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Map a DB row to a camelCase public-facing object.
  */
@@ -144,7 +152,7 @@ async function toPublic(row) {
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
     categoryIds: row.category_ids ?? [],
-    primaryImageUrl: await resolveRestaurantImageUrl(row.primary_image_url),
+    primaryImageUrl: await resolvePublicRestaurantImageUrl(row.primary_image_url),
     ...(row.distance_meters !== undefined && row.distance_meters !== null
       ? { distanceMeters: parseFloat(row.distance_meters) }
       : {}),
