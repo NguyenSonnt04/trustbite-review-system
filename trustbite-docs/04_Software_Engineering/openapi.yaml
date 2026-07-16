@@ -1320,6 +1320,42 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
+  /admin-web/restaurants/bulk-delete:
+    post:
+      tags: [Admin, Restaurants]
+      security:
+      - adminBffSecret: []
+        adminWebSession: []
+      summary: Soft-delete multiple restaurants atomically
+      description: Requires ADMIN or SUPER_ADMIN. All selected restaurants are soft-deleted in one transaction and each deletion is audited. If any restaurant is missing or already deleted, no restaurant is changed.
+      operationId: adminWebBulkDeleteRestaurants
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminRestaurantBulkDeleteRequest'
+      responses:
+        '200':
+          description: Restaurants soft-deleted or a completed idempotent response replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRestaurantBulkDeleteResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
   /admin-web/restaurants/{restaurantId}:
     parameters:
     - $ref: '#/components/parameters/RestaurantId'
@@ -1784,9 +1820,11 @@ components:
       name: Idempotency-Key
       in: header
       required: true
+      description: UUID v4 key used to replay the completed response safely and reject reuse with a different payload.
       schema:
         type: string
         format: uuid
+        pattern: '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$'
     IdempotencyKeyOptional:
       name: Idempotency-Key
       in: header
@@ -2867,6 +2905,40 @@ components:
           type: string
           minLength: 10
           maxLength: 500
+    AdminRestaurantBulkDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [restaurantIds, reason]
+      properties:
+        restaurantIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+    AdminRestaurantBulkDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [deletedIds, deletedCount]
+      properties:
+        deletedIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+        deletedCount:
+          type: integer
+          minimum: 1
+          maximum: 100
     AdminRestaurantImageUpload:
       type: object
       required: [restaurantImage]

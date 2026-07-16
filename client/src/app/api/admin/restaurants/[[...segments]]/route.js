@@ -21,6 +21,12 @@ const MAX_MULTIPART_BYTES = 6 * 1024 * 1024;
 
 const validateSegments = (segments, method) => {
   if (segments.length === 0) return method === 'GET';
+  if (
+    segments.length === 1
+    && segments[0] === 'bulk-delete'
+  ) {
+    return method === 'POST';
+  }
   if (segments.length === 1 && UUID_PATTERN.test(segments[0])) {
     return ['GET', 'PATCH'].includes(method);
   }

@@ -51,6 +51,20 @@ export const updateAdminRestaurant = async (req, res, next) => {
   }
 };
 
+export const deleteAdminRestaurants = async (req, res, next) => {
+  try {
+    const result = await adminRestaurantManagementService.deleteRestaurants(
+      req.user,
+      req.body,
+      req.header('idempotency-key'),
+    );
+    if (result.replayed) res.set('Idempotency-Replayed', 'true');
+    res.status(result.statusCode).json(result.body);
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const uploadAdminRestaurantImage = async (req, res, next) => {
   try {
     requireUuid(req.params.restaurantId, 'restaurantId');

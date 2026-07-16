@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowRight,
   Bell,
+  Check,
   Eye,
   EyeOff,
   Info,
@@ -20,6 +21,7 @@ import {
   Search,
   ShieldCheck,
   Store,
+  Trash2,
   TrendingDown,
   TrendingUp,
   Upload,
@@ -54,6 +56,8 @@ const icons = {
   info: Info,
   image: ImagePlus,
   upload: Upload,
+  check: Check,
+  trash: Trash2,
 };
 
 export default function AdminIcon({ name, size = 20, strokeWidth = 1.8 }) {
