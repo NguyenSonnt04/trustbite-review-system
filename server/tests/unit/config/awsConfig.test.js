@@ -7,6 +7,8 @@ async function loadAwsConfig(caseName) {
   const imports = {
     's3-allow-list': () => import('../../../src/config/aws.js?s3-allow-list'),
     'localstack-s3-endpoint': () => import('../../../src/config/aws.js?localstack-s3-endpoint'),
+    'restaurant-image-ttl': () => import('../../../src/config/aws.js?restaurant-image-ttl'),
+    'restaurant-image-invalid-ttl': () => import('../../../src/config/aws.js?restaurant-image-invalid-ttl'),
   };
   return (await imports[caseName]()).default;
 }
@@ -42,4 +44,23 @@ describe('AWS config', () => {
       forcePathStyle: true,
     });
   });
+
+  it('parses a bounded restaurant image signed URL TTL', async () => {
+    process.env.TRUSTBITE_RESTAURANT_IMAGE_SIGNED_URL_TTL_SECONDS = '600';
+
+    const config = await loadAwsConfig('restaurant-image-ttl');
+
+    expect(config.restaurantImages.signedUrlTtlSeconds).toBe(600);
+  });
+
+  it.each(['invalid', '59', '3601'])(
+    'falls back to 15 minutes for invalid restaurant image TTL %s',
+    async (value) => {
+      process.env.TRUSTBITE_RESTAURANT_IMAGE_SIGNED_URL_TTL_SECONDS = value;
+
+      const config = await loadAwsConfig('restaurant-image-invalid-ttl');
+
+      expect(config.restaurantImages.signedUrlTtlSeconds).toBe(900);
+    },
+  );
 });

@@ -6,7 +6,10 @@ import { sendAccepted, sendSuccess } from '../utils/responses.js';
 export const getMe = async (req, res, next) => {
   try {
     const user = await userService.getCurrentUser(req.user.id);
-    sendSuccess(res, user);
+    sendSuccess(res, {
+      ...user,
+      roles: req.user.roles,
+    });
   } catch (err) {
     next(err);
   }

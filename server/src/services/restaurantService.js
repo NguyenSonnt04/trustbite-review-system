@@ -100,23 +100,27 @@ function normalizeVietnameseSearchText(value) {
     .toLowerCase();
 }
 
+const PRIMARY_IMAGE_URL_PROJECTION = `
+  (
+    SELECT ri.image_url
+    FROM restaurant_images ri
+    WHERE ri.restaurant_id = r.id
+      AND ri.branch_id IS NULL
+      AND ri.is_primary = TRUE
+    ORDER BY ri.created_at DESC, ri.id DESC
+    LIMIT 1
+  )
+`;
+
 /** Common SELECT projection for a restaurant and its aggregated category IDs. */
 const RESTAURANT_SELECT_PROJECTION = `
   SELECT
     r.*,
-    (
-      SELECT ri.image_url
-      FROM restaurant_images ri
-      WHERE ri.restaurant_id = r.id
-        AND ri.branch_id IS NULL
-        AND ri.is_primary = TRUE
-      ORDER BY ri.created_at DESC, ri.id DESC
-      LIMIT 1
-    ) AS primary_image_url,
     COALESCE(
       ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
       '{}'::integer[]
-    ) AS category_ids
+    ) AS category_ids,
+    ${PRIMARY_IMAGE_URL_PROJECTION} AS primary_image_url
   FROM restaurants r
   LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
 `;
@@ -300,7 +304,8 @@ export async function listRestaurants({
         COALESCE(
           ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
           '{}'::integer[]
-        ) AS category_ids
+        ) AS category_ids,
+        ${PRIMARY_IMAGE_URL_PROJECTION} AS primary_image_url
         ${distanceProjection}
       FROM restaurants r
       LEFT JOIN restaurant_category_map rcm ON rcm.restaurant_id = r.id
@@ -694,7 +699,8 @@ export async function getRestaurantDetail(restaurantId) {
 
   if (restaurantResult.rows.length === 0) return null;
 
-  const [ratingResult, claimResult] = await Promise.all([
+  const [restaurant, ratingResult, claimResult] = await Promise.all([
+    toPublic(restaurantResult.rows[0]),
     pool.query(
       `
       SELECT
@@ -724,7 +730,6 @@ export async function getRestaurantDetail(restaurantId) {
     ),
   ]);
 
-  const restaurant = await toPublic(restaurantResult.rows[0]);
   const rRow = ratingResult.rows[0];
   const ratingBreakdown = {
     avgFood: rRow.avg_food !== null ? parseFloat(rRow.avg_food) : null,

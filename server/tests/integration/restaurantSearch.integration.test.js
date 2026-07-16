@@ -117,58 +117,43 @@ describe('restaurant search API', () => {
     }
   });
 
-  it('returns only the branchless primary restaurant image as a public URL', async () => {
-    const restaurant = await createSearchRestaurant({
-      name: `Image Search ${Date.now()}`,
-    });
+  it('returns the newest restaurant-level primary image and null when absent', async () => {
+    const token = `Image Search ${Date.now()}`;
+    const withImage = await createSearchRestaurant({ name: `${token} With Image` });
+    const withoutImage = await createSearchRestaurant({ name: `${token} Without Image` });
+    const olderUrl = 'https://cdn.trustbite.test/restaurants/older.jpg';
+    const newestUrl = 'https://cdn.trustbite.test/restaurants/newest.jpg';
 
     try {
       await query(
-        `INSERT INTO restaurant_images (
-           restaurant_id, image_url, caption, is_primary
-         )
-         VALUES
-           ($1, 'https://cdn.example.test/non-primary.jpg', 'Secondary', FALSE),
-           ($1, 'https://cdn.example.test/primary.jpg', 'Primary', TRUE)`,
-        [restaurant.id],
+        `
+        INSERT INTO restaurant_images (
+          restaurant_id, image_url, caption, is_primary, created_at
+        )
+        VALUES
+          ($1, $2, 'Older primary', TRUE, NOW() - INTERVAL '1 minute'),
+          ($1, $3, 'Newest primary', TRUE, NOW()),
+          ($1, $4, 'Non-primary', FALSE, NOW() + INTERVAL '1 minute')
+        `,
+        [
+          withImage.id,
+          olderUrl,
+          newestUrl,
+          'https://cdn.trustbite.test/restaurants/non-primary.jpg',
+        ],
       );
 
       const response = await requestApp()
         .get('/api/v1/restaurants')
-        .query({ keyword: restaurant.name })
+        .query({ keyword: token, sort: 'name' })
         .expect(200);
 
-      expect(response.body.items).toEqual([
-        expect.objectContaining({
-          id: restaurant.id,
-          primaryImageUrl: 'https://cdn.example.test/primary.jpg',
-        }),
-      ]);
-      expect(response.body.items[0]).not.toHaveProperty('imageUrl');
+      const itemsById = new Map(response.body.items.map((item) => [item.id, item]));
+      expect(itemsById.get(withImage.id).primaryImageUrl).toBe(newestUrl);
+      expect(itemsById.get(withoutImage.id).primaryImageUrl).toBeNull();
+      expect(itemsById.get(withImage.id)).not.toHaveProperty('imageUrl');
     } finally {
-      await cleanupRestaurants([restaurant.id]);
-    }
-  });
-
-  it('returns null when a public restaurant has no primary image', async () => {
-    const restaurant = await createSearchRestaurant({
-      name: `No Image Search ${Date.now()}`,
-    });
-
-    try {
-      const response = await requestApp()
-        .get('/api/v1/restaurants')
-        .query({ keyword: restaurant.name })
-        .expect(200);
-
-      expect(response.body.items).toEqual([
-        expect.objectContaining({
-          id: restaurant.id,
-          primaryImageUrl: null,
-        }),
-      ]);
-    } finally {
-      await cleanupRestaurants([restaurant.id]);
+      await cleanupRestaurants([withImage.id, withoutImage.id]);
     }
   });
 

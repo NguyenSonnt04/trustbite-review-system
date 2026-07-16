@@ -257,6 +257,7 @@ Phản hồi:
       "address": "Quận 1, TP.HCM",
       "latitude": 10.776,
       "longitude": 106.700,
+      "primaryImageUrl": "https://bucket.s3.ap-southeast-1.amazonaws.com/restaurant-images/uuid/cover.jpg?X-Amz-Signature=...",
       "trustScore": 4.4,
       "verifiedReviewCount": 35,
       "referenceReviewCount": 12,
@@ -269,6 +270,10 @@ Phản hồi:
 }
 ```
 
+`primaryImageUrl` là URL ảnh đại diện công khai, có thể `null` khi quán chưa có
+ảnh. Backend chỉ chọn ảnh cấp quán có `is_primary = TRUE`, không dùng ảnh chi
+nhánh hoặc ảnh hóa đơn riêng tư.
+
 ### GET /restaurants/nearby
 
 Tham số truy vấn:
@@ -279,7 +284,64 @@ northEastLat, northEastLng, southWestLat, southWestLng
 
 ### GET /restaurants/{restaurantId}
 
-Response gồm hồ sơ quán, phân rã điểm đánh giá và trạng thái chủ quán.
+Response gồm hồ sơ quán, `primaryImageUrl` nullable, phân rã điểm đánh giá và
+trạng thái chủ quán.
+
+### GET /restaurants/{restaurantId}/images
+
+Trả danh sách ảnh cấp nhà hàng cùng presigned GET URL mới. Quyền truy cập gồm
+`ADMIN`, `SUPER_ADMIN`, hoặc merchant `ACTIVE` có assignment `ACTIVE` với quyền
+`OWNER`/`MANAGER` đúng nhà hàng.
+
+### POST /restaurants/{restaurantId}/images
+
+Quyền tải ảnh dùng cùng chính sách với API danh sách ảnh.
+Request dùng `multipart/form-data`, bắt buộc `Idempotency-Key` UUID v4:
+
+```text
+restaurantImage: JPG, PNG hoặc WebP, tối đa 5 MB
+caption: tùy chọn, tối đa 255 ký tự
+isPrimary: true | false, mặc định true
+```
+
+Backend lưu object riêng tư trong bucket ảnh nhà hàng, lưu stable `s3://`
+reference vào `restaurant_images.image_url`, và ghi audit log. API chuyển
+reference hợp lệ thành presigned HTTPS GET URL có thời hạn. Ảnh hóa đơn không
+được dùng làm ảnh hồ sơ quán.
+
+### DELETE /restaurants/{restaurantId}/images/{imageId}
+
+Bắt buộc `Idempotency-Key` UUID v4. Khi xóa ảnh đại diện, backend chọn ảnh cấp
+nhà hàng mới nhất còn lại theo `created_at DESC, id DESC`. Database reference
+được gỡ trong transaction, còn cleanup S3 được retry từ idempotency state.
+
+### GET /merchant/restaurants
+
+Trả các nhà hàng có assignment `ACTIVE` của merchant hiện tại, bao gồm
+`permissionLevel` và `primaryImageUrl`.
+
+### GET, POST /merchant/restaurant-claims
+
+Merchant xem hoặc gửi giấy tờ chứng minh quyền `OWNER`/`MANAGER`. Upload dùng
+`multipart/form-data`, `Idempotency-Key`, và field `evidenceFile` là PDF, JPEG,
+PNG hoặc WebP tối đa 10 MB. Evidence lưu riêng tư dưới prefix
+`receipts/merchant-claims/` và không đi vào `receipt_verifications`.
+
+### GET /admin/restaurant-claims
+
+`ADMIN`/`SUPER_ADMIN` đọc hàng đợi claim theo trạng thái và nhận presigned URL
+ngắn hạn để xem bằng chứng.
+
+### GET /admin/restaurants
+
+Trả tất cả nhà hàng chưa soft-delete, gồm cả `DRAFT`, `SUSPENDED` và `CLOSED`,
+để quản trị viên có thể quản lý ảnh trước khi quán được công khai.
+
+### POST /admin/restaurant-claims/{claimId}/decision
+
+Nhận `decision=APPROVED|REJECTED` và `adminNote`. Approval kích hoạt merchant,
+đảm bảo role `MERCHANT`, rồi upsert assignment `OWNER` hoặc `MANAGER` trong cùng
+transaction.
 
 ### GET /restaurants/{restaurantId}/reviews
 

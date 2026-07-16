@@ -189,8 +189,6 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
-        '422':
-          $ref: '#/components/responses/Error'
   /users/me/avatar-upload-url:
     post:
       tags:
@@ -349,6 +347,144 @@ paths:
               schema:
                 $ref: '#/components/schemas/RestaurantDetail'
         '404':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}/images:
+    get:
+      tags:
+      - Restaurants
+      summary: List managed restaurant images
+      description: Requires ADMIN, SUPER_ADMIN, or an active TrustBite-local MERCHANT with an active OWNER or MANAGER assignment for this restaurant.
+      operationId: listRestaurantImages
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      responses:
+        '200':
+          description: Managed restaurant image list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - restaurantId
+                - items
+                properties:
+                  restaurantId:
+                    type: string
+                    format: uuid
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RestaurantImage'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - Restaurants
+      summary: Upload restaurant profile image
+      description: Requires ADMIN, SUPER_ADMIN, or an active TrustBite-local MERCHANT with an active OWNER or MANAGER assignment for this restaurant. The object remains private in S3 and imageUrl is a short-lived presigned HTTPS GET URL.
+      operationId: uploadRestaurantImage
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - restaurantImage
+              properties:
+                restaurantImage:
+                  type: string
+                  format: binary
+                  description: JPEG, PNG, or WebP, maximum 5 MB.
+                caption:
+                  type: string
+                  maxLength: 255
+                  nullable: true
+                isPrimary:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Restaurant image uploaded
+          headers:
+            Idempotency-Replayed:
+              description: Present and true when returning a completed replay.
+              schema:
+                type: string
+                enum:
+                - 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantImage'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '415':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /restaurants/{restaurantId}/images/{imageId}:
+    delete:
+      tags:
+      - Restaurants
+      summary: Delete a managed restaurant image
+      description: Removes the image reference, promotes the deterministic newest remaining image when deleting the primary, and retries private S3 cleanup through idempotency state.
+      operationId: deleteRestaurantImage
+      parameters:
+      - $ref: '#/components/parameters/RestaurantId'
+      - name: imageId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      responses:
+        '200':
+          description: Restaurant image deleted
+          headers:
+            Idempotency-Replayed:
+              description: Present and true when returning a completed replay.
+              schema:
+                type: string
+                enum:
+                - 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantImageDeleteResult'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '503':
           $ref: '#/components/responses/Error'
   /restaurants/{restaurantId}/reviews:
     get:
@@ -578,6 +714,117 @@ paths:
           $ref: '#/components/responses/Error'
         '422':
           $ref: '#/components/responses/Error'
+  /merchant/restaurants:
+    get:
+      tags:
+      - Restaurants
+      summary: List restaurants assigned to the current merchant
+      operationId: listMerchantRestaurants
+      responses:
+        '200':
+          description: Active restaurant assignments
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MerchantRestaurant'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /merchant/restaurant-claims:
+    get:
+      tags:
+      - Restaurants
+      summary: List current merchant restaurant claims
+      operationId: listMerchantRestaurantClaims
+      responses:
+        '200':
+          description: Merchant claim list
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RestaurantClaim'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - Restaurants
+      summary: Submit private restaurant ownership evidence
+      description: Creates a merchant restaurant claim. Evidence is private and is never used as customer receipt verification.
+      operationId: submitMerchantRestaurantClaim
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequired'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - restaurantId
+              - requestedPermissionLevel
+              - evidenceFile
+              properties:
+                restaurantId:
+                  type: string
+                  format: uuid
+                requestedPermissionLevel:
+                  type: string
+                  enum:
+                  - OWNER
+                  - MANAGER
+                evidenceFile:
+                  type: string
+                  format: binary
+                  description: PDF, JPEG, PNG, or WebP, maximum 10 MB.
+      responses:
+        '201':
+          description: Restaurant claim submitted
+          headers:
+            Idempotency-Replayed:
+              description: Present and true when returning a completed replay.
+              schema:
+                type: string
+                enum:
+                - 'true'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantClaim'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '413':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
   /receipts:
     post:
       tags:
@@ -698,6 +945,139 @@ paths:
         '401':
           $ref: '#/components/responses/Error'
         '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/restaurants:
+    get:
+      tags:
+      - Admin
+      - Restaurants
+      summary: List non-deleted restaurants for media administration
+      operationId: listAdminRestaurants
+      parameters:
+      - name: keyword
+        in: query
+        required: false
+        schema:
+          type: string
+          maxLength: 120
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      responses:
+        '200':
+          description: Admin restaurant list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRestaurantPage'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+  /admin/restaurant-claims:
+    get:
+      tags:
+      - Admin
+      summary: List merchant restaurant claims
+      operationId: listAdminRestaurantClaims
+      parameters:
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - APPROVED
+          - REJECTED
+      responses:
+        '200':
+          description: Restaurant claim queue
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RestaurantClaim'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /admin/restaurant-claims/{claimId}/decision:
+    post:
+      tags:
+      - Admin
+      summary: Approve or reject a merchant restaurant claim
+      description: Approval activates the merchant profile, ensures the MERCHANT role, and upserts the requested OWNER or MANAGER restaurant assignment.
+      operationId: decideAdminRestaurantClaim
+      parameters:
+      - name: claimId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - decision
+              properties:
+                decision:
+                  type: string
+                  enum:
+                  - APPROVED
+                  - REJECTED
+                adminNote:
+                  type:
+                  - string
+                  - 'null'
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Claim decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestaurantClaim'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
           $ref: '#/components/responses/Error'
         '409':
           $ref: '#/components/responses/Error'
@@ -1982,6 +2362,16 @@ components:
           - MERCHANT
           - ADMIN
           - SUPER_ADMIN
+        roles:
+          type: array
+          description: TrustBite-local roles used for server-side authorization.
+          items:
+            type: string
+            enum:
+            - USER
+            - MERCHANT
+            - ADMIN
+            - SUPER_ADMIN
         status:
           type: string
           enum:
@@ -2000,6 +2390,7 @@ components:
       - name
       - address
       - status
+      - primaryImageUrl
       - verifiedReviewCount
       - referenceReviewCount
       properties:
@@ -2027,6 +2418,12 @@ components:
           type: string
           enum:
           - ACTIVE
+        primaryImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Short-lived presigned HTTPS URL for the newest restaurant-level primary image. Branch images and private receipt evidence are excluded.
     RestaurantDetail:
       allOf:
       - $ref: '#/components/schemas/Restaurant'
@@ -2041,6 +2438,242 @@ components:
           ownerClaimStatus:
             type: string
             nullable: true
+    RestaurantImage:
+      type: object
+      required:
+      - id
+      - restaurantId
+      - branchId
+      - imageUrl
+      - caption
+      - isPrimary
+      - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+          format: uuid
+        branchId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+          description: Short-lived presigned HTTPS GET URL. Refetch restaurant data after expiration.
+        caption:
+          type:
+          - string
+          - 'null'
+          maxLength: 255
+        isPrimary:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    RestaurantImageDeleteResult:
+      type: object
+      required:
+      - id
+      - restaurantId
+      - deleted
+      - wasPrimary
+      - promotedPrimaryImageId
+      properties:
+        id:
+          type: string
+          format: uuid
+        restaurantId:
+          type: string
+          format: uuid
+        deleted:
+          type: boolean
+          const: true
+        wasPrimary:
+          type: boolean
+        promotedPrimaryImageId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+    MerchantRestaurant:
+      type: object
+      required:
+      - id
+      - name
+      - status
+      - permissionLevel
+      - assignmentStatus
+      - primaryImageUrl
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type:
+          - string
+          - 'null'
+        address:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+        permissionLevel:
+          type: string
+          enum:
+          - OWNER
+          - MANAGER
+          - STAFF
+        assignmentStatus:
+          type: string
+          enum:
+          - ACTIVE
+        primaryImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+    RestaurantClaim:
+      type: object
+      required:
+      - id
+      - merchantId
+      - restaurantId
+      - requestedPermissionLevel
+      - status
+      - evidenceUrl
+      - adminNote
+      - decidedBy
+      - decidedAt
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        merchantId:
+          type: string
+          format: uuid
+        merchantUserId:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        merchantName:
+          type:
+          - string
+          - 'null'
+        businessName:
+          type:
+          - string
+          - 'null'
+        restaurantId:
+          type: string
+          format: uuid
+        restaurantName:
+          type:
+          - string
+          - 'null'
+        requestedPermissionLevel:
+          type: string
+          enum:
+          - OWNER
+          - MANAGER
+        status:
+          type: string
+          enum:
+          - SUBMITTED
+          - UNDER_REVIEW
+          - APPROVED
+          - REJECTED
+        evidenceUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+          description: Short-lived private signed URL for authorized review only.
+        adminNote:
+          type:
+          - string
+          - 'null'
+        decidedBy:
+          type:
+          - string
+          - 'null'
+          format: uuid
+        decidedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminRestaurant:
+      type: object
+      required:
+      - id
+      - name
+      - status
+      - trustScore
+      - primaryImageUrl
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type:
+          - string
+          - 'null'
+        address:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - ACTIVE
+          - SUSPENDED
+          - CLOSED
+        trustScore:
+          type:
+          - number
+          - 'null'
+        primaryImageUrl:
+          type:
+          - string
+          - 'null'
+          format: uri
+    AdminRestaurantPage:
+      type: object
+      required:
+      - items
+      - page
+      - pageSize
+      - total
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminRestaurant'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
     RestaurantPage:
       type: object
       required:
@@ -2576,7 +3209,6 @@ components:
           required:
           - code
           - message
-          - requestId
           properties:
             code:
               type: string
@@ -2594,6 +3226,7 @@ components:
               - DUPLICATE_RECEIPT_HASH
               - REVIEW_NOT_EDITABLE
               - RESTAURANT_NOT_ACTIVE
+              - RESTAURANT_NOT_FOUND
               - CLAIM_CONFLICT
               - REPORT_DUPLICATE
               - PROVIDER_UNAVAILABLE
@@ -2906,31 +3539,6 @@ components:
         total:
           type: integer
           minimum: 0
-    RestaurantImage:
-      type: object
-      required: [id, restaurantId, imageUrl, isPrimary, createdAt]
-      properties:
-        id:
-          type: string
-          format: uuid
-        restaurantId:
-          type: string
-          format: uuid
-        branchId:
-          type: [string, 'null']
-          format: uuid
-        imageUrl:
-          type: string
-          format: uri
-          description: Short-lived signed URL or a validated legacy HTTPS URL.
-        caption:
-          type: [string, 'null']
-          maxLength: 255
-        isPrimary:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
     AdminRestaurantDetail:
       allOf:
       - $ref: '#/components/schemas/AdminRestaurantListItem'
