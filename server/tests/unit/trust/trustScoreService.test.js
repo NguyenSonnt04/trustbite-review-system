@@ -24,6 +24,9 @@ function mockReviewsThenUpdate(reviewRows, { updateRowCount = 1 } = {}) {
   client.query.mockImplementation(async (sql) => {
     const text = String(sql);
     if (/^\s*BEGIN/i.test(text) || /^\s*COMMIT/i.test(text) || /^\s*ROLLBACK/i.test(text)) return {};
+    if (/SELECT\s+1\s+FROM\s+restaurants[\s\S]*FOR\s+UPDATE/i.test(text)) {
+      return { rows: [{ '?column?': 1 }], rowCount: 1 };
+    }
     if (/FROM\s+reviews/i.test(text)) return { rows: reviewRows };
     if (/UPDATE\s+restaurants/i.test(text)) {
       return { rows: updateRowCount ? [{ id: RESTAURANT_ID }] : [], rowCount: updateRowCount };
@@ -61,8 +64,19 @@ describe('recomputeRestaurantTrustScore', () => {
     expect(upd[1]).toEqual([RESTAURANT_ID, 4.64, 1, 1]);
 
     const texts = client.query.mock.calls.map((c) => String(c[0]));
-    expect(texts.some((t) => /^\s*BEGIN/i.test(t))).toBe(true);
-    expect(texts.some((t) => /^\s*COMMIT/i.test(t))).toBe(true);
+    expect(texts).toHaveLength(5);
+    expect(texts[0]).toMatch(/^\s*BEGIN/i);
+    expect(texts[1]).toMatch(/SELECT\s+1\s+FROM\s+restaurants[\s\S]*FOR\s+UPDATE/i);
+    expect(texts[2]).toMatch(/FROM\s+reviews/i);
+    expect(texts[2]).toMatch(/status\s+IN\s*\('VERIFIED',\s*'REFERENCE_ONLY'\)/i);
+    expect(texts[2]).toMatch(/public_visibility\s*=\s*'PUBLIC'/i);
+    expect(texts[2]).toMatch(/WHEN\s+'FULL'\s+THEN\s+'HIGH'/i);
+    expect(texts[2]).toMatch(/WHEN\s+'PARTIAL'\s+THEN\s+'LOW'/i);
+    expect(texts[2]).toMatch(
+      /trust_weight_bucket\s+IN\s*\('HIGH',\s*'LOW',\s*'FULL',\s*'PARTIAL'\)/i,
+    );
+    expect(texts[3]).toMatch(/UPDATE\s+restaurants/i);
+    expect(texts[4]).toMatch(/^\s*COMMIT/i);
     expect(client.release).toHaveBeenCalled();
   });
 
@@ -79,6 +93,9 @@ describe('recomputeRestaurantTrustScore', () => {
     const outer = { query: vi.fn(), release: vi.fn() };
     outer.query.mockImplementation(async (sql) => {
       const text = String(sql);
+      if (/SELECT\s+1\s+FROM\s+restaurants[\s\S]*FOR\s+UPDATE/i.test(text)) {
+        return { rows: [{ '?column?': 1 }], rowCount: 1 };
+      }
       if (/FROM\s+reviews/i.test(text)) return { rows: [{ averageRating: '4.00', trustWeightBucket: 'HIGH', rankCode: 'NEWBIE' }] };
       if (/UPDATE\s+restaurants/i.test(text)) return { rows: [{ id: RESTAURANT_ID }], rowCount: 1 };
       return { rows: [] };
@@ -91,6 +108,9 @@ describe('recomputeRestaurantTrustScore', () => {
     const outerTexts = outer.query.mock.calls.map((c) => String(c[0]));
     expect(outerTexts.some((t) => /^\s*BEGIN/i.test(t))).toBe(false);
     expect(outerTexts.some((t) => /^\s*COMMIT/i.test(t))).toBe(false);
+    expect(outerTexts[0]).toMatch(/SELECT\s+1\s+FROM\s+restaurants[\s\S]*FOR\s+UPDATE/i);
+    expect(outerTexts[1]).toMatch(/FROM\s+reviews/i);
+    expect(outerTexts[2]).toMatch(/UPDATE\s+restaurants/i);
     expect(outer.release).not.toHaveBeenCalled();
     // Pool must not be used when a client is supplied.
     expect(db.pool.connect).not.toHaveBeenCalled();

@@ -7,8 +7,18 @@ vi.mock('../../src/config/db.js', () => ({
   },
 }));
 
+vi.mock('../../src/services/trustScoreService.js', () => ({
+  recomputeRestaurantTrustScore: vi.fn(),
+}));
+
 const { pool } = await import('../../src/config/db.js');
-const { createReviewForVerificationIntent } = await import('../../src/services/reviewService.js');
+const { recomputeRestaurantTrustScore } = await import(
+  '../../src/services/trustScoreService.js'
+);
+const {
+  createReviewForVerificationIntent,
+  skipReviewReceiptVerification,
+} = await import('../../src/services/reviewService.js');
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
 const RESTAURANT_ID = '22222222-2222-4222-8222-222222222222';
@@ -130,5 +140,193 @@ describe('createReviewForVerificationIntent', () => {
     })).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
 
     expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+});
+
+describe('skipReviewReceiptVerification', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    recomputeRestaurantTrustScore.mockResolvedValue({
+      trustScore: 4.5,
+      verifiedReviewCount: 0,
+      referenceReviewCount: 1,
+    });
+  });
+
+  it('publishes an owner review and refreshes restaurant trust aggregates in the same transaction', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
+          status: 'SUBMITTED',
+          verificationStatus: 'UNVERIFIED',
+          trustLabel: 'PENDING_VERIFICATION',
+          publicVisibility: 'PRIVATE_UNTIL_DECISION',
+          trustWeightBucket: 'NONE',
+        }],
+      })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          status: 'REFERENCE_ONLY',
+          verificationStatus: 'SKIPPED',
+          trustLabel: 'REFERENCE_ONLY',
+          publicVisibility: 'PUBLIC',
+          trustWeightBucket: 'LOW',
+        }],
+      })
+      .mockResolvedValueOnce({});
+
+    const result = await skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    });
+
+    expect(result).toMatchObject({
+      status: 'REFERENCE_ONLY',
+      verificationStatus: 'SKIPPED',
+      trustLabel: 'REFERENCE_ONLY',
+      publicVisibility: 'PUBLIC',
+      trustWeightBucket: 'LOW',
+    });
+    expect(client.query.mock.calls[1][0]).toContain('FOR UPDATE');
+    expect(client.query.mock.calls[3][0]).toContain("verification_status = 'SKIPPED'");
+    expect(recomputeRestaurantTrustScore).toHaveBeenCalledWith(RESTAURANT_ID, {
+      client,
+    });
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('repairs trust aggregates when an already skipped review is retried', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
+          status: 'REFERENCE_ONLY',
+          verificationStatus: 'SKIPPED',
+          trustLabel: 'REFERENCE_ONLY',
+          publicVisibility: 'PUBLIC',
+          trustWeightBucket: 'LOW',
+        }],
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).resolves.toMatchObject({
+      status: 'REFERENCE_ONLY',
+      verificationStatus: 'SKIPPED',
+    });
+
+    expect(recomputeRestaurantTrustScore).toHaveBeenCalledWith(RESTAURANT_ID, {
+      client,
+    });
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('rolls back the review transition when trust aggregate recomputation fails', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    recomputeRestaurantTrustScore.mockRejectedValueOnce(
+      new Error('aggregate recompute failed'),
+    );
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
+          status: 'SUBMITTED',
+          verificationStatus: 'UNVERIFIED',
+          trustLabel: 'PENDING_VERIFICATION',
+          publicVisibility: 'PRIVATE_UNTIL_DECISION',
+          trustWeightBucket: 'NONE',
+        }],
+      })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: '33333333-3333-4333-8333-333333333333' }],
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).rejects.toThrow('aggregate recompute failed');
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('does not reveal a review owned by another user', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' });
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('rejects skipping after a receipt upload has started', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          status: 'SUBMITTED',
+          verificationStatus: 'UNVERIFIED',
+          trustLabel: 'PENDING_VERIFICATION',
+          publicVisibility: 'PRIVATE_UNTIL_DECISION',
+          trustWeightBucket: 'NONE',
+        }],
+      })
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ '?column?': 1 }] })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).rejects.toMatchObject({ statusCode: 409, code: 'REVIEW_NOT_EDITABLE' });
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('rejects an unsupported skip reason before opening a transaction', async () => {
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'BYPASS_TRUST',
+    })).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+    expect(pool.connect).not.toHaveBeenCalled();
   });
 });

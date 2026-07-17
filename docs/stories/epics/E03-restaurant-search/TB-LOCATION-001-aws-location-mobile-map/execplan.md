@@ -59,4 +59,3 @@ Pause for human confirmation if:
 - Background location collection is required.
 - The accepted AWS resources must be replaced rather than consumed.
 - Validation requirements need to be weakened.
-

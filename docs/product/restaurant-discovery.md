@@ -9,7 +9,8 @@ stories and tests should prove before UI/mobile work depends on it.
 ## Scope
 
 Restaurant discovery covers public restaurant list/search, map-bounds lookup,
-restaurant detail, and public verified/reference review listing.
+restaurant detail, active electronic menu items, and public
+verified/reference review listing.
 
 It does not cover the Phase 3 UI tasks, merchant portal ownership editing,
 review creation, OCR verification, external map provider integration, or trust
@@ -64,8 +65,10 @@ Response shape remains the current page envelope:
 }
 ```
 
-Each item includes the current public restaurant fields plus `distanceMeters`
-when location search or map-bounds lookup computes a distance.
+Each item includes the current public restaurant fields, nullable
+`primaryImageUrl`, plus `distanceMeters` when location search or map-bounds
+lookup computes a distance. `primaryImageUrl` is a resolved public or
+short-lived signed URL and never exposes the stored `s3://` reference.
 
 Invalid query combinations return the standard error envelope with HTTP `422`
 and `VALIDATION_ERROR`. Invalid numeric syntax such as `1abc` is rejected, not
@@ -113,7 +116,21 @@ Query parameters:
 | `pageSize` | Optional positive integer. Default `20`, maximum `100`. |
 
 The response must distinguish `VERIFIED` from `REFERENCE_ONLY` so clients can
-render trust badges without guessing. Public responses omit reviewer `userId`.
+render trust badges without guessing. Public responses expose the author's
+trimmed `reviewerDisplayName`, or `Người dùng TrustBite` when the profile name
+is blank or the author is deleted. They continue to omit reviewer `userId`,
+Cognito subject, email, phone number, avatar, helpful counts, replies, receipt
+data, and media.
+
+### GET `/api/v1/restaurants/:restaurantId/menu`
+
+Purpose: public electronic menu for a restaurant detail page.
+
+The endpoint returns active `menu_items` ordered by name and ID. Each item
+exposes `id`, `name`, numeric `price` from `price_default`, and `currency`.
+Default pagination is page `1` with `50` items and a maximum page size of
+`100`. The endpoint does not infer branch-specific prices or dish images.
+Non-active, soft-deleted, or unknown restaurants return `404 NOT_FOUND`.
 
 ## Data And Implementation Boundary
 
@@ -151,10 +168,13 @@ render trust badges without guessing. Public responses omit reviewer `userId`.
 | --- | --- | --- |
 | CRUD routes | Present in `server/src/routes/restaurant.js` with auth on mutating routes | Add DB-backed proof and decide production authorization boundary for mutations |
 | Public list | Implemented with `keyword`, `lat/lng/radiusMeters`, `minTrustScore`, `sort`, strict validation, ACTIVE-only filtering, and DB proof | Keep docs, integration proof, and Harness matrix current |
+| Mobile Discover cards | Loads the first ten public restaurant summaries sorted by trust score, including nullable primary image URLs | Add device location as a separate story before claiming GPS-nearby ordering |
+| Mobile restaurant detail | Tapping a Discover card loads the selected public detail, active electronic menu, and first page of public reviews by restaurant ID; review cards show the backend-issued reviewer display name, comment, score, time, and trust status | Add avatars, helpful counts, replies, or media only after their public API contracts are defined |
 | `/restaurants/nearby` | Implemented before `/:restaurantId` with strict bounds validation and map-bounds DB proof | Keep route ordering and map-bounds proof current |
 | Mobile map | MapLibre/AWS Location map-first view with Vietnamese floating search, persistent four-item navigation, and a snapping nearby sheet tucked behind navigation when collapsed; `LocationApi` owns provider place/route calls while `RestaurantApi` owns viewport restaurant lookup | Complete redesigned marker/card, place-selection, and route-line interaction smoke with nearby fixture data before release claim |
 | Detail | Implemented via `getRestaurantDetail` with DB-backed proof for active/soft-delete gates, rating breakdown, and latest owner claim status | Keep DB-backed detail proof current |
-| Public reviews | Implemented via `listPublicReviewsByRestaurant` with DB-backed proof for status/visibility filters and omitted reviewer `userId` | Keep public review proof current |
+| Public reviews | Implemented via `listPublicReviewsByRestaurant` with DB-backed proof for status/visibility filters, privacy-safe `reviewerDisplayName`, deleted-user fallback, and omitted private identity fields | Keep public review proof current |
+| Public menu | Implemented from active `menu_items` with default price/currency and public restaurant visibility gates | Branch-specific availability, prices, descriptions, categories, and dish images require separate contracts |
 
 ## Validation Contract
 

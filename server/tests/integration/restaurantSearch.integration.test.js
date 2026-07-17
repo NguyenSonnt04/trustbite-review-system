@@ -117,6 +117,61 @@ describe('restaurant search API', () => {
     }
   });
 
+  it('returns only the branchless primary restaurant image as a public URL', async () => {
+    const restaurant = await createSearchRestaurant({
+      name: `Image Search ${Date.now()}`,
+    });
+
+    try {
+      await query(
+        `INSERT INTO restaurant_images (
+           restaurant_id, image_url, caption, is_primary
+         )
+         VALUES
+           ($1, 'https://cdn.example.test/non-primary.jpg', 'Secondary', FALSE),
+           ($1, 'https://cdn.example.test/primary.jpg', 'Primary', TRUE)`,
+        [restaurant.id],
+      );
+
+      const response = await requestApp()
+        .get('/api/v1/restaurants')
+        .query({ keyword: restaurant.name })
+        .expect(200);
+
+      expect(response.body.items).toEqual([
+        expect.objectContaining({
+          id: restaurant.id,
+          primaryImageUrl: 'https://cdn.example.test/primary.jpg',
+        }),
+      ]);
+      expect(response.body.items[0]).not.toHaveProperty('imageUrl');
+    } finally {
+      await cleanupRestaurants([restaurant.id]);
+    }
+  });
+
+  it('returns null when a public restaurant has no primary image', async () => {
+    const restaurant = await createSearchRestaurant({
+      name: `No Image Search ${Date.now()}`,
+    });
+
+    try {
+      const response = await requestApp()
+        .get('/api/v1/restaurants')
+        .query({ keyword: restaurant.name })
+        .expect(200);
+
+      expect(response.body.items).toEqual([
+        expect.objectContaining({
+          id: restaurant.id,
+          primaryImageUrl: null,
+        }),
+      ]);
+    } finally {
+      await cleanupRestaurants([restaurant.id]);
+    }
+  });
+
   it('filters by keyword and PostGIS radius while returning distanceMeters', async () => {
     const token = `Radius Search ${Date.now()}`;
     const near = await createSearchRestaurant({

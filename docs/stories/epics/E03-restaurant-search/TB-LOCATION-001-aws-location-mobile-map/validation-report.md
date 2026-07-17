@@ -49,6 +49,23 @@ git -c core.whitespace=cr-at-eol diff --check
 | Diff hygiene | pass | The CRLF-aware diff check is clean; Git only reports line-ending conversion warnings. |
 | Review remediation | pass | Full server suite: 590 passed / 4 skipped; mobile: 47 passed and analyze clean. Paid routes return pre-provider 429, service state excludes the map key, and nearby lookup is owned by `RestaurantApi`. |
 
+## Main-Branch Merge Remediation
+
+PR #62 was merged locally with `origin/main` on 2026-07-17. The resolution
+preserves both the Location dependencies/permissions and the review receipt
+image-picker dependencies/permissions introduced on `main`.
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Backend unit | pass | 49 files / 463 tests passed after installing the PR lockfile dependencies. |
+| Location integration | pass | 1 file / 4 tests passed. |
+| Backend syntax | pass | `server:build` checked 139 files. |
+| Mobile analyze | pass | No issues found after resolving the combined Flutter plugin set. |
+| Mobile unit/widget | pass | All 76 tests passed, including Location and the review/detail work from `main`. |
+| PR diff hygiene | pass | `git diff --cached origin/main --check` is clean; this removes the whitespace failure reported by the Static infrastructure validation job. |
+| Full backend integration | blocked locally | PostgreSQL was unavailable on `localhost:15432`; DB-backed tests could not run locally. |
+| Static infrastructure script | blocked locally | Docker Desktop was not running, so the Terraform-in-container check could not start. The original CI failure was later in the script and was specifically caused by the now-clean PR diff whitespace check. |
+
 ## Evidence
 
 - `server/tests/unit/location/`

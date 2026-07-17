@@ -1,0 +1,68 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../../src/config/db.js', () => ({
+  pool: {
+    query: vi.fn(),
+  },
+}));
+
+vi.mock('../../../src/services/s3RestaurantImageStorageService.js', () => ({
+  resolveRestaurantImageUrl: vi.fn(),
+}));
+
+const { pool } = await import('../../../src/config/db.js');
+const { resolveRestaurantImageUrl } = await import(
+  '../../../src/services/s3RestaurantImageStorageService.js'
+);
+const { listRestaurants } = await import('../../../src/services/restaurantService.js');
+
+function restaurantRow(overrides = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Signing fallback restaurant',
+    slug: 'signing-fallback-restaurant',
+    description: null,
+    phone_number: null,
+    address: null,
+    latitude: null,
+    longitude: null,
+    status: 'ACTIVE',
+    trust_score: '4.50',
+    verified_review_count: 2,
+    reference_review_count: 1,
+    category_ids: [],
+    primary_image_url:
+      's3://trustbite-restaurant-images/restaurant-images/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg',
+    created_at: new Date('2026-07-15T00:00:00.000Z'),
+    updated_at: new Date('2026-07-15T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+describe('listRestaurants', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps public restaurant data available when image delivery fails', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rows: [restaurantRow()] })
+      .mockResolvedValueOnce({ rows: [{ total: '1' }] });
+    resolveRestaurantImageUrl.mockRejectedValue(
+      Object.assign(new Error('signing unavailable'), {
+        statusCode: 503,
+        code: 'PROVIDER_UNAVAILABLE',
+      }),
+    );
+
+    await expect(listRestaurants()).resolves.toMatchObject({
+      items: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          primaryImageUrl: null,
+        },
+      ],
+      total: 1,
+    });
+  });
+});

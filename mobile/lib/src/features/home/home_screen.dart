@@ -4,6 +4,7 @@ import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
 import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
+import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/pages/discover_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/favorites_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/profile_page.dart';
@@ -11,10 +12,16 @@ import 'package:trustbite_mobile/src/features/home/widgets/trustbite_bottom_nav.
 import 'package:trustbite_mobile/src/features/map/map_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, this.authService, this.cognitoAuthGateway});
+  const HomeScreen({
+    super.key,
+    this.authService,
+    this.cognitoAuthGateway,
+    this.restaurantRepository,
+  });
 
   final MobileAuthService? authService;
   final CognitoAuthGateway? cognitoAuthGateway;
+  final RestaurantDiscoveryRepository? restaurantRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -25,10 +32,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _activeServiceIndex = 0;
   bool _isSignedIn = false;
   Map<String, dynamic>? _currentUser;
+  late final RestaurantDiscoveryRepository _restaurantRepository;
 
   @override
   void initState() {
     super.initState();
+    _restaurantRepository =
+        widget.restaurantRepository ??
+        RestaurantDiscoveryService(apiClient: appApiClient);
     _loadAuthState();
   }
 
@@ -92,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _openLogin() async {
+  Future<bool> _openLogin() async {
     final user = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute<Map<String, dynamic>>(
         builder: (_) => LoginScreen(
@@ -102,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
 
-    if (!mounted) return;
+    if (!mounted) return false;
     if (user != null) {
       setState(() {
         _isSignedIn = true;
@@ -116,10 +127,11 @@ class _HomeScreenState extends State<HomeScreen> {
           behavior: SnackBarBehavior.floating,
         ),
       );
-      return;
+      return true;
     }
 
     await _loadAuthState();
+    return _isSignedIn;
   }
 
   Future<void> _logout() async {
@@ -220,6 +232,7 @@ class _HomeScreenState extends State<HomeScreen> {
         isSignedIn: _isSignedIn,
         currentUser: _currentUser,
         onLogin: _openLogin,
+        restaurantRepository: _restaurantRepository,
       ),
       1 => const MapScreen(),
       2 => const FavoritesPage(),

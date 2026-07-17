@@ -357,7 +357,7 @@ paths:
       - Reviews
       security: []
       summary: List public reviews for restaurant
-      description: Unauthenticated public listing. Responses must omit reviewer userId values; userId is populated only for the review owner and ADMIN/SUPER_ADMIN callers on authenticated endpoints.
+      description: Unauthenticated public listing. Responses include reviewerDisplayName and a nullable short-lived reviewerAvatarUrl, but omit reviewer userId, stored avatar references, and all private identity fields. Deleted users always receive a null avatar.
       operationId: listRestaurantReviews
       parameters:
       - $ref: '#/components/parameters/RestaurantId'
@@ -528,6 +528,55 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
         '409':
+          $ref: '#/components/responses/Error'
+  /reviews/{reviewId}/reaction:
+    put:
+      tags:
+      - Reviews
+      summary: Create or replace the authenticated user's review reaction
+      description: The reacting user is derived only from authenticated TrustBite context. The review must be public VERIFIED or REFERENCE_ONLY at an active restaurant.
+      operationId: setReviewReaction
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewReactionRequest'
+      responses:
+        '200':
+          description: Reaction persisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewReactionResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - Reviews
+      summary: Remove the authenticated user's review reaction
+      description: Removes only the reaction owned by the authenticated TrustBite user and is idempotent.
+      operationId: deleteReviewReaction
+      parameters:
+      - $ref: '#/components/parameters/ReviewId'
+      responses:
+        '200':
+          description: Reaction removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewReactionResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '422':
           $ref: '#/components/responses/Error'
   /receipts:
     post:
@@ -2136,6 +2185,17 @@ components:
             type: string
             format: uuid
             description: Omit on unauthenticated/public responses. Populate only for the review owner and ADMIN/SUPER_ADMIN callers.
+          reviewerDisplayName:
+            type: string
+            description: Public review author name. Uses `Người dùng TrustBite` when the author is deleted or has no display name.
+          reviewerAvatarUrl:
+            type: string
+            format: uri
+            nullable: true
+            description: Short-lived read URL for a TrustBite-owned avatar. Null when missing, deleted, invalid, or temporarily unavailable.
+          reactionCounts:
+            $ref: '#/components/schemas/ReviewReactionCounts'
+            description: Anonymous public aggregates only. Reacting-user identities are never returned.
           foodRating:
             type: integer
           priceRating:
@@ -2173,6 +2233,53 @@ components:
           type: integer
         total:
           type: integer
+    ReviewReactionCounts:
+      type: object
+      required:
+      - LOVE
+      - HAHA
+      - ANGRY
+      properties:
+        LOVE:
+          type: integer
+          minimum: 0
+        HAHA:
+          type: integer
+          minimum: 0
+        ANGRY:
+          type: integer
+          minimum: 0
+    ReviewReactionRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - reactionType
+      properties:
+        reactionType:
+          type: string
+          enum:
+          - LOVE
+          - HAHA
+          - ANGRY
+    ReviewReactionResponse:
+      type: object
+      required:
+      - reviewId
+      - myReaction
+      - reactionCounts
+      properties:
+        reviewId:
+          type: string
+          format: uuid
+        myReaction:
+          type: string
+          nullable: true
+          enum:
+          - LOVE
+          - HAHA
+          - ANGRY
+        reactionCounts:
+          $ref: '#/components/schemas/ReviewReactionCounts'
     ReceiptUploadResponse:
       type: object
       required:
