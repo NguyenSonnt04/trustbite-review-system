@@ -25,6 +25,7 @@ async function cleanupUser(userId) {
   await query('DELETE FROM user_saved_lists WHERE user_id = $1', [userId]);
   await query('DELETE FROM user_follows WHERE follower_id = $1 OR following_id = $1', [userId]);
   await query('DELETE FROM user_blocks WHERE blocker_user_id = $1 OR blocked_user_id = $1', [userId]);
+  await query('DELETE FROM review_reactions WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_votes WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_tags WHERE review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
   await query('DELETE FROM review_replies WHERE review_id IN (SELECT id FROM reviews WHERE user_id = $1)', [userId]);
@@ -1973,7 +1974,7 @@ describe('account deletion processor', () => {
       ambienceRating: 1,
       comment: 'Review that must leave aggregates',
       verificationStatus: 'VERIFIED',
-      trustWeightBucket: 'FULL',
+      trustWeightBucket: 'HIGH',
     });
       const remainingReview = await createReview({
         userId: otherUser.id,
@@ -1983,6 +1984,8 @@ describe('account deletion processor', () => {
       serviceRating: 5,
       ambienceRating: 4,
       verificationStatus: 'VERIFIED',
+        // Persisted before the HIGH/LOW vocabulary was introduced. Account
+        // deletion must not drop this surviving review during recomputation.
         trustWeightBucket: 'FULL',
         publicVisibility: 'PUBLIC',
       });
@@ -1995,7 +1998,7 @@ describe('account deletion processor', () => {
         ambienceRating: 1,
         status: 'HIDDEN',
         verificationStatus: 'VERIFIED',
-        trustWeightBucket: 'FULL',
+        trustWeightBucket: 'HIGH',
         publicVisibility: 'PUBLIC',
       });
     const menuItem = await query(
@@ -2087,7 +2090,7 @@ describe('account deletion processor', () => {
     }
   });
 
-  it('clears restaurant trust score when deletion leaves no eligible public reviews', async () => {
+  it('resets restaurant trust score when deletion leaves no eligible public reviews', async () => {
     const user = await createUser({ displayName: 'Zero Aggregate Target' });
     const restaurant = await createRestaurant({
       trustScore: 4.75,
@@ -2102,7 +2105,7 @@ describe('account deletion processor', () => {
       serviceRating: 5,
       ambienceRating: 5,
       verificationStatus: 'VERIFIED',
-      trustWeightBucket: 'FULL',
+      trustWeightBucket: 'HIGH',
       publicVisibility: 'PUBLIC',
     });
     await query(
@@ -2136,7 +2139,7 @@ describe('account deletion processor', () => {
         [restaurant.id],
       );
 
-      expect(restaurantRows.rows[0].trust_score).toBeNull();
+      expect(Number(restaurantRows.rows[0].trust_score)).toBe(5);
       expect(restaurantRows.rows[0]).toMatchObject({
         verified_review_count: 0,
         reference_review_count: 0,

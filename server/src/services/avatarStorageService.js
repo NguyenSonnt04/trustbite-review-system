@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'node:crypto';
 import appConfig from '../config/app.js';
@@ -87,9 +87,11 @@ export class AvatarUploadService {
     region = awsConfig.region,
     client = null,
     signer = null,
+    readSigner = null,
     randomUuid = crypto.randomUUID,
     now = () => new Date(),
     expiresSeconds = DEFAULT_UPLOAD_EXPIRES_SECONDS,
+    readExpiresSeconds = DEFAULT_UPLOAD_EXPIRES_SECONDS,
   } = {}) {
     this.bucketName = bucketName;
     this.avatarAllowedHosts = avatarAllowedHosts;
@@ -98,9 +100,11 @@ export class AvatarUploadService {
     this.region = region;
     this.client = client;
     this.signer = signer;
+    this.readSigner = readSigner;
     this.randomUuid = randomUuid;
     this.now = now;
     this.expiresSeconds = expiresSeconds;
+    this.readExpiresSeconds = readExpiresSeconds;
   }
 
   getClient() {
@@ -156,6 +160,30 @@ export class AvatarUploadService {
       avatarUrl,
       expiresAt,
     };
+  }
+
+  async resolveReadUrl(avatarReference) {
+    try {
+      const parsed = parseOwnedObjectUrl(avatarReference, {
+        bucketName: this.bucketName,
+        region: this.region,
+        allowedHosts: this.cleanupAllowedHosts,
+        allowedPrefixes: ['avatars/'],
+      });
+      if (!parsed.owned) return null;
+
+      const signer = this.readSigner ?? defaultSigner;
+      return await signer({
+        client: this.getClient(),
+        command: new GetObjectCommand({
+          Bucket: parsed.bucket,
+          Key: parsed.key,
+        }),
+        expiresIn: this.readExpiresSeconds,
+      });
+    } catch {
+      return null;
+    }
   }
 }
 

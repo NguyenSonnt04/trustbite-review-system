@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { pool } from '../config/db.js';
 import { cognitoIdentityProvider } from './identityProviders/cognitoProvider.js';
 import { s3ObjectStorage } from './objectStorage.js';
+import { recomputeRestaurantTrustScore } from './trustScoreService.js';
 
 const DEFAULT_BATCH_SIZE = 10;
 const MAX_BATCH_SIZE = 100;
@@ -261,60 +262,21 @@ const cleanupExternalResources = async (request, { identityProvider, objectStora
   return { providerResult, objectResults };
 };
 
-const recomputeAffectedRestaurantAggregates = async (client, userId) => {
+const loadAffectedRestaurantIds = async (client, userId) => {
   const result = await client.query(
-    `WITH affected_restaurants AS (
-       SELECT DISTINCT restaurant_id
-       FROM reviews
-       WHERE user_id = $1
-     ),
-     eligible_reviews AS (
-        SELECT
-          r.restaurant_id,
-          r.status AS review_status,
-          r.average_rating,
-          CASE
-            WHEN r.trust_weight_bucket IN ('FULL', 'HIGH') THEN 1.00
-            WHEN r.trust_weight_bucket IN ('PARTIAL', 'LOW') THEN 0.25
-           ELSE 0.00
-         END AS trust_weight
-        FROM reviews r
-        JOIN affected_restaurants ar ON ar.restaurant_id = r.restaurant_id
-        WHERE r.status IN ('VERIFIED', 'REFERENCE_ONLY')
-          AND r.public_visibility = 'PUBLIC'
-          AND r.trust_weight_bucket <> 'NONE'
-     )
-     UPDATE restaurants restaurant
-     SET trust_score = (
-           SELECT ROUND((SUM(er.average_rating * er.trust_weight) / NULLIF(SUM(er.trust_weight), 0))::numeric, 2)
-           FROM eligible_reviews er
-           WHERE er.restaurant_id = restaurant.id
-             AND er.trust_weight > 0
-         ),
-         verified_review_count = (
-           SELECT count(*)::int
-            FROM eligible_reviews er
-            WHERE er.restaurant_id = restaurant.id
-              AND er.trust_weight > 0
-              AND er.review_status = 'VERIFIED'
-           ),
-           reference_review_count = (
-             SELECT count(*)::int
-             FROM eligible_reviews er
-             WHERE er.restaurant_id = restaurant.id
-               AND er.trust_weight > 0
-               AND er.review_status = 'REFERENCE_ONLY'
-           ),
-         updated_at = now()
-     WHERE restaurant.id IN (SELECT restaurant_id FROM affected_restaurants)`,
+    `SELECT DISTINCT restaurant_id AS "restaurantId"
+     FROM reviews
+     WHERE user_id = $1
+     ORDER BY restaurant_id`,
     [userId],
   );
 
-  return result.rowCount;
+  return result.rows.map((row) => row.restaurantId);
 };
 
 const completeDeletionRequest = async (client, request, cleanupResult) => {
   const phoneTombstone = createDeletedPhoneTombstone(request.user_id);
+  const affectedRestaurantIds = await loadAffectedRestaurantIds(client, request.user_id);
   const sessionResult = await client.query(
       `UPDATE user_sessions
        SET revoked_at = COALESCE(revoked_at, now()),
@@ -389,6 +351,11 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
        WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)`,
       [request.user_id],
     );
+    const reviewReactionsResult = await client.query(
+      `DELETE FROM review_reactions
+       WHERE user_id = $1 OR review_id IN (SELECT id FROM reviews WHERE user_id = $1)`,
+      [request.user_id],
+    );
     const moderationReportsResult = await client.query(
       `UPDATE moderation_reports
        SET description = NULL,
@@ -445,7 +412,10 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
        WHERE restaurant_id IN (SELECT DISTINCT restaurant_id FROM reviews WHERE user_id = $1)`,
       [request.user_id],
     );
-    const restaurantAggregateCount = await recomputeAffectedRestaurantAggregates(client, request.user_id);
+    for (const restaurantId of affectedRestaurantIds) {
+      await recomputeRestaurantTrustScore(restaurantId, { client });
+    }
+    const restaurantAggregateCount = affectedRestaurantIds.length;
     // Keep only previously verified transaction hashes as fraud-minimum evidence
     // so deleted verified receipts still block replay of the same transaction.
     await client.query(
@@ -612,6 +582,7 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
             blocks: blocksResult.rowCount,
             reviewTags: reviewTagsResult.rowCount,
             reviewVotes: reviewVotesResult.rowCount,
+            reviewReactions: reviewReactionsResult.rowCount,
           },
           removedSystemRows: {
             notifications: notificationsResult.rowCount,

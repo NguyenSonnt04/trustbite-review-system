@@ -14,12 +14,14 @@ In scope:
 - `recomputeRestaurantTrustScore` service persisting score + counts, transaction
   or caller-client.
 - Weights/default constants in `trustScoreRules.js`.
-- Unit proof (calculator boundaries + service transaction/validation/not-found).
+- Receipt-free publication and idempotent retry trigger.
+- Account-deletion consolidation onto the shared service.
+- Read compatibility for persisted `FULL`/`PARTIAL` bucket aliases.
+- Unit proof plus committed PostgreSQL integration regressions.
 
 Out of scope (follow-up):
 
-- Wiring recompute into verification/admin/deletion triggers.
-- Live DB proof (no schema change; local Docker unavailable).
+- Wiring recompute into receipt-verification and admin-moderation triggers.
 - Per-user reputation score, DB-backed weights, API/UI changes.
 
 ## Risk Classification
@@ -44,5 +46,5 @@ Paused/narrowed for:
 
 - "User" vs restaurant trust score ambiguity → resolved to the schema-backed
   restaurant aggregate (no user trust_score column exists); documented in overview.
-- Auto-recompute triggers deferred to avoid destabilizing the verification test
-  path; service is built to join a caller transaction.
+- Receipt-verification and admin-moderation triggers remain deferred; receipt-free
+  publication and account deletion now join the shared service transactionally.

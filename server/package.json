@@ -16,7 +16,8 @@
     "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "vitest run --no-file-parallelism tests/integration"
+    "test:integration": "vitest run --no-file-parallelism tests/integration",
+    "test:integration:files": "vitest run --no-file-parallelism"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.0.0",

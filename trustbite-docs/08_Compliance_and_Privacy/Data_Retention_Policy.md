@@ -17,6 +17,7 @@
 | Bản hóa đơn đã che dữ liệu | 365 ngày | Dùng làm bằng chứng xác minh nếu cần hiển thị công khai. |
 | Tọa độ GPS | 30-90 ngày | Chỉ dùng cho xác minh/audit; sau đó tổng hợp hoặc ẩn danh hóa. |
 | Nội dung đánh giá | Đến khi người dùng yêu cầu xóa hoặc bị kiểm duyệt xóa | Xóa mềm để phục vụ audit nếu pháp lý cho phép. |
+| Cảm xúc trên đánh giá | Theo vòng đời tài khoản và review | Xóa khi user yêu cầu xóa tài khoản hoặc review đích bị xóa; API public chỉ trả số lượng tổng hợp. |
 | Bản dịch bình luận review | Theo vòng đời review gốc | Dữ liệu dẫn xuất để hiển thị; xóa hoặc không trả về khi review gốc bị xóa/ẩn/không còn quyền xem. |
 | Cờ gian lận | 2 năm | Dùng cho phân tích bảo mật/chống lạm dụng; giới hạn quyền truy cập. |
 | Audit log | 3 năm | Hồ sơ vận hành/pháp lý. |

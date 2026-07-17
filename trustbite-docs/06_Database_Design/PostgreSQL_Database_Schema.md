@@ -442,6 +442,16 @@ CREATE TABLE review_votes (
   UNIQUE(review_id, user_id, vote_type)
 );
 
+-- review_reactions - một cảm xúc công khai cho mỗi user/review
+CREATE TABLE review_reactions (
+  review_id UUID NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  reaction_type VARCHAR(10) NOT NULL CHECK (reaction_type IN ('LOVE', 'HAHA', 'ANGRY')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (review_id, user_id)
+);
+
 -- review_translations - cache bản dịch bình luận review
 CREATE TABLE review_translations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

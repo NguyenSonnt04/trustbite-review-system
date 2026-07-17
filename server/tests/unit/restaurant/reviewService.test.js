@@ -6,7 +6,14 @@ vi.mock('../../../src/config/db.js', () => ({
   },
 }));
 
+vi.mock('../../../src/services/avatarStorageService.js', () => ({
+  avatarUploadService: {
+    resolveReadUrl: vi.fn(),
+  },
+}));
+
 const { pool } = await import('../../../src/config/db.js');
+const { avatarUploadService } = await import('../../../src/services/avatarStorageService.js');
 const { listPublicReviewsByRestaurant } = await import('../../../src/services/reviewService.js');
 
 const RESTAURANT_ID = '11111111-1111-4111-8111-111111111111';
@@ -15,6 +22,8 @@ function mockReviewRow(overrides = {}) {
   return {
     id: '22222222-2222-4222-8222-222222222222',
     userId: '33333333-3333-4333-8333-333333333333',
+    reviewerDisplayName: 'Nguyễn An',
+    reviewerAvatarReference: null,
     restaurantId: RESTAURANT_ID,
     branchId: null,
     foodRating: 5,
@@ -44,6 +53,7 @@ function mockQueryResults(rows = [mockReviewRow()], total = '1') {
 describe('listPublicReviewsByRestaurant', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    avatarUploadService.resolveReadUrl.mockResolvedValue(null);
   });
 
   it('filters ALL public reviews to verified and reference-only statuses', async () => {
@@ -56,6 +66,7 @@ describe('listPublicReviewsByRestaurant', () => {
 
     expect(dataSql).toContain("r.status IN ('VERIFIED', 'REFERENCE_ONLY')");
     expect(countSql).toContain("r.status IN ('VERIFIED', 'REFERENCE_ONLY')");
+    expect(countSql).toContain('JOIN users u ON u.id = r.user_id');
     expect(dataSql).toContain("r.public_visibility = 'PUBLIC'");
     expect(countSql).toContain("r.public_visibility = 'PUBLIC'");
   });
@@ -90,9 +101,59 @@ describe('listPublicReviewsByRestaurant', () => {
     expect(result.items[0]).toMatchObject({
       id: '22222222-2222-4222-8222-222222222222',
       restaurantId: RESTAURANT_ID,
+      reviewerDisplayName: 'Nguyễn An',
       averageRating: 4.5,
       status: 'VERIFIED',
     });
+  });
+
+  it('joins only the public display name and uses a safe fallback', async () => {
+    mockQueryResults([mockReviewRow({ reviewerDisplayName: null })]);
+
+    const result = await listPublicReviewsByRestaurant(RESTAURANT_ID);
+    const dataSql = pool.query.mock.calls[0][0];
+
+    expect(dataSql).toContain('JOIN users u ON u.id = r.user_id');
+    expect(dataSql).toContain("u.status = 'DELETED'");
+    expect(result.items[0].reviewerDisplayName).toBe('Người dùng TrustBite');
+    expect(result.items[0]).not.toHaveProperty('userId');
+  });
+
+  it('returns a signed avatar URL only for an active reviewer avatar', async () => {
+    const avatarReference =
+      'https://cdn.trustbite.test/trustbite-test-media/avatars/user/avatar.png';
+    avatarUploadService.resolveReadUrl.mockResolvedValue(
+      'https://cdn.trustbite.test/signed-avatar-read',
+    );
+    mockQueryResults([mockReviewRow({ reviewerAvatarReference: avatarReference })]);
+
+    const result = await listPublicReviewsByRestaurant(RESTAURANT_ID);
+    const dataSql = pool.query.mock.calls[0][0];
+
+    expect(dataSql).toContain("u.status = 'DELETED'");
+    expect(avatarUploadService.resolveReadUrl).toHaveBeenCalledWith(avatarReference);
+    expect(result.items[0].reviewerAvatarUrl).toBe(
+      'https://cdn.trustbite.test/signed-avatar-read',
+    );
+    expect(result.items[0]).not.toHaveProperty('avatarUrl');
+  });
+
+  it('returns anonymous reaction aggregates without reacting user identities', async () => {
+    mockQueryResults([
+      mockReviewRow({ loveCount: 3, hahaCount: 2, angryCount: 1 }),
+    ]);
+
+    const result = await listPublicReviewsByRestaurant(RESTAURANT_ID);
+    const dataSql = pool.query.mock.calls[0][0];
+
+    expect(dataSql).toContain('FROM review_reactions');
+    expect(result.items[0].reactionCounts).toEqual({
+      LOVE: 3,
+      HAHA: 2,
+      ANGRY: 1,
+    });
+    expect(result.items[0]).not.toHaveProperty('reactingUserIds');
+    expect(result.items[0]).not.toHaveProperty('myReaction');
   });
 
   it('uses default pagination and returns numeric totals', async () => {

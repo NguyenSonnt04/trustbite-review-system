@@ -396,7 +396,7 @@ class _SuggestedSaveTile extends StatelessWidget {
                     const SizedBox(width: 2),
                     Expanded(
                       child: Text(
-                        restaurant.distance,
+                        restaurant.distance ?? 'Chưa có khoảng cách',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: AppTypography.tiny.copyWith(
