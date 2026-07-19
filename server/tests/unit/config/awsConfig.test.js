@@ -7,6 +7,8 @@ async function loadAwsConfig(caseName) {
   const imports = {
     's3-allow-list': () => import('../../../src/config/aws.js?s3-allow-list'),
     'localstack-s3-endpoint': () => import('../../../src/config/aws.js?localstack-s3-endpoint'),
+    'location-resources': () => import('../../../src/config/aws.js?location-resources'),
+    'shared-credentials': () => import('../../../src/config/aws.js?shared-credentials'),
   };
   return (await imports[caseName]()).default;
 }
@@ -15,6 +17,20 @@ describe('AWS config', () => {
   afterEach(() => {
     process.env = { ...ORIGINAL_ENV };
     vi.resetModules();
+  });
+
+  it('includes the session token in shared temporary credentials', async () => {
+    process.env.AWS_ACCESS_KEY_ID = 'shared-access-key';
+    process.env.AWS_SECRET_ACCESS_KEY = 'shared-secret-key';
+    process.env.AWS_SESSION_TOKEN = 'shared-session-token';
+
+    const config = await loadAwsConfig('shared-credentials');
+
+    expect(config.credentials).toEqual({
+      accessKeyId: 'shared-access-key',
+      secretAccessKey: 'shared-secret-key',
+      sessionToken: 'shared-session-token',
+    });
   });
 
   it('parses S3 owned-object allow lists from environment', async () => {
@@ -40,6 +56,22 @@ describe('AWS config', () => {
     expect(config.s3).toMatchObject({
       endpoint: 'http://127.0.0.1:4566',
       forcePathStyle: true,
+    });
+  });
+
+  it('exposes Location resource configuration through the shared AWS boundary', async () => {
+    process.env.AWS_LOCATION_MAP_NAME = 'map-from-env';
+    process.env.AWS_LOCATION_PLACE_INDEX_NAME = 'index-from-env';
+    process.env.AWS_LOCATION_ROUTE_CALCULATOR_NAME = 'route-from-env';
+    process.env.AWS_LOCATION_MAP_API_KEY = 'key-from-env';
+
+    const config = await loadAwsConfig('location-resources');
+
+    expect(config.location).toMatchObject({
+      mapName: 'map-from-env',
+      placeIndexName: 'index-from-env',
+      routeCalculatorName: 'route-from-env',
+      mapApiKey: 'key-from-env',
     });
   });
 });

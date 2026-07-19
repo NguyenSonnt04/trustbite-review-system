@@ -99,12 +99,13 @@ npm run mobile:pubget
 npm run mobile:run
 ```
 
-`npm run mobile:run` maps only `AWS_REGION`,
-`AWS_COGNITO_USER_POOL_ID`, and `AWS_COGNITO_CLIENT_ID` from the ignored
-`server/.env` file into Flutter `--dart-define` values. AWS access keys,
-secrets, database credentials, and other server-only settings are never passed
-to the mobile process. Explicit `TRUSTBITE_*` environment variables override
-the mapped values.
+`npm run mobile:run` maps `AWS_REGION`, Cognito public identifiers, and the AWS
+Location map name/API key from the ignored `server/.env` file into Flutter
+`--dart-define` values. AWS access keys, secret access keys, database
+credentials, Place Index/Route Calculator names, and other server-only settings
+are never passed to the mobile process. Explicit `TRUSTBITE_*` environment
+variables override the mapped values. Restrict the mobile map API key to the
+intended map/action, apps or origins, and usage quotas in AWS.
 
 If `mobile/android`, `mobile/ios`, `mobile/web`, or another Flutter platform runner folder is missing, generate runners first:
 ```bash
@@ -190,6 +191,15 @@ AWS_S3_BUCKET_NAME=trustbite-invoices
 AWS_SES_SENDER_EMAIL=noreply@trustbite.com
 AWS_COGNITO_USER_POOL_ID=local-cognito-user-pool
 AWS_COGNITO_CLIENT_ID=local-cognito-client
+AWS_LOCATION_MAP_NAME=TrustBiteMap
+AWS_LOCATION_PLACE_INDEX_NAME=TrustBitePlaceIndex
+AWS_LOCATION_ROUTE_CALCULATOR_NAME=TrustBiteRouteCalculator
+AWS_LOCATION_ACCESS_KEY_ID=
+AWS_LOCATION_SECRET_ACCESS_KEY=
+AWS_LOCATION_SESSION_TOKEN=
+AWS_LOCATION_MAP_API_KEY=
+AWS_LOCATION_RATE_LIMIT_MAX=60
+AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS=60
 AUTH_PHONE_FALLBACK_ENABLED=true
 TRUSTBITE_TRUSTED_AUTH_HEADERS=true
 TRUSTBITE_AVATAR_ALLOWED_HOSTS=cdn.trustbite.test

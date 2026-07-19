@@ -24,7 +24,7 @@ class TrustBiteBottomNav extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0).withValues(alpha: 0.96),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(26),
         border: Border.all(color: const Color(0xFFE5E5E5)),
         boxShadow: [
@@ -53,7 +53,7 @@ class TrustBiteBottomNav extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       decoration: BoxDecoration(
                         color: activeIndex == i
-                            ? const Color(0xFFD9D9D9).withValues(alpha: 0.78)
+                            ? const Color(0xFFFFEEE4)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(18),
                       ),

@@ -12,7 +12,10 @@ dependencies:
   amplify_auth_cognito: ^2.12.0
   amplify_flutter: ^2.12.0
   cupertino_icons: ^1.0.8
+  geolocator: ^14.0.3
   image_picker: ^1.2.3
+  maplibre_gl: ^0.26.2
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
