@@ -27,10 +27,14 @@ mobile map key/name are not part of the service instance configuration.
 
 ## Interface Contract
 
-All routes are public read-only routes.
-The three paid Location routes share one per-IP fixed-window quota. Exceeding
-the configured quota returns `429 LOCATION_RATE_LIMITED` before validation or
-provider execution.
+All three Location routes are authenticated read-only routes. After the shared
+per-IP fixed-window quota accepts a request, `authMiddleware` verifies the
+Cognito-backed identity and active local account state before validation or
+provider execution. Missing or invalid authentication returns `401` without
+calling the provider.
+
+Exceeding the configured quota returns `429 LOCATION_RATE_LIMITED` before
+authentication, validation, or provider execution.
 
 
 ### `GET /api/v1/location/search`

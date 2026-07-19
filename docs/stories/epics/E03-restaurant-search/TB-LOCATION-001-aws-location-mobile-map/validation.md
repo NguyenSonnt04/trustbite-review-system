@@ -14,7 +14,7 @@ Amazon Location APIs.
 | Layer | Cases |
 | --- | --- |
 | Unit | Env/rate-limit parsing; AWS command inputs; config redaction; normalization; controller negative cases; separate Flutter Location/Restaurant API parsing. |
-| Integration | Express routes return normalized data and reject over-quota requests before calling the provider service. |
+| Integration | Authenticated Express routes return normalized data; anonymous and over-quota requests are rejected before calling the provider service. |
 | E2E | Manual mobile search, viewport restaurants, GPS, and route line against configured real AWS resources. |
 | Platform | Android/iOS permissions; Flutter analyze/test/build; widget proof for full-canvas map, floating search, and draggable bottom-sheet bounds. |
 | Performance | Search input is controlled; viewport lookup is bounded to 250 items; paid provider routes share a configurable per-IP quota. |
@@ -69,6 +69,16 @@ Code-review remediation proof on 2026-07-17:
 - Server syntax check passed for 138 files.
 - All 47 mobile tests passed and `flutter analyze` reported no issues.
 - Focused proof covers pre-provider 429 limiting, map-key state exclusion, and the separate `RestaurantApi` viewport client.
+
+Authentication review remediation proof on 2026-07-19:
+
+- Focused Location route integration passed: 1 file / 5 tests.
+- Anonymous search, reverse-geocode, and route requests return `401` without
+  provider execution; authenticated search still succeeds.
+- The per-IP quota executes before authentication and provider middleware.
+- Server syntax and AWS provider-boundary checks passed.
+- Full server regression remains blocked by local PostgreSQL refusing
+  connections on port 5432; focused non-DB proof is green.
 
 Remaining proof:
 

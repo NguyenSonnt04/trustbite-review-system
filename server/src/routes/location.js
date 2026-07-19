@@ -5,6 +5,7 @@ import {
   reverseGeocodeHandler,
   searchPlacesHandler,
 } from '../controllers/location.js';
+import { authMiddleware } from '../middlewares/auth.js';
 import { createFixedWindowRateLimiter } from '../middlewares/rateLimit.js';
 
 const defaultRateLimiter = createFixedWindowRateLimiter({
@@ -17,6 +18,7 @@ const defaultRateLimiter = createFixedWindowRateLimiter({
 export function createLocationRouter({ rateLimiter = defaultRateLimiter } = {}) {
   const router = Router();
   router.use(rateLimiter);
+  router.use(authMiddleware);
   router.get('/search', searchPlacesHandler);
   router.get('/reverse-geocode', reverseGeocodeHandler);
   router.get('/route', calculateRouteHandler);

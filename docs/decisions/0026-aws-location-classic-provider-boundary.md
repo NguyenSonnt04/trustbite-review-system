@@ -17,7 +17,7 @@ provisioned resources is outside this implementation request.
 ## Decision
 
 Use MapLibre with the scoped map API key for map rendering. Keep place and route
-operations behind public read-only Express endpoints that use server IAM
+operations behind read-only Express endpoints that use server IAM
 credentials and the classic `@aws-sdk/client-location` commands. Normalize all
 provider responses at the service boundary. Accept only `car`, `truck`, and
 `walking` for the configured Esri calculator; classic bicycle/motorcycle modes
@@ -35,6 +35,18 @@ names into service state and never retains the mobile map API key.
 Flutter uses separate clients: `LocationApi` owns provider-backed place and
 route operations, while `RestaurantApi` owns TrustBite restaurant discovery.
 This keeps provider and product-domain responsibilities independently mockable.
+
+## Amendment: Authenticated Paid Operations (2026-07-19)
+
+This amendment supersedes the unauthenticated-route portion of the 2026-07-17
+amendment. Search, reverse-geocode, and route endpoints now require the shared
+Cognito-backed `authMiddleware` and an active TrustBite account before
+controller or provider execution.
+
+The per-IP quota remains first in the middleware chain so invalid-token floods
+are bounded before Cognito verification. The database-backed
+`/restaurants/nearby` discovery route remains public because it does not invoke
+the paid Location provider.
 
 ## Alternatives Considered
 

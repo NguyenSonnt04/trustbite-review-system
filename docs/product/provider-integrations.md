@@ -59,10 +59,12 @@ required baseline when the emulator does not implement the classic APIs.
 
 The mobile map receives only the configured map name, AWS region, and a scoped
 map API key through build-time runtime configuration. Place search, reverse
-geocoding, and route calculation stay behind public read-only Express routes
-using server IAM credentials. Provider payloads are normalized before they
-leave the service boundary, and exact device coordinates/search text are not
-persisted or logged by this slice.
+geocoding, and route calculation stay behind authenticated read-only Express
+routes using server IAM credentials. The shared Cognito/local-account middleware
+must accept an active TrustBite user before a controller or paid provider call
+runs. Provider payloads are normalized before they leave the service boundary,
+and exact device coordinates/search text are not persisted or logged by this
+slice.
 
 The current adapter uses classic Place Index and Route Calculator operations to
 match the provisioned resources. AWS marks classic `CalculateRoute` as no
@@ -73,9 +75,11 @@ The three paid provider routes share a fixed-window quota keyed by Express's
 trusted `req.ip`. The default is 60 requests per 60 seconds and deployments may
 override it with `AWS_LOCATION_RATE_LIMIT_MAX` and
 `AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS`. Requests over quota return
-`429 LOCATION_RATE_LIMITED` before controller/provider execution. This
-in-process guard limits each Express instance; multi-instance deployments must
-also enforce a distributed or edge quota.
+`429 LOCATION_RATE_LIMITED` before authentication, controller, or provider
+execution. Requests within quota still require a valid Cognito-backed identity;
+unauthenticated requests return `401` before controller/provider execution.
+This in-process guard limits each Express instance; multi-instance deployments
+must also enforce a distributed or edge quota.
 
 `LocationService` retains only the Place Index and Route Calculator names in
 its service config. The mobile map name/key remain outside provider service

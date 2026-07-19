@@ -38,11 +38,13 @@ build and restricted at the AWS resource boundary.
 
 - Location resource names and endpoint/region are read from server environment
   configuration with no source credential or API-key literal.
-- Express exposes validated public read-only search, reverse-geocode, and route
-  endpoints under `/api/v1/location`.
+- Express exposes validated authenticated read-only search, reverse-geocode,
+  and route endpoints under `/api/v1/location`.
 - Paid Location endpoints share a configurable per-IP quota and return
-  `429 LOCATION_RATE_LIMITED` before controller/provider execution when the
-  quota is exceeded.
+  `429 LOCATION_RATE_LIMITED` before authentication/controller/provider
+  execution when the quota is exceeded.
+- Requests within quota require an active Cognito-backed TrustBite user and
+  return `401` before controller/provider execution when unauthenticated.
 - Backend Location service state never retains the mobile map API key.
 - Controllers validate exact numeric coordinate strings, coordinate ranges,
   search length, and supported travel modes before services run.
