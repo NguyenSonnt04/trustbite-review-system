@@ -41,15 +41,18 @@ These signals feed the same §4.2 decision buckets as the GPS/merchant/timestamp
 Accepted rule for `TB-TRUST-001` (Anti-Fraud §10, Status_Mapping §2). `restaurants.trust_score` (`1.00–5.00`) is a backend-computed weighted average of the restaurant's review ratings; the client never computes it.
 
 - Each review contributes by its `trust_weight_bucket`: `HIGH` (verified) is weighted by the reviewer's rank (Newbie 0.5, Apprentice 0.8, Foodie 1.0, Trusted Foodie 1.5; unknown rank falls back to 0.5), `LOW` (reference) is weighted 0.1, and `NONE` (hidden/rejected/deleted/pending) is excluded.
+- Persisted legacy buckets remain read-compatible during recomputation: `FULL` is normalized to `HIGH` and `PARTIAL` to `LOW`. New writes use only `HIGH`, `LOW`, or `NONE`.
 - `trust_score = sum(rating_i * weight_i) / sum(weight_i)`, clamped to `1.00–5.00` and rounded to 2 decimals, where `rating_i` is the review's `average_rating`.
 - A restaurant with no qualifying (HIGH/LOW) reviews resets to the neutral default `5.00`.
 - The same pass recomputes `verified_review_count` (HIGH) and `reference_review_count` (LOW).
+- Every wired aggregate writer locks the restaurant before loading public HIGH/LOW reviews so concurrent review decisions for the same restaurant are reflected without losing an aggregate update.
 
 This is the restaurant trust score. TrustBite has no per-user trust score; user
-reputation is `exp_points`/`rank_code`. Automated verified-review decisions
-recompute the affected restaurant in the same transaction. A rank change also
-recomputes every restaurant containing that user's HIGH-weight reviews. Admin
-moderation and deletion triggers remain tracked follow-up work.
+reputation is `exp_points`/`rank_code`. Receipt-free publication, automated
+verified-review decisions, and account deletion recompute affected restaurants
+inside their existing transactions. A rank change also recomputes every
+restaurant containing that user's HIGH-weight reviews. Admin-moderation
+recomputation remains tracked follow-up work.
 
 ## Vietnam Receipt Parsing
 

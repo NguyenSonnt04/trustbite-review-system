@@ -24,6 +24,10 @@ TrustBite has no per-user trust_score column (user reputation is EXP/rank).
   `HIGH` → verified, weighted by reviewer `rank_code`
   (Newbie 0.5 / Apprentice 0.8 / Foodie 1.0 / Trusted Foodie 1.5, unknown → 0.5);
   `LOW` → reference (0.1); `NONE` → excluded.
+- Preserve read compatibility for rows written with the earlier vocabulary:
+  normalize persisted `FULL` to `HIGH` and `PARTIAL` to `LOW` during aggregate
+  loading. New writes continue to use only `HIGH`, `LOW`, or `NONE`; a future
+  backfill/constraint may remove the aliases after live data proof.
 - Weights ship as frozen constants in `trustScoreRules.js` (Decision 0014
   pattern), consumed by a pure calculator; a DB service persists score + counts.
 - With no qualifying (HIGH/LOW) reviews, reset to the neutral default `5.00`.
@@ -51,13 +55,18 @@ Positive:
 
 Tradeoffs:
 
-- The score does not update automatically until recompute is wired to triggers
-  (verification/admin/deletion) in a follow-up.
+- Receipt-free publication, automated receipt-verification decisions, and
+  account deletion now recompute transactionally. Admin-moderation decisions
+  still require focused trigger wiring and proof.
 - Unseeded ranks fall back to the Newbie weight until rank definitions are seeded.
+- Legacy aliases remain accepted on reads until a separately proven migration
+  can backfill them and constrain the column.
 
 ## Follow-Up
 
-- Wire `recomputeRestaurantTrustScore` into the verification decision, admin
-  moderation decisions, and the deletion/anonymization job (shared client).
+- Wire `recomputeRestaurantTrustScore` into admin-moderation decisions using
+  the shared transaction client.
 - Live DB recompute + rollback proof when local PostgreSQL is available.
+- Backfill `FULL`/`PARTIAL` and add a `trust_weight_bucket` check constraint only
+  after deployed-data inventory and migration rollback proof.
 - Seed the non-Newbie rank_definitions rows if/when gamification ranks land.

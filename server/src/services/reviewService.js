@@ -2,6 +2,7 @@ import { pool } from '../config/db.js';
 import { PENDING_ADMIN_REVIEW_PUBLIC_REASON } from '../config/receiptStatus.js';
 import { createHttpError } from '../utils/httpErrors.js';
 import { avatarUploadService } from './avatarStorageService.js';
+import { recomputeRestaurantTrustScore } from './trustScoreService.js';
 
 const REVIEW_SELECT_PROJECTION = `
   SELECT
@@ -357,6 +358,7 @@ export async function skipReviewReceiptVerification({ userId, reviewId, reason }
     const reviewResult = await client.query(
       `SELECT
          id,
+         restaurant_id AS "restaurantId",
          status,
          verification_status AS "verificationStatus",
          trust_label AS "trustLabel",
@@ -380,6 +382,8 @@ export async function skipReviewReceiptVerification({ userId, reviewId, reason }
       && review.verificationStatus === 'SKIPPED'
       && review.publicVisibility === 'PUBLIC'
     ) {
+      // Repair aggregates created before automatic recomputation was wired.
+      await recomputeRestaurantTrustScore(review.restaurantId, { client });
       await client.query('COMMIT');
       return {
         reviewId: review.id,
@@ -433,6 +437,7 @@ export async function skipReviewReceiptVerification({ userId, reviewId, reason }
       [reviewId],
     );
 
+    await recomputeRestaurantTrustScore(review.restaurantId, { client });
     await client.query('COMMIT');
     const result = updated.rows[0];
     return {

@@ -13,6 +13,8 @@ locals {
     { name = "ALLOWED_ORIGINS", value = var.allowed_origins == null ? "" : var.allowed_origins },
     { name = "AWS_S3_BUCKET_NAME", value = coalesce(var.receipt_bucket_name, "pending-receipt-bucket") },
     { name = "TRUSTBITE_AVATAR_ALLOWED_HOSTS", value = coalesce(var.receipt_bucket_domain_name, "pending-receipt-bucket.s3.amazonaws.com") },
+    { name = "TRUSTBITE_S3_ALLOWED_HOSTS", value = coalesce(var.receipt_bucket_domain_name, "pending-receipt-bucket.s3.amazonaws.com") },
+    { name = "TRUSTBITE_S3_ALLOWED_PREFIXES", value = "avatars/,receipts/,review-media/,merchant-claims/,restaurant-images/" },
     { name = "DATABASE_HOST", value = coalesce(var.database_host, "pending-rds-host") },
     { name = "DATABASE_PORT", value = "5432" },
     { name = "DATABASE_NAME", value = var.database_name },

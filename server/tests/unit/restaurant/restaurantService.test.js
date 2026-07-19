@@ -14,51 +14,55 @@ const { pool } = await import('../../../src/config/db.js');
 const { resolveRestaurantImageUrl } = await import(
   '../../../src/services/s3RestaurantImageStorageService.js'
 );
-const { listRestaurants } = await import(
-  '../../../src/services/restaurantService.js'
-);
+const { listRestaurants } = await import('../../../src/services/restaurantService.js');
 
-describe('restaurantService public image delivery', () => {
+function restaurantRow(overrides = {}) {
+  return {
+    id: '11111111-1111-4111-8111-111111111111',
+    name: 'Signing fallback restaurant',
+    slug: 'signing-fallback-restaurant',
+    description: null,
+    phone_number: null,
+    address: null,
+    latitude: null,
+    longitude: null,
+    status: 'ACTIVE',
+    trust_score: '4.50',
+    verified_review_count: 2,
+    reference_review_count: 1,
+    category_ids: [],
+    primary_image_url:
+      's3://trustbite-restaurant-images/restaurant-images/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg',
+    created_at: new Date('2026-07-15T00:00:00.000Z'),
+    updated_at: new Date('2026-07-15T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+describe('listRestaurants', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('returns restaurant data with a null image when URL signing fails', async () => {
+  it('keeps public restaurant data available when image delivery fails', async () => {
     pool.query
-      .mockResolvedValueOnce({
-        rows: [{
-          id: '11111111-1111-4111-8111-111111111111',
-          name: 'Provider-safe restaurant',
-          slug: 'provider-safe-restaurant',
-          description: null,
-          phone_number: null,
-          address: null,
-          latitude: null,
-          longitude: null,
-          status: 'ACTIVE',
-          trust_score: '4.50',
-          verified_review_count: 2,
-          reference_review_count: 1,
-          category_ids: [],
-          primary_image_url: 's3://trustbite-restaurant-images/image.jpg',
-          created_at: new Date('2026-07-16T00:00:00.000Z'),
-          updated_at: new Date('2026-07-16T00:00:00.000Z'),
-        }],
-      })
+      .mockResolvedValueOnce({ rows: [restaurantRow()] })
       .mockResolvedValueOnce({ rows: [{ total: '1' }] });
     resolveRestaurantImageUrl.mockRejectedValue(
-      Object.assign(new Error('provider unavailable'), {
+      Object.assign(new Error('signing unavailable'), {
         statusCode: 503,
         code: 'PROVIDER_UNAVAILABLE',
       }),
     );
 
-    const result = await listRestaurants();
-
-    expect(result.total).toBe(1);
-    expect(result.items[0]).toMatchObject({
-      id: '11111111-1111-4111-8111-111111111111',
-      primaryImageUrl: null,
+    await expect(listRestaurants()).resolves.toMatchObject({
+      items: [
+        {
+          id: '11111111-1111-4111-8111-111111111111',
+          primaryImageUrl: null,
+        },
+      ],
+      total: 1,
     });
   });
 });

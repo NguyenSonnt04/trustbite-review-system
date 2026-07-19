@@ -132,7 +132,7 @@ describe('account deletion processor', () => {
       `UPDATE users
        SET cognito_sub = $2, avatar_url = $3
        WHERE id = $1`,
-      [user.id, cognitoSub, 's3://trustbite-invoices/avatars/delete-me.png'],
+      [user.id, cognitoSub, `s3://trustbite-invoices/avatars/${user.id}/delete-me.png`],
     );
     await query(
       `INSERT INTO receipt_verifications (
@@ -320,7 +320,9 @@ describe('account deletion processor', () => {
       expect(persisted.rowCount).toBe(1);
       expect(identityProvider.deleteUser).toHaveBeenCalledWith({ username: cognitoSub });
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledTimes(5);
-      expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/avatars/delete-me.png');
+      expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith(
+        `s3://trustbite-invoices/avatars/${user.id}/delete-me.png`,
+      );
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/receipts/raw-receipt.png');
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/receipts/redacted-receipt.png');
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/review-media/review-photo.png');
@@ -404,6 +406,13 @@ describe('account deletion processor', () => {
 
       it('completes deletion without Cognito cleanup when no provider identity is mapped', async () => {
         const user = await createUser({ displayName: 'Phone Only Deletion Target' });
+        await query(
+          'UPDATE users SET avatar_url = $2 WHERE id = $1',
+          [
+            user.id,
+            `s3://trustbite-invoices/avatars/33333333-3333-4333-8333-333333333333/avatars/${user.id}/foreign.png`,
+          ],
+        );
         await query(
           `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
            VALUES ($1, $2, now() - interval '1 minute')`,
@@ -712,7 +721,8 @@ describe('account deletion processor', () => {
       it('keeps the request retryable when owned-object cleanup cannot run without bucket config', async () => {
         const user = await createUser({ displayName: 'Missing Bucket Target' });
         const cognitoSub = `missing-bucket-sub-${user.id}`;
-        const avatarUrl = 's3://trustbite-invoices/avatars/missing-bucket.png';
+        const avatarUrl =
+          `s3://trustbite-invoices/avatars/${user.id}/missing-bucket.png`;
         await query(
           `UPDATE users
            SET cognito_sub = $2,
@@ -793,7 +803,11 @@ describe('account deletion processor', () => {
          SET cognito_sub = $2,
              avatar_url = $3
          WHERE id = $1`,
-        [user.id, cognitoSub, 's3://trustbite-invoices/avatars/completion-retry.png'],
+        [
+          user.id,
+          cognitoSub,
+          `s3://trustbite-invoices/avatars/${user.id}/completion-retry.png`,
+        ],
       );
       const deletionRequest = await query(
         `INSERT INTO account_deletion_requests (user_id, reason, scheduled_deletion_at)
@@ -825,7 +839,9 @@ describe('account deletion processor', () => {
           reason: 'completion_persistence_failed',
         });
         expect(identityProvider.deleteUser).toHaveBeenCalledWith({ username: cognitoSub });
-        expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/avatars/completion-retry.png');
+        expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith(
+          `s3://trustbite-invoices/avatars/${user.id}/completion-retry.png`,
+        );
 
         const persisted = await query(
           `SELECT u.status AS user_status,
@@ -1677,7 +1693,11 @@ describe('account deletion processor', () => {
            SET cognito_sub = $2,
                avatar_url = $3
            WHERE id = $1`,
-          [user.id, `parallel-cleanup-sub-${user.id}`, 's3://trustbite-invoices/avatars/parallel-avatar.png'],
+          [
+            user.id,
+            `parallel-cleanup-sub-${user.id}`,
+            `s3://trustbite-invoices/avatars/${user.id}/parallel-avatar.png`,
+          ],
         );
         await query(
           `INSERT INTO receipt_verifications (
@@ -1739,7 +1759,11 @@ describe('account deletion processor', () => {
            SET cognito_sub = $2,
                avatar_url = $3
            WHERE id = $1`,
-          [user.id, `object-failure-sub-${user.id}`, 's3://trustbite-invoices/avatars/failure-avatar.png'],
+          [
+            user.id,
+            `object-failure-sub-${user.id}`,
+            `s3://trustbite-invoices/avatars/${user.id}/failure-avatar.png`,
+          ],
         );
         await query(
           `INSERT INTO receipt_verifications (
@@ -1974,7 +1998,7 @@ describe('account deletion processor', () => {
       ambienceRating: 1,
       comment: 'Review that must leave aggregates',
       verificationStatus: 'VERIFIED',
-      trustWeightBucket: 'FULL',
+      trustWeightBucket: 'HIGH',
     });
       const remainingReview = await createReview({
         userId: otherUser.id,
@@ -1984,6 +2008,8 @@ describe('account deletion processor', () => {
       serviceRating: 5,
       ambienceRating: 4,
       verificationStatus: 'VERIFIED',
+        // Persisted before the HIGH/LOW vocabulary was introduced. Account
+        // deletion must not drop this surviving review during recomputation.
         trustWeightBucket: 'FULL',
         publicVisibility: 'PUBLIC',
       });
@@ -1996,7 +2022,7 @@ describe('account deletion processor', () => {
         ambienceRating: 1,
         status: 'HIDDEN',
         verificationStatus: 'VERIFIED',
-        trustWeightBucket: 'FULL',
+        trustWeightBucket: 'HIGH',
         publicVisibility: 'PUBLIC',
       });
     const menuItem = await query(
@@ -2088,7 +2114,7 @@ describe('account deletion processor', () => {
     }
   });
 
-  it('clears restaurant trust score when deletion leaves no eligible public reviews', async () => {
+  it('resets restaurant trust score when deletion leaves no eligible public reviews', async () => {
     const user = await createUser({ displayName: 'Zero Aggregate Target' });
     const restaurant = await createRestaurant({
       trustScore: 4.75,
@@ -2103,7 +2129,7 @@ describe('account deletion processor', () => {
       serviceRating: 5,
       ambienceRating: 5,
       verificationStatus: 'VERIFIED',
-      trustWeightBucket: 'FULL',
+      trustWeightBucket: 'HIGH',
       publicVisibility: 'PUBLIC',
     });
     await query(
@@ -2137,7 +2163,7 @@ describe('account deletion processor', () => {
         [restaurant.id],
       );
 
-      expect(restaurantRows.rows[0].trust_score).toBeNull();
+      expect(Number(restaurantRows.rows[0].trust_score)).toBe(5);
       expect(restaurantRows.rows[0]).toMatchObject({
         verified_review_count: 0,
         reference_review_count: 0,

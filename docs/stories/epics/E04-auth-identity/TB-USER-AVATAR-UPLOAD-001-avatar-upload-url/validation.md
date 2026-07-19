@@ -62,3 +62,24 @@ npm run verify:tb-user-avatar-upload
 - Green proof: avatar upload URL creation now parses the candidate public URL through the same owned-object cleanup parser before signing, failing closed with `PROVIDER_UNAVAILABLE` if the URL would be `unapproved_host` or otherwise unowned for account-deletion cleanup. Targeted unit proof passed with 21 files / 222 tests and targeted profile integration proof passed with 12 files / 2 skipped and 103 tests / 4 skipped.
 - `npm run verify:tb-user-avatar-upload` passed: `db:migrate` applied 0, targeted unit proof passed 21 files / 222 tests, targeted integration proof passed 12 files / 2 skipped and 103 tests / 4 skipped, and `server:build` passed for 104 files.
 - `npm run harness -- story verify TB-USER-AVATAR-UPLOAD-001` passed through the same verify command.
+
+2026-07-16 public-read degradation fix:
+
+- `resolveReadUrl` now treats malformed or non-owned persisted avatar references
+  as unavailable media and returns `null`, so a bad historical URL cannot fail an
+  otherwise valid public review response.
+- `avatarStorageService.test.js` covers malformed URL parsing in addition to
+  untrusted and allowlisted-host behavior; the full server unit suite passed
+  45 files / 424 tests.
+
+2026-07-20 avatar ownership fix:
+
+- `PATCH /api/v1/users/me` now accepts only cleanup-compatible avatar
+  references under `avatars/<currentUserId>/...`; an allowlisted URL owned by a
+  different user returns `422 AVATAR_REFERENCE_NOT_OWNED`.
+- Account deletion independently skips an avatar cleanup target whose object
+  path does not match the deleted user, preventing cross-user object deletion
+  even if a historical invalid reference exists.
+- Focused ownership proof passed 3 files / 52 tests. The full server suite
+  passed 76 files / 649 tests with 4 provider tests skipped, `server:build`
+  passed for 144 files, and `verify:tb-user-avatar-upload` passed.

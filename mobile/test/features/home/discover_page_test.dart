@@ -180,6 +180,10 @@ void main() {
       find.byKey(const ValueKey('restaurant-review-bubble')),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('restaurant-review-card-review-1')),
+      findsOneWidget,
+    );
     await tester.ensureVisible(
       find.byKey(const ValueKey('write-review-button')),
     );
@@ -300,16 +304,54 @@ void main() {
 
   testWidgets('retries a failed restaurant detail request', (tester) async {
     final repository = _DetailFailingOnceRestaurantRepository();
-    await tester.pumpWidget(buildPage(repository));
+    await tester.pumpWidget(
+      buildPage(
+        repository,
+        isSignedIn: true,
+        reviewReactionRepository: const _FakeReviewReactionRepository(),
+      ),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('Quán thử lại chi tiết'));
     await tester.pumpAndSettle();
     expect(find.text('Không thể tải chi tiết nhà hàng.'), findsOneWidget);
+    expect(find.text('Menu vẫn tải'), findsOneWidget);
+    expect(find.text('Bình luận vẫn tải.'), findsOneWidget);
+    expect(repository.menuCalls, 1);
+    expect(repository.reviewCalls, 1);
 
+    final reactionTarget = find.byKey(
+      const ValueKey('review-reaction-target-review-detail-failure'),
+    );
+    await tester.ensureVisible(reactionTarget);
+    await tester.pumpAndSettle();
+    await tester.longPress(reactionTarget);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('❤️'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('selected-reaction-review-detail-failure')),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Thử lại'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Thử lại'));
+    await tester.pump();
+    expect(find.text('Menu vẫn tải'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('restaurant-menu-loading')),
+      findsNothing,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Chi tiết đã tải lại.'), findsOneWidget);
+    expect(repository.menuCalls, 1);
+    expect(repository.reviewCalls, 1);
+    expect(
+      find.byKey(const ValueKey('selected-reaction-review-detail-failure')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('retries only the failed restaurant menu section', (
@@ -474,6 +516,8 @@ class _FakeRestaurantRepository implements RestaurantDiscoveryRepository {
 class _DetailFailingOnceRestaurantRepository
     implements RestaurantDiscoveryRepository {
   var _detailCalls = 0;
+  var menuCalls = 0;
+  var reviewCalls = 0;
 
   @override
   Future<List<HomeRestaurant>> fetchRestaurants() async {
@@ -520,18 +564,45 @@ class _DetailFailingOnceRestaurantRepository
 
   @override
   Future<List<HomeMenuItem>> fetchRestaurantMenu(String restaurantId) async {
-    return const [];
+    menuCalls += 1;
+    return const [
+      HomeMenuItem(
+        id: 'menu-detail-failure',
+        name: 'Menu vẫn tải',
+        price: 45000,
+        currency: 'VND',
+      ),
+    ];
   }
 
   @override
   Future<HomeRestaurantReviewPage> fetchRestaurantReviews(
     String restaurantId,
   ) async {
-    return const HomeRestaurantReviewPage(
-      items: [],
+    reviewCalls += 1;
+    return HomeRestaurantReviewPage(
+      items: [
+        HomeRestaurantReview(
+          id: 'review-detail-failure',
+          restaurantId: restaurantId,
+          branchId: null,
+          foodRating: 4,
+          priceRating: 4,
+          serviceRating: 4,
+          ambienceRating: 4,
+          averageRating: 4,
+          reviewerDisplayName: 'Người dùng TrustBite',
+          comment: 'Bình luận vẫn tải.',
+          status: 'VERIFIED',
+          verificationStatus: 'VERIFIED',
+          trustLabel: 'RECEIPT_VERIFIED',
+          visitedAt: null,
+          createdAt: DateTime.utc(2026, 7, 15),
+        ),
+      ],
       page: 1,
       pageSize: 20,
-      total: 0,
+      total: 1,
     );
   }
 }

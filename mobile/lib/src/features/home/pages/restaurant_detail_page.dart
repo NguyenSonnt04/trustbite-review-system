@@ -40,19 +40,45 @@ class RestaurantDetailPage extends StatefulWidget {
 
 class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
   late Future<HomeRestaurantDetail> _detail;
+  late Future<List<HomeMenuItem>> _menu;
+  late Future<HomeRestaurantReviewPage> _reviews;
+  late final ProfileManagementRepository _safetyRepository;
+  final _menuSectionKey = GlobalKey();
+  final _reviewsSectionKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
+    _safetyRepository =
+        widget.safetyRepository ??
+        ProfileManagementService(apiClient: appApiClient);
     _loadDetail();
+    _loadMenu();
+    _loadReviews();
   }
 
   void _loadDetail() {
     _detail = widget.repository.fetchRestaurantDetail(widget.restaurantId);
   }
 
-  void _retry() {
+  void _retryDetail() {
     setState(_loadDetail);
+  }
+
+  void _loadMenu() {
+    _menu = widget.repository.fetchRestaurantMenu(widget.restaurantId);
+  }
+
+  void _retryMenu() {
+    setState(_loadMenu);
+  }
+
+  void _loadReviews() {
+    _reviews = widget.repository.fetchRestaurantReviews(widget.restaurantId);
+  }
+
+  void _retryReviews() {
+    setState(_loadReviews);
   }
 
   @override
@@ -64,21 +90,54 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
         future: _detail,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done) {
-            return _DetailLoading(restaurant: widget.initialRestaurant);
+            return _DetailLoading(
+              restaurant: widget.initialRestaurant,
+              menu: _menu,
+              reviews: _reviews,
+              menuSectionKey: _menuSectionKey,
+              reviewsSectionKey: _reviewsSectionKey,
+              onRetryMenu: _retryMenu,
+              onRetryReviews: _retryReviews,
+              isSignedIn: widget.isSignedIn,
+              onLogin: widget.onLogin,
+              reviewReactionRepository:
+                  widget.reviewReactionRepository ??
+                  ReviewReactionService(apiClient: appApiClient),
+              safetyRepository: _safetyRepository,
+            );
           }
           if (snapshot.hasError) {
-            return _DetailError(onRetry: _retry);
+            return _DetailError(
+              menu: _menu,
+              reviews: _reviews,
+              menuSectionKey: _menuSectionKey,
+              reviewsSectionKey: _reviewsSectionKey,
+              onRetryDetail: _retryDetail,
+              onRetryMenu: _retryMenu,
+              onRetryReviews: _retryReviews,
+              isSignedIn: widget.isSignedIn,
+              onLogin: widget.onLogin,
+              reviewReactionRepository:
+                  widget.reviewReactionRepository ??
+                  ReviewReactionService(apiClient: appApiClient),
+              safetyRepository: _safetyRepository,
+            );
           }
           return _DetailContent(
             detail: snapshot.requireData,
             restaurantId: widget.restaurantId,
-            repository: widget.repository,
+            menu: _menu,
+            reviews: _reviews,
+            menuSectionKey: _menuSectionKey,
+            reviewsSectionKey: _reviewsSectionKey,
+            onRetryMenu: _retryMenu,
+            onRetryReviews: _retryReviews,
             isSignedIn: widget.isSignedIn,
             onLogin: widget.onLogin,
             reviewRepository: widget.reviewRepository,
             receiptPicker: widget.receiptPicker,
             reviewReactionRepository: widget.reviewReactionRepository,
-            safetyRepository: widget.safetyRepository,
+            safetyRepository: _safetyRepository,
           );
         },
       ),
@@ -87,19 +146,67 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
 }
 
 class _DetailLoading extends StatelessWidget {
-  const _DetailLoading({required this.restaurant});
+  const _DetailLoading({
+    required this.restaurant,
+    required this.menu,
+    required this.reviews,
+    required this.menuSectionKey,
+    required this.reviewsSectionKey,
+    required this.onRetryMenu,
+    required this.onRetryReviews,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.reviewReactionRepository,
+    required this.safetyRepository,
+  });
 
   final HomeRestaurant restaurant;
+  final Future<List<HomeMenuItem>> menu;
+  final Future<HomeRestaurantReviewPage> reviews;
+  final Key menuSectionKey;
+  final Key reviewsSectionKey;
+  final VoidCallback onRetryMenu;
+  final VoidCallback onRetryReviews;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository reviewReactionRepository;
+  final ProfileManagementRepository safetyRepository;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           _SimpleBackHeader(title: restaurant.name),
-          const Expanded(
-            child: Center(
-              child: CircularProgressIndicator(color: HomeColors.brand),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(
+                  height: 120,
+                  child: Center(
+                    child: CircularProgressIndicator(color: HomeColors.brand),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _MenuSection(
+                  key: menuSectionKey,
+                  menu: menu,
+                  onRetry: onRetryMenu,
+                ),
+                const SizedBox(height: 34),
+                _ReviewsSection(
+                  key: reviewsSectionKey,
+                  reviews: reviews,
+                  onRetry: onRetryReviews,
+                  isSignedIn: isSignedIn,
+                  onLogin: onLogin,
+                  repository: reviewReactionRepository,
+                  safetyRepository: safetyRepository,
+                ),
+              ],
             ),
           ),
         ],
@@ -109,45 +216,87 @@ class _DetailLoading extends StatelessWidget {
 }
 
 class _DetailError extends StatelessWidget {
-  const _DetailError({required this.onRetry});
+  const _DetailError({
+    required this.menu,
+    required this.reviews,
+    required this.menuSectionKey,
+    required this.reviewsSectionKey,
+    required this.onRetryDetail,
+    required this.onRetryMenu,
+    required this.onRetryReviews,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.reviewReactionRepository,
+    required this.safetyRepository,
+  });
 
-  final VoidCallback onRetry;
+  final Future<List<HomeMenuItem>> menu;
+  final Future<HomeRestaurantReviewPage> reviews;
+  final Key menuSectionKey;
+  final Key reviewsSectionKey;
+  final VoidCallback onRetryDetail;
+  final VoidCallback onRetryMenu;
+  final VoidCallback onRetryReviews;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository reviewReactionRepository;
+  final ProfileManagementRepository safetyRepository;
 
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: Column(
+      child: ListView(
+        padding: EdgeInsets.zero,
         children: [
           const _SimpleBackHeader(title: 'Chi tiết nhà hàng'),
-          Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.cloud_off_rounded,
-                      size: 46,
-                      color: HomeColors.muted,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Không thể tải chi tiết nhà hàng.',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.title,
-                    ),
-                    const SizedBox(height: 12),
-                    FilledButton(
-                      onPressed: onRetry,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: HomeColors.brand,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.cloud_off_rounded,
+                        size: 46,
+                        color: HomeColors.muted,
                       ),
-                      child: const Text('Thử lại'),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Không thể tải chi tiết nhà hàng.',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.title,
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton(
+                        onPressed: onRetryDetail,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: HomeColors.brand,
+                        ),
+                        child: const Text('Thử lại'),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 32),
+                _MenuSection(
+                  key: menuSectionKey,
+                  menu: menu,
+                  onRetry: onRetryMenu,
+                ),
+                const SizedBox(height: 34),
+                _ReviewsSection(
+                  key: reviewsSectionKey,
+                  reviews: reviews,
+                  onRetry: onRetryReviews,
+                  isSignedIn: isSignedIn,
+                  onLogin: onLogin,
+                  repository: reviewReactionRepository,
+                  safetyRepository: safetyRepository,
+                ),
+              ],
             ),
           ),
         ],
@@ -191,7 +340,12 @@ class _DetailContent extends StatefulWidget {
   const _DetailContent({
     required this.detail,
     required this.restaurantId,
-    required this.repository,
+    required this.menu,
+    required this.reviews,
+    required this.menuSectionKey,
+    required this.reviewsSectionKey,
+    required this.onRetryMenu,
+    required this.onRetryReviews,
     required this.isSignedIn,
     required this.onLogin,
     required this.reviewRepository,
@@ -202,50 +356,25 @@ class _DetailContent extends StatefulWidget {
 
   final HomeRestaurantDetail detail;
   final String restaurantId;
-  final RestaurantDiscoveryRepository repository;
+  final Future<List<HomeMenuItem>> menu;
+  final Future<HomeRestaurantReviewPage> reviews;
+  final Key menuSectionKey;
+  final Key reviewsSectionKey;
+  final VoidCallback onRetryMenu;
+  final VoidCallback onRetryReviews;
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
   final ReviewSubmissionRepository? reviewRepository;
   final ReceiptPicker? receiptPicker;
   final ReviewReactionRepository? reviewReactionRepository;
-  final ProfileManagementRepository? safetyRepository;
+  final ProfileManagementRepository safetyRepository;
 
   @override
   State<_DetailContent> createState() => _DetailContentState();
 }
 
 class _DetailContentState extends State<_DetailContent> {
-  Future<List<HomeMenuItem>>? _menu;
-  Future<HomeRestaurantReviewPage>? _reviews;
-  late final ProfileManagementRepository _safetyRepository;
-
   HomeRestaurantDetail get detail => widget.detail;
-
-  @override
-  void initState() {
-    super.initState();
-    _safetyRepository =
-        widget.safetyRepository ??
-        ProfileManagementService(apiClient: appApiClient);
-    _loadMenu();
-    _loadReviews();
-  }
-
-  void _loadMenu() {
-    _menu = widget.repository.fetchRestaurantMenu(widget.restaurantId);
-  }
-
-  void _retryMenu() {
-    setState(_loadMenu);
-  }
-
-  void _loadReviews() {
-    _reviews = widget.repository.fetchRestaurantReviews(widget.restaurantId);
-  }
-
-  void _retryReviews() {
-    setState(_loadReviews);
-  }
 
   Future<void> _openReviewFlow() async {
     var signedIn = widget.isSignedIn;
@@ -267,7 +396,7 @@ class _DetailContentState extends State<_DetailContent> {
       ),
     );
     if (published == true && mounted) {
-      setState(_loadReviews);
+      widget.onRetryReviews();
     }
   }
 
@@ -281,7 +410,7 @@ class _DetailContentState extends State<_DetailContent> {
     );
     if (input == null || !mounted) return;
     try {
-      await _safetyRepository.submitReport(
+      await widget.safetyRepository.submitReport(
         entityType: ReportEntityType.restaurant,
         entityId: widget.restaurantId,
         reasonCode: input.reasonCode,
@@ -303,13 +432,6 @@ class _DetailContentState extends State<_DetailContent> {
 
   @override
   Widget build(BuildContext context) {
-    final menu = _menu ??= widget.repository.fetchRestaurantMenu(
-      widget.restaurantId,
-    );
-    final reviews = _reviews ??= widget.repository.fetchRestaurantReviews(
-      widget.restaurantId,
-    );
-
     return CustomScrollView(
       slivers: [
         SliverAppBar(
@@ -470,65 +592,118 @@ class _DetailContentState extends State<_DetailContent> {
                 const SizedBox(height: 12),
                 _RatingSummaryCard(breakdown: detail.ratingBreakdown),
                 const SizedBox(height: 32),
-                const _SectionHeading(
-                  icon: Icons.restaurant_outlined,
-                  title: 'Thực đơn điện tử',
-                  subtitle: 'Giá mặc định do nhà hàng cung cấp',
-                ),
-                const SizedBox(height: 14),
-                FutureBuilder<List<HomeMenuItem>>(
-                  future: menu,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState != ConnectionState.done) {
-                      return const _MenuLoading();
-                    }
-                    if (snapshot.hasError) {
-                      return _MenuError(onRetry: _retryMenu);
-                    }
-                    final items = snapshot.requireData;
-                    if (items.isEmpty) {
-                      return const _MenuEmpty();
-                    }
-                    return _MenuList(items: items);
-                  },
+                _MenuSection(
+                  key: widget.menuSectionKey,
+                  menu: widget.menu,
+                  onRetry: widget.onRetryMenu,
                 ),
                 const SizedBox(height: 34),
                 _ReviewCallToAction(onPressed: _openReviewFlow),
                 const SizedBox(height: 30),
-                FutureBuilder<HomeRestaurantReviewPage>(
-                  future: reviews,
-                  builder: (context, snapshot) {
-                    final page = snapshot.data;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _CommentsHeader(total: page?.total),
-                        const SizedBox(height: 14),
-                        if (snapshot.connectionState != ConnectionState.done)
-                          const _ReviewsLoading()
-                        else if (snapshot.hasError)
-                          _ReviewsError(onRetry: _retryReviews)
-                        else if (page!.items.isEmpty)
-                          const _ReviewsEmpty()
-                        else
-                          _RestaurantReviewList(
-                            items: page.items,
-                            isSignedIn: widget.isSignedIn,
-                            onLogin: widget.onLogin,
-                            repository:
-                                widget.reviewReactionRepository ??
-                                ReviewReactionService(apiClient: appApiClient),
-                            safetyRepository: _safetyRepository,
-                          ),
-                      ],
-                    );
-                  },
+                _ReviewsSection(
+                  key: widget.reviewsSectionKey,
+                  reviews: widget.reviews,
+                  onRetry: widget.onRetryReviews,
+                  isSignedIn: widget.isSignedIn,
+                  onLogin: widget.onLogin,
+                  repository:
+                      widget.reviewReactionRepository ??
+                      ReviewReactionService(apiClient: appApiClient),
+                  safetyRepository: widget.safetyRepository,
                 ),
               ],
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MenuSection extends StatelessWidget {
+  const _MenuSection({super.key, required this.menu, required this.onRetry});
+
+  final Future<List<HomeMenuItem>> menu;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionHeading(
+          icon: Icons.restaurant_outlined,
+          title: 'Thực đơn điện tử',
+          subtitle: 'Giá mặc định do nhà hàng cung cấp',
+        ),
+        const SizedBox(height: 14),
+        FutureBuilder<List<HomeMenuItem>>(
+          future: menu,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const _MenuLoading();
+            }
+            if (snapshot.hasError) {
+              return _MenuError(onRetry: onRetry);
+            }
+            final items = snapshot.requireData;
+            if (items.isEmpty) {
+              return const _MenuEmpty();
+            }
+            return _MenuList(items: items);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewsSection extends StatelessWidget {
+  const _ReviewsSection({
+    super.key,
+    required this.reviews,
+    required this.onRetry,
+    required this.isSignedIn,
+    required this.onLogin,
+    required this.repository,
+    required this.safetyRepository,
+  });
+
+  final Future<HomeRestaurantReviewPage> reviews;
+  final VoidCallback onRetry;
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final ReviewReactionRepository repository;
+  final ProfileManagementRepository safetyRepository;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<HomeRestaurantReviewPage>(
+      future: reviews,
+      builder: (context, snapshot) {
+        final page = snapshot.data;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CommentsHeader(total: page?.total),
+            const SizedBox(height: 14),
+            if (snapshot.connectionState != ConnectionState.done)
+              const _ReviewsLoading()
+            else if (snapshot.hasError)
+              _ReviewsError(onRetry: onRetry)
+            else if (page!.items.isEmpty)
+              const _ReviewsEmpty()
+            else
+              _RestaurantReviewList(
+                items: page.items,
+                isSignedIn: isSignedIn,
+                onLogin: onLogin,
+                repository: repository,
+                safetyRepository: safetyRepository,
+              ),
+          ],
+        );
+      },
     );
   }
 }
@@ -911,6 +1086,7 @@ class _RestaurantReviewList extends StatelessWidget {
       children: [
         for (var index = 0; index < items.length; index++) ...[
           _RestaurantReviewCard(
+            key: ValueKey('restaurant-review-card-${items[index].id}'),
             review: items[index],
             isSignedIn: isSignedIn,
             onLogin: onLogin,
@@ -926,6 +1102,7 @@ class _RestaurantReviewList extends StatelessWidget {
 
 class _RestaurantReviewCard extends StatefulWidget {
   const _RestaurantReviewCard({
+    super.key,
     required this.review,
     required this.isSignedIn,
     required this.onLogin,

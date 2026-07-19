@@ -37,16 +37,29 @@ export class ValidationError extends Error {
   }
 }
 
-// Only HIGH/LOW buckets contribute; NONE (hidden/rejected/deleted/pending) is
-// excluded at the query level so hidden/deleted reviews never affect the score.
+// Only verified/reference buckets contribute. FULL/PARTIAL are legacy persisted
+// aliases for HIGH/LOW; NONE (hidden/rejected/deleted/pending) stays excluded.
 const LOAD_REVIEWS_SQL = `
   SELECT r.average_rating AS "averageRating",
-         r.trust_weight_bucket AS "trustWeightBucket",
+         CASE r.trust_weight_bucket
+           WHEN 'FULL' THEN 'HIGH'
+           WHEN 'PARTIAL' THEN 'LOW'
+           ELSE r.trust_weight_bucket
+         END AS "trustWeightBucket",
          u.rank_code AS "rankCode"
   FROM reviews r
   JOIN users u ON u.id = r.user_id
   WHERE r.restaurant_id = $1
-    AND r.trust_weight_bucket IN ('HIGH', 'LOW')
+    AND r.status IN ('VERIFIED', 'REFERENCE_ONLY')
+    AND r.public_visibility = 'PUBLIC'
+    AND r.trust_weight_bucket IN ('HIGH', 'LOW', 'FULL', 'PARTIAL')
+`;
+
+const LOCK_RESTAURANT_SQL = `
+  SELECT 1
+  FROM restaurants
+  WHERE id = $1
+  FOR UPDATE
 `;
 
 const UPDATE_RESTAURANT_SQL = `
@@ -80,13 +93,9 @@ export async function recomputeRestaurantTrustScore(restaurantId, { client } = {
   try {
     if (ownsTransaction) await db.query('BEGIN');
 
-    await db.query(
-      `SELECT id
-       FROM restaurants
-       WHERE id = $1
-       FOR UPDATE`,
-      [restaurantId],
-    );
+    // Serialize recomputes for one restaurant before taking the aggregate
+    // snapshot so a waiter sees review changes committed by the lock holder.
+    await db.query(LOCK_RESTAURANT_SQL, [restaurantId]);
     const reviewsResult = await db.query(LOAD_REVIEWS_SQL, [restaurantId]);
     const result = computeTrustScore(reviewsResult.rows, rules);
 

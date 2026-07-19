@@ -1,6 +1,7 @@
 import appConfig from '../config/app.js';
 import { pool } from '../config/db.js';
 import { createHttpError } from '../utils/httpErrors.js';
+import { avatarUploadService } from './avatarStorageService.js';
 
 const ACTIVE_DELETION_STATUSES = ['REQUESTED', 'PROCESSING'];
 const ACCOUNT_DELETION_REASON_MAX_LENGTH = 500;
@@ -149,7 +150,7 @@ const normalizeDateOfBirth = (value) => {
   return value;
 };
 
-const normalizeAvatarUrl = (value) => {
+const normalizeAvatarUrl = (value, userId) => {
   if (value === undefined) return undefined;
   if (value === null || value === '') return null;
   if (typeof value !== 'string') {
@@ -175,6 +176,7 @@ const normalizeAvatarUrl = (value) => {
     throw createHttpError(422, 'AVATAR_ORIGIN_NOT_ALLOWED', 'Avatar URL origin is not allowed');
   }
 
+  avatarUploadService.assertOwnedAvatarReference(parsed.href, userId);
   return parsed.href;
 };
 
@@ -242,7 +244,7 @@ export class UserService {
 
   async updateCurrentUser(userId, body) {
     const displayName = normalizeDisplayName(body.displayName);
-    const avatarUrl = normalizeAvatarUrl(body.avatarUrl);
+    const avatarUrl = normalizeAvatarUrl(body.avatarUrl, userId);
     const phoneNumber = normalizePhoneNumber(body.phoneNumber);
     const dateOfBirth = normalizeDateOfBirth(body.dateOfBirth);
 

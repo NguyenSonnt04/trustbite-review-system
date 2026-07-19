@@ -130,18 +130,17 @@ const PUBLIC_RESTAURANT_CONDITION = `
   AND r.is_deleted = FALSE
 `;
 
-async function resolvePublicRestaurantImageUrl(reference) {
-  try {
-    return await resolveRestaurantImageUrl(reference);
-  } catch {
-    return null;
-  }
-}
-
 /**
  * Map a DB row to a camelCase public-facing object.
  */
 async function toPublic(row) {
+  let primaryImageUrl = null;
+  try {
+    primaryImageUrl = await resolveRestaurantImageUrl(row.primary_image_url);
+  } catch {
+    // Public restaurant reads remain available when image delivery is degraded.
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -156,7 +155,7 @@ async function toPublic(row) {
     verifiedReviewCount: row.verified_review_count,
     referenceReviewCount: row.reference_review_count,
     categoryIds: row.category_ids ?? [],
-    primaryImageUrl: await resolvePublicRestaurantImageUrl(row.primary_image_url),
+    primaryImageUrl,
     ...(row.distance_meters !== undefined && row.distance_meters !== null
       ? { distanceMeters: parseFloat(row.distance_meters) }
       : {}),
@@ -292,15 +291,6 @@ export async function listRestaurants({
   const dataQuery = `
       SELECT
         r.*,
-        (
-          SELECT ri.image_url
-          FROM restaurant_images ri
-          WHERE ri.restaurant_id = r.id
-            AND ri.branch_id IS NULL
-            AND ri.is_primary = TRUE
-          ORDER BY ri.created_at DESC, ri.id DESC
-          LIMIT 1
-        ) AS primary_image_url,
         COALESCE(
           ARRAY_AGG(rcm.category_id) FILTER (WHERE rcm.category_id IS NOT NULL),
           '{}'::integer[]

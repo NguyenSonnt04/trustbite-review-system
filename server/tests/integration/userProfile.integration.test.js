@@ -122,7 +122,6 @@ describe('current user profile API', () => {
           displayName: 'Updated Profile',
           phoneNumber: onboardingPhone,
           dateOfBirth: '2004-11-20',
-          avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
         })
         .expect(200);
 
@@ -132,7 +131,7 @@ describe('current user profile API', () => {
         phoneNumber: toE164VietnamPhone(onboardingPhone),
         dateOfBirth: '2004-11-20',
         profileComplete: true,
-        avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
+        avatarUrl: null,
       });
 
       const persisted = await query(
@@ -142,7 +141,7 @@ describe('current user profile API', () => {
       expect(persisted.rows[0]).toMatchObject({
         display_name: 'Updated Profile',
         phone_number: toE164VietnamPhone(onboardingPhone),
-        avatar_url: 'https://cdn.trustbite.test/avatars/profile-user.webp',
+        avatar_url: null,
       });
       expect(mapDateOnly(persisted.rows[0].date_of_birth)).toBe('2004-11-20');
     } finally {
@@ -177,6 +176,32 @@ describe('current user profile API', () => {
       expect(persisted.rows[0].avatar_url).toBe(avatarReference);
     } finally {
       await cleanupUser(user.id);
+    }
+  });
+
+  it('rejects an avatar reference owned by another user', async () => {
+    const user = await createUser({ displayName: 'Avatar Owner Check User' });
+    const otherUser = await createUser({ displayName: 'Other Avatar Owner' });
+    const foreignAvatarReferences = [
+      `https://localhost:4566/trustbite-test-media/avatars/${otherUser.id}/profile.webp`,
+      `https://localhost:4566/trustbite-test-media/avatars/${otherUser.id}/avatars/${user.id}/profile.webp`,
+    ];
+
+    try {
+      for (const avatarUrl of foreignAvatarReferences) {
+        const response = await requestApp()
+          .patch('/api/v1/users/me')
+          .set(authHeaders(user.id))
+          .send({ avatarUrl })
+          .expect(422);
+
+        expect(response.body.error.code).toBe('AVATAR_REFERENCE_NOT_OWNED');
+      }
+      const persisted = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
+      expect(persisted.rows[0].avatar_url).toBeNull();
+    } finally {
+      await cleanupUser(user.id);
+      await cleanupUser(otherUser.id);
     }
   });
 

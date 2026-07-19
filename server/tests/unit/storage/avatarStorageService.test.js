@@ -8,6 +8,38 @@ const USER_ID = '11111111-1111-4111-8111-111111111111';
 const OBJECT_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('avatar upload storage service', () => {
+  it('accepts only avatar references owned by the current user', () => {
+    const service = new AvatarUploadService({
+      bucketName: 'trustbite-test-media',
+      avatarAllowedHosts: ['cdn.trustbite.test'],
+      cleanupAllowedHosts: ['cdn.trustbite.test'],
+    });
+    const ownedReference =
+      `https://cdn.trustbite.test/trustbite-test-media/avatars/${USER_ID}/${OBJECT_ID}.png`;
+    const foreignReference =
+      `https://cdn.trustbite.test/trustbite-test-media/avatars/33333333-3333-4333-8333-333333333333/${OBJECT_ID}.png`;
+    const nestedForeignReference =
+      `https://cdn.trustbite.test/trustbite-test-media/avatars/33333333-3333-4333-8333-333333333333/avatars/${USER_ID}/${OBJECT_ID}.png`;
+
+    expect(service.ownsAvatarReference(ownedReference, USER_ID)).toBe(true);
+    expect(service.ownsAvatarReference(foreignReference, USER_ID)).toBe(false);
+    expect(service.ownsAvatarReference(nestedForeignReference, USER_ID)).toBe(false);
+    expect(service.hasAvatarOwnerPath(`s3://another-bucket/avatars/${USER_ID}/avatar.png`, USER_ID))
+      .toBe(true);
+    expect(service.hasAvatarOwnerPath(foreignReference, USER_ID)).toBe(false);
+    expect(service.hasAvatarOwnerPath(nestedForeignReference, USER_ID)).toBe(false);
+    let error;
+    try {
+      service.assertOwnedAvatarReference(foreignReference, USER_ID);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toMatchObject({
+      statusCode: 422,
+      code: 'AVATAR_REFERENCE_NOT_OWNED',
+    });
+  });
+
   it('creates a short-lived signed read URL for an owned avatar object', async () => {
     const readSigner = vi.fn().mockResolvedValue(
       'https://cdn.trustbite.test/signed-avatar-read',
@@ -51,6 +83,7 @@ describe('avatar upload storage service', () => {
     await expect(
       service.resolveReadUrl('https://untrusted.example/avatar.png'),
     ).resolves.toBeNull();
+    await expect(service.resolveReadUrl('s3://[invalid')).resolves.toBeNull();
     await expect(
       service.resolveReadUrl(
         `https://cdn.trustbite.test/trustbite-test-media/avatars/${USER_ID}/${OBJECT_ID}.png`,

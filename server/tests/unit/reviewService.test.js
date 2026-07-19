@@ -7,7 +7,14 @@ vi.mock('../../src/config/db.js', () => ({
   },
 }));
 
+vi.mock('../../src/services/trustScoreService.js', () => ({
+  recomputeRestaurantTrustScore: vi.fn(),
+}));
+
 const { pool } = await import('../../src/config/db.js');
+const { recomputeRestaurantTrustScore } = await import(
+  '../../src/services/trustScoreService.js'
+);
 const {
   createReviewForVerificationIntent,
   skipReviewReceiptVerification,
@@ -139,9 +146,14 @@ describe('createReviewForVerificationIntent', () => {
 describe('skipReviewReceiptVerification', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    recomputeRestaurantTrustScore.mockResolvedValue({
+      trustScore: 4.5,
+      verifiedReviewCount: 0,
+      referenceReviewCount: 1,
+    });
   });
 
-  it('publishes an owner review as low-weight reference without a receipt', async () => {
+  it('publishes an owner review and refreshes restaurant trust aggregates in the same transaction', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     client.query
@@ -150,6 +162,7 @@ describe('skipReviewReceiptVerification', () => {
         rowCount: 1,
         rows: [{
           id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
           status: 'SUBMITTED',
           verificationStatus: 'UNVERIFIED',
           trustLabel: 'PENDING_VERIFICATION',
@@ -186,7 +199,80 @@ describe('skipReviewReceiptVerification', () => {
     });
     expect(client.query.mock.calls[1][0]).toContain('FOR UPDATE');
     expect(client.query.mock.calls[3][0]).toContain("verification_status = 'SKIPPED'");
+    expect(recomputeRestaurantTrustScore).toHaveBeenCalledWith(RESTAURANT_ID, {
+      client,
+    });
     expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('repairs trust aggregates when an already skipped review is retried', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
+          status: 'REFERENCE_ONLY',
+          verificationStatus: 'SKIPPED',
+          trustLabel: 'REFERENCE_ONLY',
+          publicVisibility: 'PUBLIC',
+          trustWeightBucket: 'LOW',
+        }],
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).resolves.toMatchObject({
+      status: 'REFERENCE_ONLY',
+      verificationStatus: 'SKIPPED',
+    });
+
+    expect(recomputeRestaurantTrustScore).toHaveBeenCalledWith(RESTAURANT_ID, {
+      client,
+    });
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+  });
+
+  it('rolls back the review transition when trust aggregate recomputation fails', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    recomputeRestaurantTrustScore.mockRejectedValueOnce(
+      new Error('aggregate recompute failed'),
+    );
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{
+          id: '33333333-3333-4333-8333-333333333333',
+          restaurantId: RESTAURANT_ID,
+          status: 'SUBMITTED',
+          verificationStatus: 'UNVERIFIED',
+          trustLabel: 'PENDING_VERIFICATION',
+          publicVisibility: 'PRIVATE_UNTIL_DECISION',
+          trustWeightBucket: 'NONE',
+        }],
+      })
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ id: '33333333-3333-4333-8333-333333333333' }],
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(skipReviewReceiptVerification({
+      userId: USER_ID,
+      reviewId: '33333333-3333-4333-8333-333333333333',
+      reason: 'USER_SKIPPED_RECEIPT',
+    })).rejects.toThrow('aggregate recompute failed');
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 
   it('does not reveal a review owned by another user', async () => {
