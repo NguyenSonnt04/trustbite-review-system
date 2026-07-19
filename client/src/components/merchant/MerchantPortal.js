@@ -152,7 +152,15 @@ export default function MerchantPortal() {
         <div className={styles.profile}>
           <span>{user?.displayName?.slice(0, 1).toUpperCase() || 'M'}</span>
           <div><strong>{user?.displayName || 'Merchant'}</strong><small>Phiên đã xác minh</small></div>
-          <button onClick={() => { authService.logout(); window.location.assign('/'); }} type="button">Đăng xuất</button>
+          <button
+            onClick={async () => {
+              await authService.logout();
+              window.location.assign('/');
+            }}
+            type="button"
+          >
+            Đăng xuất
+          </button>
         </div>
       </header>
 

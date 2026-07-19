@@ -115,15 +115,6 @@ class AuthService {
   }
 
   async logout() {
-    const storage = getBrowserStorage();
-    const merchantToken = storage?.getItem(AUTH_TOKEN_KEY);
-    storage?.removeItem(AUTH_TOKEN_KEY);
-    storage?.removeItem(USER_STORAGE_KEY);
-    storage?.removeItem(OAUTH_STATE_KEY);
-    storage?.removeItem(OAUTH_VERIFIER_KEY);
-    storage?.removeItem(OAUTH_RETURN_TO_KEY);
-    if (merchantToken) return;
-
     const response = await fetch('/api/admin-auth/logout', {
       method: 'DELETE',
     });
@@ -131,6 +122,13 @@ class AuthService {
     if (!response.ok) {
       throw new Error(body?.error?.message || 'Không thể đăng xuất an toàn.');
     }
+
+    const storage = getBrowserStorage();
+    storage?.removeItem(AUTH_TOKEN_KEY);
+    storage?.removeItem(USER_STORAGE_KEY);
+    storage?.removeItem(OAUTH_STATE_KEY);
+    storage?.removeItem(OAUTH_VERIFIER_KEY);
+    storage?.removeItem(OAUTH_RETURN_TO_KEY);
   }
 
   getToken() {
