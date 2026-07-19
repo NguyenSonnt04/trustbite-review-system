@@ -1,5 +1,9 @@
 import config from '@/config/config';
 const normalizeRootUrl = (url) => url.replace(/\/+$/u, '');
+const normalizeApiUrl = (url) => {
+  const rootUrl = normalizeRootUrl(url);
+  return rootUrl.endsWith('/api/v1') ? rootUrl : `${rootUrl}/api/v1`;
+};
 const ADMIN_SESSION_ERROR_CODES = new Set([
   'ADMIN_SESSION_INVALID',
   'ADMIN_SESSION_EXPIRED',
@@ -78,6 +82,30 @@ const listRestaurants = ({
   }
   if (status) params.set('status', status);
   return requestAdminResource('restaurants', `?${params.toString()}`);
+};
+
+const listRestaurantReviews = async (restaurantId, {
+  status = 'ALL',
+  page = 1,
+  pageSize = 10,
+} = {}) => {
+  const params = new URLSearchParams({
+    status,
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  const response = await fetch(
+    `${normalizeApiUrl(config.apiUrl)}/restaurants/${encodeURIComponent(restaurantId)}/reviews?${params.toString()}`,
+    { cache: 'no-store' },
+  );
+  const responseBody = await response.json().catch(() => null);
+  if (!response.ok) {
+    const error = new Error(responseBody?.error?.message || 'Không thể tải đánh giá của nhà hàng.');
+    error.code = responseBody?.error?.code || 'RESTAURANT_REVIEWS_REQUEST_FAILED';
+    error.status = response.status;
+    throw error;
+  }
+  return responseBody;
 };
 
 const requestAdminUsers = async (path = '', { method = 'GET', body } = {}) => {
@@ -191,8 +219,8 @@ export const adminCapabilities = Object.freeze({
     detail: 'Danh sách, hồ sơ, trạng thái và thư viện ảnh được bảo vệ qua BFF quản trị.',
   },
   reviews: {
-    state: 'blocked',
-    detail: 'Server chưa có API kiểm duyệt hoặc quản lý đánh giá dành cho quản trị viên.',
+    state: 'read-only',
+    detail: 'Có thể đọc đánh giá công khai theo nhà hàng; thao tác kiểm duyệt vẫn chờ API quản trị.',
   },
   verifications: {
     state: 'blocked',
@@ -211,6 +239,7 @@ export const adminCapabilities = Object.freeze({
 export const adminService = {
   readHealth,
   listRestaurants,
+  listRestaurantReviews,
   getRestaurant,
   updateRestaurant,
   deleteRestaurants,

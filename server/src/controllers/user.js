@@ -3,11 +3,20 @@ import { avatarUploadService } from '../services/avatarStorageService.js';
 import { getUserGamification } from '../services/gamificationService.js';
 import { sendAccepted, sendSuccess } from '../utils/responses.js';
 
+const withDisplayAvatar = async (user) => {
+  if (!user.avatarUrl) return user;
+  const displayAvatarUrl = await avatarUploadService.resolveReadUrl(user.avatarUrl);
+  return {
+    ...user,
+    avatarUrl: displayAvatarUrl ?? user.avatarUrl,
+  };
+};
+
 export const getMe = async (req, res, next) => {
   try {
     const user = await userService.getCurrentUser(req.user.id);
     sendSuccess(res, {
-      ...user,
+      ...await withDisplayAvatar(user),
       roles: req.user.roles,
     });
   } catch (err) {
@@ -18,7 +27,7 @@ export const getMe = async (req, res, next) => {
 export const updateMe = async (req, res, next) => {
   try {
     const user = await userService.updateCurrentUser(req.user.id, req.body || {});
-    sendSuccess(res, user);
+    sendSuccess(res, await withDisplayAvatar(user));
   } catch (err) {
     next(err);
   }

@@ -1,33 +1,220 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
+import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
-import 'package:trustbite_mobile/src/features/home/data/home_mock_data.dart';
+import 'package:trustbite_mobile/src/features/home/data/favorites_service.dart';
+import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 
-class FavoritesPage extends StatelessWidget {
-  const FavoritesPage({super.key});
+class FavoritesPage extends StatefulWidget {
+  const FavoritesPage({
+    super.key,
+    required this.isSignedIn,
+    required this.onLogin,
+    this.favoritesRepository,
+    this.restaurantRepository,
+  });
+
+  final bool isSignedIn;
+  final Future<bool> Function() onLogin;
+  final FavoritesRepository? favoritesRepository;
+  final RestaurantDiscoveryRepository? restaurantRepository;
+
+  @override
+  State<FavoritesPage> createState() => _FavoritesPageState();
+}
+
+class _FavoritesPageState extends State<FavoritesPage> {
+  late final FavoritesRepository _favoritesRepository;
+  late final RestaurantDiscoveryRepository _restaurantRepository;
+  Future<_FavoritesData>? _data;
+
+  @override
+  void initState() {
+    super.initState();
+    _favoritesRepository =
+        widget.favoritesRepository ?? FavoritesService(apiClient: appApiClient);
+    _restaurantRepository =
+        widget.restaurantRepository ??
+        RestaurantDiscoveryService(apiClient: appApiClient);
+    if (widget.isSignedIn) _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant FavoritesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.isSignedIn && widget.isSignedIn) _load();
+  }
+
+  void _load() {
+    _data = _fetchData();
+  }
+
+  Future<_FavoritesData> _fetchData() async {
+    final results = await Future.wait<Object>([
+      _favoritesRepository.fetchFavorites(),
+      _restaurantRepository.fetchRestaurants(),
+    ]);
+    final favorites = results[0] as List<FavoriteRestaurant>;
+    final favoriteIds = favorites
+        .map((item) => item.restaurant.id)
+        .whereType<String>()
+        .toSet();
+    final suggestions = (results[1] as List<HomeRestaurant>)
+        .where((restaurant) => !favoriteIds.contains(restaurant.id))
+        .take(3)
+        .toList(growable: false);
+    return _FavoritesData(favorites: favorites, suggestions: suggestions);
+  }
+
+  Future<void> _requireLogin() async {
+    if (await widget.onLogin() && mounted) {
+      setState(_load);
+    }
+  }
+
+  Future<void> _save(HomeRestaurant restaurant) async {
+    final id = restaurant.id;
+    if (id == null) return;
+    try {
+      final current = await (_data ??= _fetchData());
+      await _favoritesRepository.saveFavorite(id);
+      if (!mounted) return;
+      setState(() {
+        _data = Future.value(
+          _FavoritesData(
+            favorites: [
+              FavoriteRestaurant(
+                restaurant: restaurant,
+                addedAt: DateTime.now().toUtc(),
+              ),
+              ...current.favorites.where(
+                (item) => item.restaurant.id != restaurant.id,
+              ),
+            ],
+            suggestions: current.suggestions
+                .where((item) => item.id != restaurant.id)
+                .toList(growable: false),
+          ),
+        );
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Đã lưu ${restaurant.name}.')));
+    } on AuthRequiredException {
+      await _requireLogin();
+    } on Exception {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể lưu quán. Vui lòng thử lại.')),
+      );
+    }
+  }
+
+  Future<void> _remove(HomeRestaurant restaurant) async {
+    final id = restaurant.id;
+    if (id == null) return;
+    try {
+      final current = await (_data ??= _fetchData());
+      await _favoritesRepository.removeFavorite(id);
+      if (!mounted) return;
+      setState(() {
+        _data = Future.value(
+          _FavoritesData(
+            favorites: current.favorites
+                .where((item) => item.restaurant.id != restaurant.id)
+                .toList(growable: false),
+            suggestions: [
+              restaurant,
+              ...current.suggestions.where(
+                (item) => item.id != restaurant.id,
+              ),
+            ].take(3).toList(growable: false),
+          ),
+        );
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Đã bỏ lưu ${restaurant.name}.')));
+    } on Exception {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Không thể bỏ lưu quán.')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.isSignedIn) {
+      return ListView(
+        key: const ValueKey('favorites-page'),
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 118),
+        children: [
+          const _FavoritesHeader(),
+          const SizedBox(height: 20),
+          _FavoritesLoginCard(onLogin: _requireLogin),
+        ],
+      );
+    }
+
     return ListView(
       key: const ValueKey('favorites-page'),
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 118),
       children: [
         const _FavoritesHeader(),
         const SizedBox(height: 18),
-        const _FavoritesOverviewCard(),
-        const SizedBox(height: 16),
-        const _FavoriteFilterBar(),
-        const SizedBox(height: 24),
-        _SuggestedSavesSection(
-          restaurants: homeRestaurants.take(3).toList(growable: false),
+        FutureBuilder<_FavoritesData>(
+          future: _data ??= _fetchData(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done) {
+              return const SizedBox(
+                height: 280,
+                child: Center(
+                  child: CircularProgressIndicator(color: HomeColors.brand),
+                ),
+              );
+            }
+            if (snapshot.hasError) {
+              return _FavoritesError(onRetry: () => setState(_load));
+            }
+            final data = snapshot.requireData;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FavoritesOverviewCard(savedCount: data.favorites.length),
+                if (data.favorites.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  _SavedFavoritesSection(
+                    favorites: data.favorites,
+                    onRemove: _remove,
+                  ),
+                ],
+                if (data.suggestions.isNotEmpty) ...[
+                  const SizedBox(height: 26),
+                  _SuggestedSavesSection(
+                    restaurants: data.suggestions,
+                    onSave: _save,
+                  ),
+                ],
+                const SizedBox(height: 22),
+                const _SaveHintPanel(),
+              ],
+            );
+          },
         ),
-        const SizedBox(height: 22),
-        const _SaveHintPanel(),
       ],
     );
   }
+}
+
+class _FavoritesData {
+  const _FavoritesData({required this.favorites, required this.suggestions});
+
+  final List<FavoriteRestaurant> favorites;
+  final List<HomeRestaurant> suggestions;
 }
 
 class _FavoritesHeader extends StatelessWidget {
@@ -63,7 +250,9 @@ class _FavoritesHeader extends StatelessWidget {
 }
 
 class _FavoritesOverviewCard extends StatelessWidget {
-  const _FavoritesOverviewCard();
+  const _FavoritesOverviewCard({required this.savedCount});
+
+  final int savedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +287,9 @@ class _FavoritesOverviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           Text(
-            'Chưa có quán yêu thích',
+            savedCount == 0
+                ? 'Chưa có quán yêu thích'
+                : 'Danh sách ghé lại của bạn',
             textAlign: TextAlign.center,
             style: AppTypography.cardTitle.copyWith(
               color: AppTypography.ink,
@@ -107,7 +298,9 @@ class _FavoritesOverviewCard extends StatelessWidget {
           ),
           const SizedBox(height: 7),
           Text(
-            'Lưu những quán có review đáng tin để xem lại nhanh hơn.',
+            savedCount == 0
+                ? 'Lưu những quán có review đáng tin để xem lại nhanh hơn.'
+                : 'Các quán được đồng bộ với tài khoản TrustBite của bạn.',
             textAlign: TextAlign.center,
             style: AppTypography.body.copyWith(
               color: HomeColors.muted,
@@ -115,18 +308,14 @@ class _FavoritesOverviewCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const Row(
+          Row(
             children: [
               Expanded(
-                child: _FavoriteMetric(value: '0', label: 'Đã lưu'),
+                child: _FavoriteMetric(value: '$savedCount', label: 'Đã lưu'),
               ),
-              SizedBox(width: 8),
-              Expanded(
-                child: _FavoriteMetric(value: '0', label: 'Bộ sưu tập'),
-              ),
-              SizedBox(width: 8),
-              Expanded(
-                child: _FavoriteMetric(value: '3', label: 'Gợi ý'),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: _FavoriteMetric(value: '1', label: 'Danh sách'),
               ),
             ],
           ),
@@ -177,102 +366,14 @@ class _FavoriteMetric extends StatelessWidget {
   }
 }
 
-class _FavoriteFilterBar extends StatelessWidget {
-  const _FavoriteFilterBar();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _FavoriteFilterChip(
-            icon: Icons.favorite_rounded,
-            label: 'Tất cả',
-            selected: true,
-          ),
-          SizedBox(width: 8),
-          _FavoriteFilterChip(
-            icon: Icons.place_rounded,
-            label: 'Gần bạn',
-            selected: false,
-          ),
-          SizedBox(width: 8),
-          _FavoriteFilterChip(
-            icon: Icons.verified_rounded,
-            label: 'Đã xác thực',
-            selected: false,
-          ),
-          SizedBox(width: 8),
-          _FavoriteFilterChip(
-            icon: Icons.schedule_rounded,
-            label: 'Mở cửa',
-            selected: false,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FavoriteFilterChip extends StatelessWidget {
-  const _FavoriteFilterChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
+class _SuggestedSavesSection extends StatelessWidget {
+  const _SuggestedSavesSection({
+    required this.restaurants,
+    required this.onSave,
   });
 
-  final IconData icon;
-  final String label;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        color: selected ? HomeColors.brand : Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: selected ? HomeColors.brand : const Color(0xFFEDEDED),
-        ),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: HomeColors.brand.withValues(alpha: 0.18),
-                  offset: const Offset(0, 6),
-                  blurRadius: 16,
-                ),
-              ]
-            : null,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 16,
-            color: selected ? Colors.white : HomeColors.muted,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: AppTypography.labelStrong.copyWith(
-              color: selected ? Colors.white : const Color(0xFF4B5563),
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SuggestedSavesSection extends StatelessWidget {
-  const _SuggestedSavesSection({required this.restaurants});
-
   final List<HomeRestaurant> restaurants;
+  final ValueChanged<HomeRestaurant> onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +422,10 @@ class _SuggestedSavesSection extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         for (var i = 0; i < restaurants.length; i++) ...[
-          _SuggestedSaveTile(restaurant: restaurants[i]),
+          _SuggestedSaveTile(
+            restaurant: restaurants[i],
+            onSave: () => onSave(restaurants[i]),
+          ),
           if (i != restaurants.length - 1) const SizedBox(height: 10),
         ],
       ],
@@ -330,9 +434,10 @@ class _SuggestedSavesSection extends StatelessWidget {
 }
 
 class _SuggestedSaveTile extends StatelessWidget {
-  const _SuggestedSaveTile({required this.restaurant});
+  const _SuggestedSaveTile({required this.restaurant, required this.onSave});
 
   final HomeRestaurant restaurant;
+  final VoidCallback onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -412,18 +517,15 @@ class _SuggestedSaveTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: HomeColors.brand.withValues(alpha: 0.09),
-              borderRadius: BorderRadius.circular(15),
+          IconButton(
+            key: ValueKey('save-favorite-${restaurant.id}'),
+            tooltip: 'Lưu ${restaurant.name}',
+            onPressed: onSave,
+            style: IconButton.styleFrom(
+              backgroundColor: HomeColors.brand.withValues(alpha: 0.09),
+              foregroundColor: HomeColors.brand,
             ),
-            child: const Icon(
-              Icons.favorite_border_rounded,
-              size: 20,
-              color: HomeColors.brand,
-            ),
+            icon: const Icon(Icons.favorite_border_rounded, size: 20),
           ),
         ],
       ),
@@ -467,6 +569,180 @@ class _VerificationBadge extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavedFavoritesSection extends StatelessWidget {
+  const _SavedFavoritesSection({
+    required this.favorites,
+    required this.onRemove,
+  });
+
+  final List<FavoriteRestaurant> favorites;
+  final ValueChanged<HomeRestaurant> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Đã lưu',
+          style: AppTypography.sectionTitle.copyWith(
+            color: AppTypography.ink,
+            fontSize: 22,
+          ),
+        ),
+        const SizedBox(height: 14),
+        for (var index = 0; index < favorites.length; index++) ...[
+          _SavedFavoriteTile(
+            favorite: favorites[index],
+            onRemove: () => onRemove(favorites[index].restaurant),
+          ),
+          if (index != favorites.length - 1) const SizedBox(height: 10),
+        ],
+      ],
+    );
+  }
+}
+
+class _SavedFavoriteTile extends StatelessWidget {
+  const _SavedFavoriteTile({required this.favorite, required this.onRemove});
+
+  final FavoriteRestaurant favorite;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final restaurant = favorite.restaurant;
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFF0F0F2)),
+      ),
+      child: Row(
+        children: [
+          OptimizedNetworkImage(
+            imageUrl: restaurant.image,
+            width: 72,
+            height: 72,
+            borderRadius: 17,
+            semanticLabel: restaurant.name,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  restaurant.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.labelStrong,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${restaurant.rating} · ${restaurant.status}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption.copyWith(
+                    color: HomeColors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: ValueKey('remove-favorite-${restaurant.id}'),
+            tooltip: 'Bỏ lưu ${restaurant.name}',
+            onPressed: onRemove,
+            color: HomeColors.brand,
+            icon: const Icon(Icons.favorite_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoritesLoginCard extends StatelessWidget {
+  const _FavoritesLoginCard({required this.onLogin});
+
+  final VoidCallback onLogin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: const Color(0xFFF0F0F2)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.favorite_border_rounded,
+            size: 48,
+            color: HomeColors.brand,
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Đăng nhập để đồng bộ quán yêu thích',
+            textAlign: TextAlign.center,
+            style: AppTypography.cardTitle,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Danh sách được lưu theo tài khoản và có thể mở lại trên thiết bị khác.',
+            textAlign: TextAlign.center,
+            style: AppTypography.body.copyWith(color: HomeColors.muted),
+          ),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: onLogin,
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              backgroundColor: HomeColors.brand,
+            ),
+            child: const Text('Đăng nhập'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FavoritesError extends StatelessWidget {
+  const _FavoritesError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFF0F0F2)),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.cloud_off_rounded,
+            color: HomeColors.muted,
+            size: 42,
+          ),
+          const SizedBox(height: 12),
+          const Text('Không thể tải quán yêu thích.'),
+          const SizedBox(height: 8),
+          TextButton(onPressed: onRetry, child: const Text('Thử lại')),
         ],
       ),
     );

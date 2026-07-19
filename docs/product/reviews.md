@@ -132,6 +132,17 @@ reaction on a public `VERIFIED` or `REFERENCE_ONLY` review.
 - Account deletion removes reactions created by the user and reactions on the
   user's deleted reviews.
 
+## Review Safety Actions
+
+Mobile may report a public review through `POST /api/v1/moderation/reports`.
+It may block or unblock that review's author through
+`POST|DELETE /api/v1/reviews/:reviewId/block-author`. Express resolves the
+author only from a public review when creating the block and applies existing
+user-block rules. Unblock resolves the active relationship by its source review
+so the user can reverse the action even if that review later becomes private or
+the restaurant becomes inactive. The response and public review DTO must not
+expose the author's internal user ID.
+
 ## Out Of Scope
 
 Phase 4 backend closeout does not implement review UI, mobile review flows,

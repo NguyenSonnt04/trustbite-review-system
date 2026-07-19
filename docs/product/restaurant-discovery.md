@@ -174,6 +174,18 @@ Purpose: protected listing and upload of restaurant profile images.
 - Claims request `OWNER` or `MANAGER`. Admin approval activates the merchant,
   ensures the local role, and provisions the active restaurant assignment.
 
+### Authenticated Favorites
+
+Mobile MVP uses one private default list named `Yêu thích`:
+
+- `GET /api/v1/users/me/favorites` returns saved active restaurant cards newest
+  first.
+- `PUT /api/v1/users/me/favorites/:restaurantId` saves idempotently.
+- `DELETE /api/v1/users/me/favorites/:restaurantId` removes idempotently.
+
+These routes never expose or mutate another user's saved list. Named/public
+collections remain out of scope.
+
 ## Data And Implementation Boundary
 
 - Use the existing `restaurants.geo` PostGIS `GEOGRAPHY(Point, 4326)` column

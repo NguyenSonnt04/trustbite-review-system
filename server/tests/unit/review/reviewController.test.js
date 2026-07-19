@@ -11,15 +11,23 @@ vi.mock('../../../src/services/reviewReactionService.js', () => ({
   setReviewReaction: vi.fn(),
 }));
 
+vi.mock('../../../src/services/userBlockService.js', () => ({
+  blockReviewAuthor: vi.fn(),
+  unblockReviewAuthor: vi.fn(),
+}));
+
 const reviewService = await import('../../../src/services/reviewService.js');
 const reactionService = await import('../../../src/services/reviewReactionService.js');
+const userBlockService = await import('../../../src/services/userBlockService.js');
 const {
+  blockReviewAuthorHandler,
   deleteReviewReactionHandler,
   getReviewStatusHandler,
   parseReviewIdParam,
   parseReviewReactionRequest,
   setReviewReactionHandler,
   skipReviewVerificationHandler,
+  unblockReviewAuthorHandler,
 } = await import('../../../src/controllers/review.js');
 
 function mockReq(reviewId) {
@@ -118,5 +126,60 @@ describe('review controller boundary validation', () => {
       userId: req.user.id,
       reviewId: req.params.reviewId,
     });
+  });
+
+  it.each([
+    ['block', blockReviewAuthorHandler, userBlockService.blockReviewAuthor],
+    ['unblock', unblockReviewAuthorHandler, userBlockService.unblockReviewAuthor],
+  ])('rejects an invalid reviewId before %s-author service execution', async (
+    _label,
+    handler,
+    service,
+  ) => {
+    const res = mockRes();
+    const next = vi.fn();
+
+    await handler(mockReq('not-a-uuid'), res, next);
+
+    expect(service).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    }));
+  });
+
+  it('blocks a public review author without returning the reviewer user id', async () => {
+    const blockedAt = new Date('2026-07-19T10:00:00.000Z');
+    userBlockService.blockReviewAuthor.mockResolvedValue({
+      success: true,
+      blockedAt,
+    });
+    const req = mockReq('22222222-2222-4222-8222-222222222222');
+    const res = mockRes();
+
+    await blockReviewAuthorHandler(req, res, vi.fn());
+
+    expect(userBlockService.blockReviewAuthor).toHaveBeenCalledWith(
+      req.user.id,
+      req.params.reviewId,
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    expect(res.json).toHaveBeenCalledWith({ success: true, blockedAt });
+    expect(res.json.mock.calls[0][0]).not.toHaveProperty('blockedUserId');
+  });
+
+  it('unblocks a public review author without returning the reviewer user id', async () => {
+    userBlockService.unblockReviewAuthor.mockResolvedValue({ success: true });
+    const req = mockReq('22222222-2222-4222-8222-222222222222');
+    const res = mockRes();
+
+    await unblockReviewAuthorHandler(req, res, vi.fn());
+
+    expect(userBlockService.unblockReviewAuthor).toHaveBeenCalledWith(
+      req.user.id,
+      req.params.reviewId,
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ success: true });
   });
 });

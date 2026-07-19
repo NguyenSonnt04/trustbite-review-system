@@ -136,3 +136,63 @@ export async function unblockUser(blockerUserId, targetUserId) {
     client.release();
   }
 }
+
+async function resolvePublicReviewAuthor(reviewId) {
+  const result = await pool.query(
+    `SELECT review.user_id
+     FROM reviews review
+     JOIN restaurants restaurant ON restaurant.id = review.restaurant_id
+     WHERE review.id = $1
+       AND review.status IN ('VERIFIED', 'REFERENCE_ONLY')
+       AND review.public_visibility = 'PUBLIC'
+       AND restaurant.status = 'ACTIVE'
+       AND restaurant.is_deleted = FALSE`,
+    [reviewId],
+  );
+
+  if (result.rowCount === 0) {
+    throw createHttpError(404, 'NOT_FOUND', 'Review not found');
+  }
+
+  return result.rows[0].user_id;
+}
+
+export async function blockReviewAuthor(blockerUserId, reviewId) {
+  const authorUserId = await resolvePublicReviewAuthor(reviewId);
+  const result = await blockUser(blockerUserId, authorUserId, {
+    sourceReviewId: reviewId,
+  });
+  return {
+    success: true,
+    blockedAt: result.blockedAt,
+  };
+}
+
+export async function unblockReviewAuthor(blockerUserId, reviewId) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(
+      `UPDATE user_blocks
+       SET deleted_at = now()
+       WHERE blocker_user_id = $1
+         AND source_review_id = $2
+         AND deleted_at IS NULL
+       RETURNING id`,
+      [blockerUserId, reviewId],
+    );
+
+    if (result.rowCount === 0) {
+      throw createHttpError(404, 'NOT_FOUND', 'Active block not found');
+    }
+
+    await client.query('COMMIT');
+    return { success: true };
+  } catch (err) {
+    await safeRollback(client);
+    throw mapDbError(err);
+  } finally {
+    client.release();
+  }
+}

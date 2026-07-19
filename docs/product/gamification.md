@@ -48,6 +48,10 @@ feeds the restaurant trust-score weighting for verified reviews (see
 The level is derived from persisted data (not read from `users.rank_code`), so it
 is correct even before an EXP/rank writer reconciles `rank_code`.
 
+Mobile renders this summary as read-only progress. It must display the returned
+level, remaining EXP, remaining verified reviews, and persisted badges without
+recomputing rank thresholds or awarding points locally.
+
 ## Badges
 
 Badge definitions and awards use `badge_definitions` / `user_badges`.

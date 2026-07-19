@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_service.dart';
 import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
@@ -20,6 +21,7 @@ class RestaurantDetailPage extends StatefulWidget {
     this.reviewRepository,
     this.receiptPicker,
     this.reviewReactionRepository,
+    this.safetyRepository,
   });
 
   final String restaurantId;
@@ -30,6 +32,7 @@ class RestaurantDetailPage extends StatefulWidget {
   final ReviewSubmissionRepository? reviewRepository;
   final ReceiptPicker? receiptPicker;
   final ReviewReactionRepository? reviewReactionRepository;
+  final ProfileManagementRepository? safetyRepository;
 
   @override
   State<RestaurantDetailPage> createState() => _RestaurantDetailPageState();
@@ -75,6 +78,7 @@ class _RestaurantDetailPageState extends State<RestaurantDetailPage> {
             reviewRepository: widget.reviewRepository,
             receiptPicker: widget.receiptPicker,
             reviewReactionRepository: widget.reviewReactionRepository,
+            safetyRepository: widget.safetyRepository,
           );
         },
       ),
@@ -193,6 +197,7 @@ class _DetailContent extends StatefulWidget {
     required this.reviewRepository,
     required this.receiptPicker,
     required this.reviewReactionRepository,
+    required this.safetyRepository,
   });
 
   final HomeRestaurantDetail detail;
@@ -203,6 +208,7 @@ class _DetailContent extends StatefulWidget {
   final ReviewSubmissionRepository? reviewRepository;
   final ReceiptPicker? receiptPicker;
   final ReviewReactionRepository? reviewReactionRepository;
+  final ProfileManagementRepository? safetyRepository;
 
   @override
   State<_DetailContent> createState() => _DetailContentState();
@@ -211,12 +217,16 @@ class _DetailContent extends StatefulWidget {
 class _DetailContentState extends State<_DetailContent> {
   Future<List<HomeMenuItem>>? _menu;
   Future<HomeRestaurantReviewPage>? _reviews;
+  late final ProfileManagementRepository _safetyRepository;
 
   HomeRestaurantDetail get detail => widget.detail;
 
   @override
   void initState() {
     super.initState();
+    _safetyRepository =
+        widget.safetyRepository ??
+        ProfileManagementService(apiClient: appApiClient);
     _loadMenu();
     _loadReviews();
   }
@@ -261,6 +271,36 @@ class _DetailContentState extends State<_DetailContent> {
     }
   }
 
+  Future<void> _reportRestaurant() async {
+    var signedIn = widget.isSignedIn;
+    if (!signedIn) signedIn = await widget.onLogin();
+    if (!signedIn || !mounted) return;
+    final input = await showReportComposer(
+      context,
+      entityType: ReportEntityType.restaurant,
+    );
+    if (input == null || !mounted) return;
+    try {
+      await _safetyRepository.submitReport(
+        entityType: ReportEntityType.restaurant,
+        entityId: widget.restaurantId,
+        reasonCode: input.reasonCode,
+        description: input.description,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã gửi báo cáo nhà hàng.')),
+        );
+      }
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Không thể gửi báo cáo.')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final menu = _menu ??= widget.repository.fetchRestaurantMenu(
@@ -292,6 +332,34 @@ class _DetailContentState extends State<_DetailContent> {
               ),
             ),
           ),
+          actions: [
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.36),
+                  shape: BoxShape.circle,
+                ),
+                child: PopupMenuButton<String>(
+                  tooltip: 'Tùy chọn nhà hàng',
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  onSelected: (value) {
+                    if (value == 'report') _reportRestaurant();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'report',
+                      child: ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(Icons.flag_outlined),
+                        title: Text('Báo cáo nhà hàng'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           flexibleSpace: FlexibleSpaceBar(
             background: Stack(
               fit: StackFit.expand,
@@ -450,6 +518,7 @@ class _DetailContentState extends State<_DetailContent> {
                             repository:
                                 widget.reviewReactionRepository ??
                                 ReviewReactionService(apiClient: appApiClient),
+                            safetyRepository: _safetyRepository,
                           ),
                       ],
                     );
@@ -826,12 +895,14 @@ class _RestaurantReviewList extends StatelessWidget {
     required this.isSignedIn,
     required this.onLogin,
     required this.repository,
+    required this.safetyRepository,
   });
 
   final List<HomeRestaurantReview> items;
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
   final ReviewReactionRepository repository;
+  final ProfileManagementRepository safetyRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -844,6 +915,7 @@ class _RestaurantReviewList extends StatelessWidget {
             isSignedIn: isSignedIn,
             onLogin: onLogin,
             repository: repository,
+            safetyRepository: safetyRepository,
           ),
           if (index != items.length - 1) const SizedBox(height: 18),
         ],
@@ -858,12 +930,14 @@ class _RestaurantReviewCard extends StatefulWidget {
     required this.isSignedIn,
     required this.onLogin,
     required this.repository,
+    required this.safetyRepository,
   });
 
   final HomeRestaurantReview review;
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
   final ReviewReactionRepository repository;
+  final ProfileManagementRepository safetyRepository;
 
   @override
   State<_RestaurantReviewCard> createState() => _RestaurantReviewCardState();
@@ -878,6 +952,7 @@ class _RestaurantReviewCardState extends State<_RestaurantReviewCard> {
   late ReviewReactionCounts _reactionCounts;
   bool _reactionInFlight = false;
   late bool _isSignedIn;
+  bool _authorBlocked = false;
 
   HomeRestaurantReview get review => widget.review;
 
@@ -1049,6 +1124,66 @@ class _RestaurantReviewCardState extends State<_RestaurantReviewCard> {
     }
   }
 
+  Future<bool> _requireSignIn() async {
+    if (_isSignedIn) return true;
+    _isSignedIn = await widget.onLogin();
+    return _isSignedIn;
+  }
+
+  Future<void> _reportReview() async {
+    if (!await _requireSignIn() || !mounted) return;
+    final input = await showReportComposer(
+      context,
+      entityType: ReportEntityType.review,
+    );
+    if (input == null || !mounted) return;
+    try {
+      await widget.safetyRepository.submitReport(
+        entityType: ReportEntityType.review,
+        entityId: review.id,
+        reasonCode: input.reasonCode,
+        description: input.description,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Đã gửi báo cáo review.')));
+      }
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể gửi báo cáo review.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleBlockAuthor() async {
+    if (!await _requireSignIn() || !mounted) return;
+    try {
+      if (_authorBlocked) {
+        await widget.safetyRepository.unblockReviewAuthor(review.id);
+      } else {
+        await widget.safetyRepository.blockReviewAuthor(review.id);
+      }
+      if (!mounted) return;
+      setState(() => _authorBlocked = !_authorBlocked);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _authorBlocked ? 'Đã chặn tác giả review.' : 'Đã bỏ chặn tác giả.',
+          ),
+        ),
+      );
+    } on Exception {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể cập nhật trạng thái chặn.')),
+        );
+      }
+    }
+  }
+
   ReviewReactionCounts _optimisticCounts(
     ReviewReactionCounts current,
     ReviewReactionType? previous,
@@ -1154,6 +1289,32 @@ class _RestaurantReviewCardState extends State<_RestaurantReviewCard> {
                                   ),
                                 ],
                               ),
+                            ),
+                            PopupMenuButton<String>(
+                              key: ValueKey('review-safety-menu-${review.id}'),
+                              tooltip: 'Tùy chọn an toàn',
+                              icon: const Icon(
+                                Icons.more_horiz_rounded,
+                                size: 20,
+                              ),
+                              onSelected: (value) {
+                                if (value == 'report') _reportReview();
+                                if (value == 'block') _toggleBlockAuthor();
+                              },
+                              itemBuilder: (_) => [
+                                const PopupMenuItem(
+                                  value: 'report',
+                                  child: Text('Báo cáo review'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'block',
+                                  child: Text(
+                                    _authorBlocked
+                                        ? 'Bỏ chặn tác giả'
+                                        : 'Chặn tác giả',
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -1478,6 +1639,126 @@ class _RatingMetric extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class ReportComposerResult {
+  const ReportComposerResult({
+    required this.reasonCode,
+    required this.description,
+  });
+
+  final String reasonCode;
+  final String? description;
+}
+
+Future<ReportComposerResult?> showReportComposer(
+  BuildContext context, {
+  required ReportEntityType entityType,
+}) {
+  final reasons = entityType == ReportEntityType.review
+      ? const {
+          'SPAM_OR_FAKE': 'Spam hoặc giả mạo',
+          'OFFENSIVE_CONTENT': 'Nội dung xúc phạm',
+          'IRRELEVANT_CONTENT': 'Không liên quan',
+          'OTHER_REVIEW': 'Lý do khác',
+        }
+      : const {
+          'INCORRECT_INFO': 'Thông tin không chính xác',
+          'CLOSED_OR_NONEXISTENT': 'Đã đóng hoặc không tồn tại',
+          'INAPPROPRIATE_LISTING': 'Thông tin đăng không phù hợp',
+          'OTHER_RESTAURANT': 'Lý do khác',
+        };
+
+  return showModalBottomSheet<ReportComposerResult>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    builder: (sheetContext) => _ReportComposerSheet(reasons: reasons),
+  );
+}
+
+class _ReportComposerSheet extends StatefulWidget {
+  const _ReportComposerSheet({required this.reasons});
+
+  final Map<String, String> reasons;
+
+  @override
+  State<_ReportComposerSheet> createState() => _ReportComposerSheetState();
+}
+
+class _ReportComposerSheetState extends State<_ReportComposerSheet> {
+  late String _reasonCode = widget.reasons.keys.first;
+  final _descriptionController = TextEditingController();
+
+  @override
+  void dispose() {
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          18,
+          20,
+          20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Gửi báo cáo', style: AppTypography.sectionTitle),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<String>(
+              key: const ValueKey('report-reason-field'),
+              initialValue: _reasonCode,
+              decoration: const InputDecoration(labelText: 'Lý do'),
+              items: [
+                for (final reason in widget.reasons.entries)
+                  DropdownMenuItem(
+                    value: reason.key,
+                    child: Text(reason.value),
+                  ),
+              ],
+              onChanged: (value) {
+                if (value != null) setState(() => _reasonCode = value);
+              },
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              key: const ValueKey('report-description-field'),
+              controller: _descriptionController,
+              maxLength: 1000,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Mô tả thêm (không bắt buộc)',
+              ),
+            ),
+            const SizedBox(height: 10),
+            FilledButton(
+              key: const ValueKey('submit-report-button'),
+              onPressed: () => Navigator.of(context).pop(
+                ReportComposerResult(
+                  reasonCode: _reasonCode,
+                  description: _descriptionController.text.trim().isEmpty
+                      ? null
+                      : _descriptionController.text.trim(),
+                ),
+              ),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                backgroundColor: HomeColors.brand,
+              ),
+              child: const Text('Gửi báo cáo'),
+            ),
+          ],
+        ),
       ),
     );
   }

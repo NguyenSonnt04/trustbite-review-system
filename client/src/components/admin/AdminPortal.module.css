@@ -2183,6 +2183,484 @@
   margin-top: 8px;
 }
 
+.reviewManagement {
+  font-family: "Segoe UI Variable", var(--font-sans);
+}
+
+.reviewOverview,
+.reviewRestaurantPanelHeader,
+.reviewContentHeader,
+.reviewCardHeader,
+.reviewCardFooter,
+.reviewPanelPagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.reviewOverview {
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.reviewOverview h2 {
+  margin-top: 4px;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
+.reviewOverview p,
+.reviewContentHeader p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.reviewScopeNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #e6dfc8;
+  border-radius: 9px;
+  background: #fcfaf3;
+  color: #6f5e27;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.reviewScopeNotice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.reviewWorkspace {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  min-height: 640px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.reviewRestaurantPanel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: oklch(0.985 0.003 285);
+  padding: 18px;
+}
+
+.reviewRestaurantPanelHeader strong,
+.reviewContentHeader h3 {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.reviewRestaurantPanelHeader span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewSearch {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 0 11px;
+}
+
+.reviewSearch input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.reviewSearch:focus-within,
+.reviewStatusFilter select:focus-visible {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px oklch(0.28 0.004 285 / 0.12);
+}
+
+.reviewRestaurantList {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reviewRestaurantItem {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 8px;
+  text-align: left;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.reviewRestaurantItem:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  transform: translateX(2px);
+}
+
+.reviewRestaurantItemActive {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.reviewRestaurantItemActive:hover {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+.reviewRestaurantImage,
+.reviewRestaurantFallback,
+.reviewAuthorAvatar,
+.reviewAuthorFallback {
+  flex: 0 0 auto;
+  border-radius: 9px;
+  object-fit: cover;
+}
+
+.reviewRestaurantThumbnail {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.reviewRestaurantThumbnail .reviewRestaurantImage {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.reviewRestaurantThumbnail .reviewRestaurantImageLoaded {
+  opacity: 1;
+}
+
+.reviewRestaurantFallback,
+.reviewAuthorFallback {
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-muted);
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.reviewRestaurantFallback {
+  width: 44px;
+  height: 44px;
+}
+
+.reviewRestaurantCopy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reviewRestaurantCopy strong,
+.reviewRestaurantCopy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewRestaurantCopy strong {
+  font-size: 13px;
+}
+
+.reviewRestaurantCopy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewRestaurantItemActive .reviewRestaurantCopy small {
+  color: oklch(0.82 0.004 285);
+}
+
+.reviewRestaurantItemActive .reviewRestaurantFallback {
+  border-color: oklch(1 0 0 / 0.18);
+  background: oklch(1 0 0 / 0.12);
+  color: var(--surface);
+}
+
+.reviewPanelPagination {
+  margin-top: 14px;
+}
+
+.reviewPanelPagination button {
+  flex: 1;
+}
+
+.reviewContentPanel {
+  min-width: 0;
+  padding: 22px;
+}
+
+.reviewContentHeader {
+  align-items: flex-end;
+}
+
+.reviewContentHeader h3 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.reviewStatusFilter {
+  display: flex;
+  min-width: 170px;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reviewStatusFilter > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewStatusFilter select {
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.reviewStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 18px 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--line);
+}
+
+.reviewStats > div {
+  display: flex;
+  min-height: 72px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  background: var(--surface);
+  padding: 12px 16px;
+}
+
+.reviewStats span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewStats strong {
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.reviewList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reviewCard {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 16px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.reviewCard:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 10px 28px oklch(0.2 0.006 285 / 0.06);
+}
+
+.reviewAuthor {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.reviewAuthorAvatar,
+.reviewAuthorFallback {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.reviewAuthor > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reviewAuthor strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reviewAuthor span,
+.reviewCardFooter {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewHeadline {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.reviewHeadline > strong {
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.reviewHeadline > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reviewHeadline .badge {
+  margin-left: 7px;
+}
+
+.reviewComment {
+  margin: 14px 0;
+  color: #414248;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.reviewRatingGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.reviewRatingGrid > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-radius: 7px;
+  background: var(--surface-muted);
+  padding: 8px 10px;
+}
+
+.reviewRatingGrid span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.reviewRatingGrid strong {
+  font-size: 12px;
+}
+
+.reviewCardFooter {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.reviewCardFooter > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.reviewEmptyState,
+.reviewListState {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  text-align: center;
+}
+
+.reviewListState {
+  min-height: 120px;
+  font-size: 12px;
+}
+
+.reviewEmptyState > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  place-items: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.reviewEmptyState strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.reviewEmptyState p {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.reviewInlineError {
+  margin-bottom: 12px;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  padding: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
 .menuButton,
 .mobileClose,
 .mobileBrand,
@@ -2220,6 +2698,13 @@
     display: none;
   }
 
+  .reviewWorkspace {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .reviewRatingGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 860px) {
@@ -2266,6 +2751,20 @@
 
   .userFilters {
     grid-template-columns: 1fr 1fr 1fr 38px;
+  }
+
+  .reviewWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewRestaurantPanel {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .reviewRestaurantList {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2375,6 +2874,37 @@
 
   .userFilters .searchBox {
     grid-column: 1 / -1;
+  }
+
+  .reviewOverview,
+  .reviewContentHeader,
+  .reviewCardHeader,
+  .reviewCardFooter {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reviewStatusFilter {
+    width: 100%;
+  }
+
+  .reviewRestaurantList,
+  .reviewStats,
+  .reviewRatingGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .reviewContentPanel,
+  .reviewRestaurantPanel {
+    padding: 16px;
+  }
+
+  .reviewHeadline {
+    align-items: center;
+  }
+
+  .reviewCardFooter > div {
+    gap: 8px;
   }
 
   .formGrid {

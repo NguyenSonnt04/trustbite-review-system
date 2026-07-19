@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
+import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_pages.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
 
 const _profileIconColor = Color(0xFF303038);
@@ -11,24 +15,62 @@ class ProfilePage extends StatelessWidget {
     required this.currentUser,
     required this.onLogin,
     required this.onLogout,
+    required this.onUserUpdated,
+    required this.onAccountDeletionAccepted,
+    this.profileRepository,
   });
 
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
-  final VoidCallback onLogin;
+  final Future<bool> Function() onLogin;
   final Future<void> Function() onLogout;
+  final ValueChanged<Map<String, dynamic>> onUserUpdated;
+  final Future<void> Function() onAccountDeletionAccepted;
+  final ProfileManagementRepository? profileRepository;
 
   @override
   Widget build(BuildContext context) {
+    final repository =
+        profileRepository ?? ProfileManagementService(apiClient: appApiClient);
+
+    Future<bool> requireSignIn() async {
+      if (isSignedIn) return true;
+      return onLogin();
+    }
+
+    Future<void> openEditProfile() async {
+      if (!await requireSignIn() || !context.mounted) return;
+      final updated = await Navigator.of(context).push<Map<String, dynamic>>(
+        MaterialPageRoute<Map<String, dynamic>>(
+          builder: (_) => EditProfilePage(
+            currentUser: currentUser ?? const {},
+            repository: repository,
+            onDeletionAccepted: onAccountDeletionAccepted,
+          ),
+        ),
+      );
+      if (updated != null) onUserUpdated(updated);
+    }
+
+    Future<void> openSignedInPage(Widget page) async {
+      if (!await requireSignIn() || !context.mounted) return;
+      await Navigator.of(
+        context,
+      ).push<void>(MaterialPageRoute<void>(builder: (_) => page));
+    }
+
     return ListView(
-      key: const ValueKey('profile-page'),
+      key: ValueKey('profile-page-$isSignedIn'),
       padding: const EdgeInsets.only(bottom: 110),
       children: [
         const SizedBox(height: 20),
         if (isSignedIn)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: _SignedInProfileCard(currentUser: currentUser),
+            child: _SignedInProfileCard(
+              currentUser: currentUser,
+              onTap: openEditProfile,
+            ),
           )
         else
           Padding(
@@ -36,24 +78,24 @@ class ProfilePage extends StatelessWidget {
             child: _LoginPromptCard(onLogin: onLogin),
           ),
         const SizedBox(height: 32),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
           child: _ProfileActionSection(
             title: 'Tác vụ',
             items: [
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.receipt_long_rounded,
                 label: 'Quét bill',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
               ),
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.local_offer_rounded,
                 label: 'Mã ưu đãi',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
               ),
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.support_agent_rounded,
                 label: 'Hỗ trợ',
                 iconColor: _profileIconColor,
@@ -64,13 +106,14 @@ class ProfilePage extends StatelessWidget {
                 label: 'Bảo mật',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
+                onTap: () => openSignedInPage(const SafetyCenterPage()),
               ),
             ],
           ),
         ),
         const SizedBox(height: 32),
-        const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 18),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18),
           child: _ProfileActionSection(
             title: 'Tiện ích & Ưu đãi',
             items: [
@@ -79,20 +122,22 @@ class ProfilePage extends StatelessWidget {
                 label: 'Hạng thành viên',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
+                onTap: () =>
+                    openSignedInPage(GamificationPage(repository: repository)),
               ),
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.verified_rounded,
                 label: 'Hội viên',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
               ),
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.card_giftcard_rounded,
                 label: 'Thẻ quà tặng',
                 iconColor: _profileIconColor,
                 iconBackground: _profileIconBackground,
               ),
-              _ProfileActionItem(
+              const _ProfileActionItem(
                 icon: Icons.group_add_rounded,
                 label: 'Giới thiệu bạn bè',
                 iconColor: _profileIconColor,
@@ -115,9 +160,10 @@ class ProfilePage extends StatelessWidget {
 }
 
 class _SignedInProfileCard extends StatelessWidget {
-  const _SignedInProfileCard({required this.currentUser});
+  const _SignedInProfileCard({required this.currentUser, required this.onTap});
 
   final Map<String, dynamic>? currentUser;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -126,81 +172,99 @@ class _SignedInProfileCard extends StatelessWidget {
         currentUser?['phoneNumber'] ??
         'Tài khoản TrustBite';
     final phoneNumber = currentUser?['phoneNumber'];
+    final avatarUrl = currentUser?['avatarUrl']?.toString();
 
-    return Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
           children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: const Color(0xFFF1F3F5),
-                border: Border.all(color: const Color(0xFFE5E7EB), width: 3),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.person_rounded,
-                color: Color(0xFF303038),
-                size: 34,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFE5E7EB),
+                      width: 2,
+                    ),
+                  ),
+                  child: ClipOval(
+                    child: OptimizedNetworkImage(
+                      imageUrl: avatarUrl,
+                      width: 52,
+                      height: 52,
+                      semanticLabel: 'Ảnh đại diện của $displayName',
+                      fallbackIconSize: 28,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -2,
+                  bottom: 0,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: HomeColors.brand,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFF8FAFC),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.edit_rounded,
+                      size: 11,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName.toString(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 18,
+                      height: 1.05,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    phoneNumber is String
+                        ? phoneNumber
+                        : 'Chạm để cập nhật hồ sơ',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF7C7C86),
+                      fontSize: 13,
+                      height: 1.1,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Positioned(
-              right: -2,
-              bottom: 0,
-              child: Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF303038),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFF8FAFC), width: 2),
-                ),
-                child: const Icon(
-                  Icons.info_rounded,
-                  size: 11,
-                  color: Colors.white,
-                ),
-              ),
-            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF9CA3AF)),
           ],
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                displayName.toString(),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF111827),
-                  fontSize: 18,
-                  height: 1.05,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                phoneNumber is String ? phoneNumber : 'Đã đăng nhập local',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF7C7C86),
-                  fontSize: 13,
-                  height: 1.1,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 4),
-        const Icon(Icons.tune_rounded, color: Color(0xFF9CA3AF), size: 24),
-      ],
+      ),
     );
   }
 }
@@ -270,7 +334,7 @@ class _ProfileActionTile extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          onTap: () {},
+          onTap: item.onTap,
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -314,12 +378,14 @@ class _ProfileActionItem {
     required this.label,
     required this.iconColor,
     required this.iconBackground,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final Color iconColor;
   final Color iconBackground;
+  final VoidCallback? onTap;
 }
 
 class _GeneralSettingsSection extends StatefulWidget {
@@ -352,7 +418,10 @@ class _GeneralSettingsSectionState extends State<_GeneralSettingsSection> {
         icon: Icons.favorite_border_rounded,
         label: 'Địa chỉ đã lưu',
       ),
-      _SettingsItem(icon: Icons.receipt_long_outlined, label: 'Hóa đơn'),
+      _SettingsItem(
+        icon: Icons.receipt_long_outlined,
+        label: 'Hóa đơn',
+      ),
       _SettingsItem(
         icon: Icons.star_border_rounded,
         label: 'Đánh giá ứng dụng',
