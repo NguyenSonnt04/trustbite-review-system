@@ -12,7 +12,10 @@ import {
 } from 'vitest';
 
 const originalTrustedAuthHeaders = process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
+const originalBucketName = process.env.AWS_S3_BUCKET_NAME;
+const TEST_CLAIM_BUCKET = 'trustbite-test-merchant-claims';
 process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = 'true';
+process.env.AWS_S3_BUCKET_NAME = TEST_CLAIM_BUCKET;
 
 let claimStorage;
 let closeDbPool;
@@ -107,6 +110,11 @@ describe('restaurant merchant claim API', () => {
         delete process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS;
       } else {
         process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS = originalTrustedAuthHeaders;
+      }
+      if (originalBucketName === undefined) {
+        delete process.env.AWS_S3_BUCKET_NAME;
+      } else {
+        process.env.AWS_S3_BUCKET_NAME = originalBucketName;
       }
     } finally {
       await closeDbPool();
@@ -224,7 +232,7 @@ describe('restaurant merchant claim API', () => {
       [
         merchant.id,
         restaurant.id,
-        `s3://claim-bucket/receipts/merchant-claims/${merchant.id}/${restaurant.id}/${crypto.randomUUID()}.pdf`,
+        `s3://${TEST_CLAIM_BUCKET}/receipts/merchant-claims/${merchant.id}/${restaurant.id}/${crypto.randomUUID()}.pdf`,
       ],
     );
 
@@ -238,6 +246,7 @@ describe('restaurant merchant claim API', () => {
       pageSize: 1,
       total: 1,
     });
+    expect(queue.body.items[0].evidenceUrl).toContain('X-Amz-Signature=claim');
 
     await requestApp()
       .get('/api/v1/admin/restaurant-claims?pageSize=51')
