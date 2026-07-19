@@ -32,7 +32,10 @@ class ApiClient {
     }
     if (token) {
       headers.Authorization = `Bearer ${token}`;
-    } else if (config.trustedDevelopmentUserId) {
+    } else if (
+      config.trustedDevelopmentHeadersEnabled
+      && config.trustedDevelopmentUserId
+    ) {
       headers['x-trustbite-user-id'] = config.trustedDevelopmentUserId;
     }
 

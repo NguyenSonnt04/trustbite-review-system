@@ -51,6 +51,8 @@ export async function listAdminRestaurantClaimsHandler(req, res, next) {
   try {
     const result = await listAdminRestaurantClaims({
       status: req.query.status,
+      page: req.query.page ?? 1,
+      pageSize: req.query.pageSize ?? 20,
     });
     res.status(200).json(result);
   } catch (err) {

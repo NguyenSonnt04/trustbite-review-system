@@ -22,6 +22,7 @@ async function loadAppConfig(caseName) {
     'notifications-development-default': () => import('../../../src/config/app.js?notifications-development-default'),
     'notifications-production-default': () => import('../../../src/config/app.js?notifications-production-default'),
     'notifications-production-enabled': () => import('../../../src/config/app.js?notifications-production-enabled'),
+    'location-rate-limit': () => import('../../../src/config/app.js?location-rate-limit'),
   };
   return (await imports[caseName]()).default;
 }
@@ -221,5 +222,24 @@ describe('app notification config', () => {
     await expect(loadAppConfig('notifications-production-enabled'))
       .resolves
       .toMatchObject({ notifications: { enabled: true } });
+  });
+});
+
+describe('Location API rate-limit config', () => {
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it('parses the shared per-IP Location quota', async () => {
+    setBaseEnv();
+    process.env.AWS_LOCATION_RATE_LIMIT_MAX = '24';
+    process.env.AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS = '120';
+
+    await expect(loadAppConfig('location-rate-limit')).resolves.toMatchObject({
+      location: {
+        rateLimitMax: 24,
+        rateLimitWindowMs: 120_000,
+      },
+    });
   });
 });

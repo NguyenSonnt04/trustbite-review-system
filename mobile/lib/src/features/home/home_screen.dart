@@ -289,13 +289,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _buildActivePage(),
                     ),
                   ),
-                  const Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    height: 176,
-                    child: _BottomContentFade(),
-                  ),
+                  if (_activeNav != 1)
+                    const Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 176,
+                      child: _BottomContentFade(),
+                    ),
                   Positioned(
                     left: 20,
                     right: 20,
@@ -335,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
         notificationCount: _notificationUnreadCount,
         onNotificationsPressed: _openNotifications,
       ),
-      1 => const MapScreen(),
+      1 => MapScreen(isSignedIn: _isSignedIn, onLogin: _openLogin),
       2 => FavoritesPage(
         isSignedIn: _isSignedIn,
         onLogin: _openLogin,

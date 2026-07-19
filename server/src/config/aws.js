@@ -1,3 +1,5 @@
+import locationConfig from './location.js';
+
 const parseBoolean = (value, defaultValue = false) => {
   if (value === undefined || value === '') {
     return defaultValue;
@@ -26,6 +28,9 @@ const credentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCE
   ? {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    ...(process.env.AWS_SESSION_TOKEN
+      ? { sessionToken: process.env.AWS_SESSION_TOKEN }
+      : {}),
   }
   : undefined;
 const endpointUrl = process.env.AWS_ENDPOINT_URL || process.env.LOCALSTACK_ENDPOINT_URL;
@@ -74,5 +79,6 @@ export default {
   },
   bedrock: {
     modelId: process.env.AWS_BEDROCK_MODEL_ID
-  }
+  },
+  location: locationConfig,
 };

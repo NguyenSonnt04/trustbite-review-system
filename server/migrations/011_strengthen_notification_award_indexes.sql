@@ -71,7 +71,14 @@ WHERE id IN (
   FROM notification_migration_duplicate_exp
 );
 
-WITH review_weights AS (
+WITH affected_restaurants AS (
+  SELECT DISTINCT reviews.restaurant_id
+  FROM reviews
+  JOIN notification_migration_duplicate_exp duplicate_exp
+    ON duplicate_exp.user_id = reviews.user_id
+  WHERE reviews.trust_weight_bucket = 'HIGH'
+),
+review_weights AS (
   SELECT
     reviews.restaurant_id,
     COUNT(*) FILTER (
@@ -106,6 +113,8 @@ WITH review_weights AS (
     ) AS total_weight
   FROM reviews
   JOIN users ON users.id = reviews.user_id
+  JOIN affected_restaurants
+    ON affected_restaurants.restaurant_id = reviews.restaurant_id
   WHERE reviews.trust_weight_bucket IN ('HIGH', 'LOW')
   GROUP BY reviews.restaurant_id
 )
@@ -124,11 +133,7 @@ SET trust_score = COALESCE(
     reference_review_count = COALESCE(review_weights.reference_count, 0),
     updated_at = NOW()
 FROM review_weights
-WHERE restaurants.id = review_weights.restaurant_id
-  AND EXISTS (
-    SELECT 1
-    FROM notification_migration_duplicate_exp
-  );
+WHERE restaurants.id = review_weights.restaurant_id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_exp_transactions_review_verified_uniq
   ON exp_transactions(user_id, entity_id)

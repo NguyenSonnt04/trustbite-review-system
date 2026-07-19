@@ -16,7 +16,7 @@ async function hasReceiptMasterBadge(client, userId) {
     `SELECT status
      FROM reviews
      WHERE user_id = $1
-       AND status IN ('VERIFIED', 'REFERENCE_ONLY', 'REJECTED', 'HIDDEN')
+       AND status IN ('VERIFIED', 'REFERENCE_ONLY', 'REJECTED')
      ORDER BY created_at DESC, id DESC
      LIMIT 10`,
     [userId],

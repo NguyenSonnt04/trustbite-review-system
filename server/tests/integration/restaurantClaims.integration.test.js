@@ -229,10 +229,20 @@ describe('restaurant merchant claim API', () => {
     );
 
     const queue = await requestApp()
-      .get('/api/v1/admin/restaurant-claims?status=SUBMITTED')
+      .get('/api/v1/admin/restaurant-claims?status=SUBMITTED&page=1&pageSize=1')
       .set(authHeaders(admin.id))
       .expect(200);
     expect(queue.body.items).toHaveLength(1);
+    expect(queue.body).toMatchObject({
+      page: 1,
+      pageSize: 1,
+      total: 1,
+    });
+
+    await requestApp()
+      .get('/api/v1/admin/restaurant-claims?pageSize=51')
+      .set(authHeaders(admin.id))
+      .expect(422);
 
     const adminRestaurants = await requestApp()
       .get('/api/v1/admin/restaurants?page=1&pageSize=20')

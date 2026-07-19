@@ -120,6 +120,13 @@ describe('awardVerifiedReview', () => {
       type: 'REVIEW_VERIFIED',
       payload: { reviewId: REVIEW_ID },
     }));
+    const streakQuery = client.query.mock.calls.find(([sql]) => (
+      /SELECT status[\s\S]*LIMIT 10/i.test(String(sql))
+    ))?.[0];
+    expect(streakQuery).toContain(
+      "status IN ('VERIFIED', 'REFERENCE_ONLY', 'REJECTED')",
+    );
+    expect(streakQuery).not.toContain('HIDDEN');
   });
 
   it('does not duplicate EXP or badge awards when processing is retried', async () => {

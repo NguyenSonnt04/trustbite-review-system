@@ -619,10 +619,22 @@ export async function listMerchantRestaurants({ userId }) {
   };
 }
 
-export async function listAdminRestaurantClaims({ status }) {
+export async function listAdminRestaurantClaims({
+  status,
+  page = 1,
+  pageSize = 20,
+}) {
   const normalizedStatus = status ? String(status).trim().toUpperCase() : null;
+  const normalizedPage = Number(page);
+  const normalizedPageSize = Number(pageSize);
   if (normalizedStatus && !CLAIM_STATUSES.has(normalizedStatus)) {
     throw createHttpError(422, 'VALIDATION_ERROR', 'status is invalid.');
+  }
+  if (!Number.isInteger(normalizedPage) || normalizedPage < 1) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'page must be a positive integer.');
+  }
+  if (!Number.isInteger(normalizedPageSize) || normalizedPageSize < 1 || normalizedPageSize > 50) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'pageSize must be between 1 and 50.');
   }
   const values = [];
   const where = [];
@@ -630,6 +642,17 @@ export async function listAdminRestaurantClaims({ status }) {
     values.push(normalizedStatus);
     where.push(`rc.status = $${values.length}`);
   }
+  const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::integer AS total
+     FROM restaurant_claims rc
+     ${whereClause}`,
+    values,
+  );
+  values.push(normalizedPageSize);
+  const limitIndex = values.length;
+  values.push((normalizedPage - 1) * normalizedPageSize);
+  const offsetIndex = values.length;
   const result = await pool.query(
     `SELECT
        rc.*,
@@ -641,7 +664,7 @@ export async function listAdminRestaurantClaims({ status }) {
      JOIN restaurants r ON r.id = rc.restaurant_id
      JOIN merchants m ON m.id = rc.merchant_id
      JOIN users u ON u.id = m.user_id
-     ${where.length > 0 ? `WHERE ${where.join(' AND ')}` : ''}
+     ${whereClause}
      ORDER BY
        CASE rc.status
          WHEN 'SUBMITTED' THEN 0
@@ -649,11 +672,16 @@ export async function listAdminRestaurantClaims({ status }) {
          ELSE 2
        END,
        rc.created_at ASC,
-       rc.id ASC`,
+       rc.id ASC
+     LIMIT $${limitIndex}
+     OFFSET $${offsetIndex}`,
     values,
   );
   return {
     items: await Promise.all(result.rows.map((row) => toClaimResponse(mapClaimRow(row)))),
+    page: normalizedPage,
+    pageSize: normalizedPageSize,
+    total: countResult.rows[0].total,
   };
 }
 

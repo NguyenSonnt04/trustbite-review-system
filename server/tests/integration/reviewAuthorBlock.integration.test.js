@@ -125,6 +125,45 @@ describe('review-author block API', () => {
     expect(afterUnblock.rows[0].deleted_at).not.toBeNull();
   });
 
+  it('unblocks a review author when the active block was created directly', async () => {
+    const actor = await newUser({ displayName: 'Direct Block Actor' });
+    const author = await newUser({ displayName: 'Direct Block Author' });
+    const restaurant = await newRestaurant({ name: 'Direct Block Restaurant' });
+    const review = await newReview({
+      userId: author.id,
+      restaurantId: restaurant.id,
+      status: 'VERIFIED',
+      publicVisibility: 'PUBLIC',
+    });
+
+    await requestApp()
+      .post(`/api/v1/users/${author.id}/block`)
+      .set(authHeaders(actor.id))
+      .send({})
+      .expect(201);
+
+    const stored = await query(
+      `SELECT source_review_id
+       FROM user_blocks
+       WHERE blocker_user_id = $1 AND blocked_user_id = $2`,
+      [actor.id, author.id],
+    );
+    expect(stored.rows[0].source_review_id).toBeNull();
+
+    await requestApp()
+      .delete(`/api/v1/reviews/${review.id}/block-author`)
+      .set(authHeaders(actor.id))
+      .expect(200);
+
+    const afterUnblock = await query(
+      `SELECT deleted_at
+       FROM user_blocks
+       WHERE blocker_user_id = $1 AND blocked_user_id = $2`,
+      [actor.id, author.id],
+    );
+    expect(afterUnblock.rows[0].deleted_at).not.toBeNull();
+  });
+
   it('rejects self-block through a public review and writes no row', async () => {
     const author = await newUser({ displayName: 'Self Review Author' });
     const restaurant = await newRestaurant({ name: 'Self Block Restaurant' });

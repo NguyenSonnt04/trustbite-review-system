@@ -187,16 +187,13 @@ describe('review-author block helpers', () => {
     vi.clearAllMocks();
   });
 
-  it('resolves only a public review author and delegates to the existing block rules', async () => {
-    pool.query.mockResolvedValueOnce({
-      rowCount: 1,
-      rows: [{ user_id: TARGET_ID }],
-    });
+  it('resolves and blocks a public review author in one locked transaction', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     const createdAt = new Date('2026-07-19T10:00:00.000Z');
     client.query
-      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: TARGET_ID }] })
       .mockResolvedValueOnce({ rows: [{ id: TARGET_ID }], rowCount: 1 })
       .mockResolvedValueOnce({ rows: [], rowCount: 0 })
       .mockResolvedValueOnce({
@@ -210,41 +207,55 @@ describe('review-author block helpers', () => {
       blockedAt: createdAt,
     });
 
-    const [lookupSql, lookupParams] = pool.query.mock.calls[0];
+    const [lookupSql, lookupParams] = client.query.mock.calls[1];
     expect(lookupSql).toContain("status IN ('VERIFIED', 'REFERENCE_ONLY')");
     expect(lookupSql).toContain("public_visibility = 'PUBLIC'");
     expect(lookupSql).toContain('restaurant.is_deleted = FALSE');
+    expect(lookupSql).toContain('FOR SHARE OF review, restaurant');
     expect(lookupParams).toEqual([REVIEW_ID]);
-    expect(client.query.mock.calls[3][1]).toEqual([
+    expect(client.query.mock.calls[4][1]).toEqual([
       BLOCKER_ID,
       TARGET_ID,
       null,
       REVIEW_ID,
     ]);
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    expect(pool.query).not.toHaveBeenCalled();
   });
 
-  it('returns 404 for a private or nonexistent review without attempting a block', async () => {
-    pool.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+  it('returns 404 and rolls back for a private or nonexistent review', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({});
 
     await expect(blockReviewAuthor(BLOCKER_ID, REVIEW_ID))
       .rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' });
 
-    expect(pool.connect).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(client.release).toHaveBeenCalled();
   });
 
   it('uses the existing self-block rule when the authenticated user authored the review', async () => {
-    pool.query.mockResolvedValueOnce({
-      rowCount: 1,
-      rows: [{ user_id: BLOCKER_ID }],
-    });
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ user_id: BLOCKER_ID }],
+      })
+      .mockResolvedValueOnce({});
 
     await expect(blockReviewAuthor(BLOCKER_ID, REVIEW_ID))
       .rejects.toMatchObject({ statusCode: 400, code: 'CANNOT_BLOCK_SELF' });
 
-    expect(pool.connect).not.toHaveBeenCalled();
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
   });
 
-  it('unblocks by source review even when the review is no longer public', async () => {
+  it('unblocks by resolved review author even when the review is no longer public', async () => {
     const client = createClient();
     pool.connect.mockResolvedValue(client);
     client.query
@@ -256,7 +267,9 @@ describe('review-author block helpers', () => {
       .resolves.toEqual({ success: true });
 
     expect(pool.query).not.toHaveBeenCalled();
-    expect(client.query.mock.calls[1][0]).toContain('source_review_id = $2');
+    expect(client.query.mock.calls[1][0]).toContain(
+      'user_blocks.blocked_user_id = review.user_id',
+    );
     expect(client.query.mock.calls[1][1]).toEqual([BLOCKER_ID, REVIEW_ID]);
   });
 });

@@ -39,10 +39,14 @@ The Flutter mobile app must integrate with the Express backend through documente
     - Request: `Authorization: Bearer <Cognito access token>`.
     - Response: current TrustBite user profile from the backend local account mapping.
     - Auth: required; backend rejects missing, invalid, unmapped, suspended, or deleted identities.
-  - `GET /api/restaurants/nearby`
-    - Query: `lat`, `lng`, optional `radiusMeters`, filters, and pagination.
-    - Response: restaurant summaries with trust score, menu verification status, and price-deviation flags.
+  - `GET /api/v1/restaurants/nearby`
+    - Query: `northEastLat`, `northEastLng`, `southWestLat`, `southWestLng`, and optional `pageSize` for the visible map viewport.
+    - Response: the accepted public restaurant page envelope with coordinate-bearing restaurant summaries.
     - Auth: optional until personalized ranking is introduced.
+  - `GET /api/v1/location/search`, `/reverse-geocode`, and `/route`
+    - Request: validated search text/coordinate query parameters from `TB-LOCATION-001`.
+    - Response: backend-normalized place and route DTOs; mobile does not parse provider-specific payloads.
+    - Auth: public read-only.
   - `POST /api/reviews`
     - Request: restaurant ID, rating/content, receipt evidence reference, GPS coordinates, and client timestamp.
     - Response: review state plus backend verification status.

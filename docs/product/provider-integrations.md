@@ -13,6 +13,7 @@ Planned provider responsibilities:
 | Textract | Receipt OCR extraction | OCR/provider service |
 | SES / AWS messaging | Email or notification delivery where selected | Messaging/provider service |
 | Bedrock/Claude | Review summarization | Summarization/provider service |
+| Amazon Location | Mobile map style, place search, reverse geocoding, and route calculation | Map API key in mobile runtime config; IAM-backed place/route adapter in `server/src/services/` |
 | LocalStack | Local simulation where supported | Docker/config only; production must use real provider endpoints |
 
 ## Cognito Boundary
@@ -47,6 +48,42 @@ implemented through the selected Cognito/SES boundary before release.
 LocalStack is configured for local AWS simulation. Cognito coverage may differ from production AWS. When LocalStack cannot prove a Cognito behavior, use an explicit Cognito-compatible test double that preserves the relevant provider semantics for tests. For token verification this means JWT claim and JWKS behavior; for account cleanup this means the real Cognito provider boundary issues global sign-out before admin delete and treats `UserNotFoundException` as idempotent.
 
 The local Docker Compose environment pins `localstack/localstack:4.4.0` instead of `latest` because current `latest` images require a LocalStack auth token before startup. In the current community image, S3 and SES provider smokes are available through `npm run verify:tb-aws-localstack`, but Cognito IdP and Textract are recorded as missing in the LocalStack health output for the accepted TB-AWS-001 proof. Cognito admin cleanup is therefore proven locally with a Cognito-compatible admin client test double unless real AWS smoke or a configured LocalStack auth-token/pro environment is available. Textract has targeted adapter/unit proof but no claimed LocalStack/live `AnalyzeExpense` success. Bedrock has no local/runtime adapter proof yet and must remain an explicit gap until a separate story introduces that boundary.
+
+Amazon Location is declared in the LocalStack service list for compatible local
+editions. That declaration is not provider proof: the pinned image must report
+the service available and pass an application-boundary smoke before local
+Location success can be claimed. Deterministic SDK adapter tests are the
+required baseline when the emulator does not implement the classic APIs.
+
+## Amazon Location Boundary
+
+The mobile map receives only the configured map name, AWS region, and a scoped
+map API key through build-time runtime configuration. Place search, reverse
+geocoding, and route calculation stay behind authenticated read-only Express
+routes using server IAM credentials. The shared Cognito/local-account middleware
+must accept an active TrustBite user before a controller or paid provider call
+runs. Provider payloads are normalized before they leave the service boundary,
+and exact device coordinates/search text are not persisted or logged by this
+slice.
+
+The current adapter uses classic Place Index and Route Calculator operations to
+match the provisioned resources. AWS marks classic `CalculateRoute` as no
+longer current, so migration to the newer Places/Routes APIs is tracked as a
+follow-up rather than hidden inside the mobile contract.
+
+The three paid provider routes share a fixed-window quota keyed by Express's
+trusted `req.ip`. The default is 60 requests per 60 seconds and deployments may
+override it with `AWS_LOCATION_RATE_LIMIT_MAX` and
+`AWS_LOCATION_RATE_LIMIT_WINDOW_SECONDS`. Requests over quota return
+`429 LOCATION_RATE_LIMITED` before authentication, controller, or provider
+execution. Requests within quota still require a valid Cognito-backed identity;
+unauthenticated requests return `401` before controller/provider execution.
+This in-process guard limits each Express instance; multi-instance deployments
+must also enforce a distributed or edge quota.
+
+`LocationService` retains only the Place Index and Route Calculator names in
+its service config. The mobile map name/key remain outside provider service
+state and must not appear in serialized backend diagnostics.
 
 `npm run verify:tb-aws-localstack` also runs a static AWS SDK provider-boundary audit. The audit fails if AWS SDK provider imports or client instantiation move outside `server/src/config/` or `server/src/services/`.
 
