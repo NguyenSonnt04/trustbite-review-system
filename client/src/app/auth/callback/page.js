@@ -5,6 +5,16 @@ import Link from 'next/link';
 import { authService } from '@/services/auth.service';
 import styles from './page.module.css';
 
+const resolveSafeReturnTo = (returnTo) => {
+  try {
+    const target = new URL(returnTo || '/', window.location.origin);
+    if (target.origin !== window.location.origin) return '/';
+    return `${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return '/';
+  }
+};
+
 export default function AuthCallbackPage() {
   const [message, setMessage] = useState('Đang hoàn tất đăng nhập với Cognito...');
 
@@ -23,7 +33,7 @@ export default function AuthCallbackPage() {
           code: params.get('code'),
           state: params.get('state'),
         });
-        window.location.replace(returnTo);
+        window.location.replace(resolveSafeReturnTo(returnTo));
       } catch (callbackError) {
         setMessage(callbackError.message || 'Không thể hoàn tất đăng nhập.');
       }
