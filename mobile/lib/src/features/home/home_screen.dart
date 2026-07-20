@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_service.dart';
 import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
+import 'package:trustbite_mobile/src/features/home/data/favorites_service.dart';
 import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/pages/discover_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/favorites_page.dart';
 import 'package:trustbite_mobile/src/features/home/pages/profile_page.dart';
 import 'package:trustbite_mobile/src/features/home/widgets/trustbite_bottom_nav.dart';
 import 'package:trustbite_mobile/src/features/map/map_screen.dart';
+import 'package:trustbite_mobile/src/features/notifications/notification_service.dart';
+import 'package:trustbite_mobile/src/features/notifications/notifications_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -17,11 +22,17 @@ class HomeScreen extends StatefulWidget {
     this.authService,
     this.cognitoAuthGateway,
     this.restaurantRepository,
+    this.notificationRepository,
+    this.favoritesRepository,
+    this.profileRepository,
   });
 
   final MobileAuthService? authService;
   final CognitoAuthGateway? cognitoAuthGateway;
   final RestaurantDiscoveryRepository? restaurantRepository;
+  final NotificationRepository? notificationRepository;
+  final FavoritesRepository? favoritesRepository;
+  final ProfileManagementRepository? profileRepository;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -33,6 +44,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSignedIn = false;
   Map<String, dynamic>? _currentUser;
   late final RestaurantDiscoveryRepository _restaurantRepository;
+  late final FavoritesRepository _favoritesRepository;
+  late final ProfileManagementRepository _profileRepository;
+  int _notificationUnreadCount = 0;
+  late final NotificationRepository _notificationRepository;
 
   @override
   void initState() {
@@ -40,6 +55,14 @@ class _HomeScreenState extends State<HomeScreen> {
     _restaurantRepository =
         widget.restaurantRepository ??
         RestaurantDiscoveryService(apiClient: appApiClient);
+    _favoritesRepository =
+        widget.favoritesRepository ?? FavoritesService(apiClient: appApiClient);
+    _profileRepository =
+        widget.profileRepository ??
+        ProfileManagementService(apiClient: appApiClient);
+    _notificationRepository =
+        widget.notificationRepository ??
+        ApiNotificationRepository(apiClient: appApiClient);
     _loadAuthState();
   }
 
@@ -83,6 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _isSignedIn = true;
         _currentUser = user;
       });
+      await _refreshNotificationUnreadCount();
     } catch (error) {
       debugPrint(
         'Unable to restore signed-in user profile: ${error.runtimeType}',
@@ -119,6 +143,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _isSignedIn = true;
         _currentUser = user;
       });
+      await _refreshNotificationUnreadCount();
+      if (!mounted) return false;
       final displayName =
           user['displayName'] ?? user['phoneNumber'] ?? 'tài khoản';
       ScaffoldMessenger.of(context).showSnackBar(
@@ -140,11 +166,84 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _isSignedIn = false;
       _currentUser = null;
+      _notificationUnreadCount = 0;
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Đã đăng xuất.'),
         behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _updateCurrentUser(Map<String, dynamic> user) {
+    setState(() => _currentUser = user);
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Đã cập nhật hồ sơ.')));
+  }
+
+  Future<void> _refreshNotificationUnreadCount() async {
+    if (!_isSignedIn) {
+      if (mounted) setState(() => _notificationUnreadCount = 0);
+      return;
+    }
+    final requestedForUser = _currentUser;
+    try {
+      final unreadCount = await _notificationRepository.fetchUnreadCount();
+      if (!mounted ||
+          !_isSignedIn ||
+          !identical(_currentUser, requestedForUser)) {
+        return;
+      }
+      setState(() => _notificationUnreadCount = unreadCount);
+    } on AuthRequiredException {
+      if (!mounted ||
+          !_isSignedIn ||
+          !identical(_currentUser, requestedForUser)) {
+        return;
+      }
+      await _handleNotificationAuthenticationRequired();
+    } catch (_) {
+      if (!mounted ||
+          !_isSignedIn ||
+          !identical(_currentUser, requestedForUser)) {
+        return;
+      }
+      setState(() => _notificationUnreadCount = 0);
+    }
+  }
+
+  Future<void> _handleNotificationAuthenticationRequired() async {
+    if (!mounted) return;
+    setState(() {
+      _isSignedIn = false;
+      _currentUser = null;
+      _notificationUnreadCount = 0;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _openNotifications() async {
+    if (!_isSignedIn) {
+      await _openLogin();
+      if (!mounted || !_isSignedIn) return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationsPage(
+          repository: _notificationRepository,
+          onUnreadCountChanged: (count) {
+            if (mounted) setState(() => _notificationUnreadCount = count);
+          },
+          onAuthenticationRequired: _handleNotificationAuthenticationRequired,
+        ),
       ),
     );
   }
@@ -233,14 +332,25 @@ class _HomeScreenState extends State<HomeScreen> {
         currentUser: _currentUser,
         onLogin: _openLogin,
         restaurantRepository: _restaurantRepository,
+        safetyRepository: _profileRepository,
+        notificationCount: _notificationUnreadCount,
+        onNotificationsPressed: _openNotifications,
       ),
-      1 => const MapScreen(),
-      2 => const FavoritesPage(),
+      1 => MapScreen(isSignedIn: _isSignedIn, onLogin: _openLogin),
+      2 => FavoritesPage(
+        isSignedIn: _isSignedIn,
+        onLogin: _openLogin,
+        favoritesRepository: _favoritesRepository,
+        restaurantRepository: _restaurantRepository,
+      ),
       _ => ProfilePage(
         isSignedIn: _isSignedIn,
         currentUser: _currentUser,
         onLogin: _openLogin,
         onLogout: _logout,
+        onUserUpdated: _updateCurrentUser,
+        onAccountDeletionAccepted: _logout,
+        profileRepository: _profileRepository,
       ),
     };
   }

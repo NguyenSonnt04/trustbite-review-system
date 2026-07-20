@@ -68,5 +68,11 @@ suspend/reactivate contract. No admin delete action is available.
 6. Relaunch with a valid Cognito session repeats the profile check, so restart
    cannot bypass interrupted onboarding.
 
+After onboarding, mobile exposes authenticated profile editing for the same
+allowlisted fields. Avatar changes request a signed upload URL, upload the exact
+image bytes, then persist the returned allowlisted `avatarUrl` through
+`PATCH /users/me`. Account deletion remains a backend request lifecycle;
+mobile signs out after the request is accepted.
+
 Date of birth and phone number are sensitive profile data. Do not include them
 in operational logs or analytics payloads.

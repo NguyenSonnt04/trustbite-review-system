@@ -123,6 +123,11 @@ export default function AdminHome() {
             </button>
           </form>
 
+          <Link className={styles.merchantButton} href="/merchant">
+            <span>Mở cổng nhà hàng</span>
+            <AdminIcon name="store" size={16} />
+          </Link>
+
           <div className={styles.preview}>
             <span>Workspace quản trị được bảo vệ.</span>
             <strong>Cognito và quyền cục bộ đều được xác minh.</strong>

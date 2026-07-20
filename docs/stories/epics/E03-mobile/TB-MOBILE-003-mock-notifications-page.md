@@ -2,7 +2,7 @@
 
 ## Status
 
-implemented
+superseded by `TB-NOTIF-001`
 
 ## Lane
 
@@ -13,6 +13,9 @@ normal
 The Flutter home notification button opens a dedicated notifications page
 populated from local mock data. The mock page must not call or imply a live
 notification API.
+
+This historical contract was replaced by `TB-NOTIF-001`, which removes the mock
+rows and connects the screen to the authenticated in-app notification API.
 
 ## Relevant Product Docs
 

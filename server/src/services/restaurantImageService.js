@@ -11,7 +11,7 @@ import {
 import { authorizeRestaurantMedia } from './restaurantMediaAuthorizationService.js';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const UPLOAD_ENDPOINT = 'POST /api/v1/admin-web/restaurants/:restaurantId/images';
+const UPLOAD_ENDPOINT = 'POST /api/v1/restaurants/:restaurantId/images';
 const REPLACEMENT_ENDPOINT = (
   'POST /api/v1/admin-web/restaurants/:restaurantId/images/:imageId/replace'
 );

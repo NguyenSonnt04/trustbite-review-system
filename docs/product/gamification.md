@@ -12,8 +12,9 @@ points or level. Points/rank carry no monetary value and can be revoked on fraud
 - Helpful vote received: `+5` EXP (P1).
 - Rejected/hidden review: `0` or revoked per moderation.
 
-EXP awarding (writes) and `users.rank_code` persistence are a tracked follow-up;
-the values above ship as shared constants for the awarder and the read API.
+Automated verified-review decisions award `+50` EXP exactly once and reconcile
+`users.rank_code` in the same transaction. Reference-review awards, helpful
+votes, and moderation revocation remain follow-up work.
 
 ## Level Ladder (Gamification_Design §3)
 
@@ -47,8 +48,13 @@ feeds the restaurant trust-score weighting for verified reviews (see
 The level is derived from persisted data (not read from `users.rank_code`), so it
 is correct even before an EXP/rank writer reconciles `rank_code`.
 
+Mobile renders this summary as read-only progress. It must display the returned
+level, remaining EXP, remaining verified reviews, and persisted badges without
+recomputing rank thresholds or awarding points locally.
+
 ## Badges
 
-Badge definitions and awards use `badge_definitions` / `user_badges`. Badge
-award triggers are P1/future (Gamification_Design §5); the API lists whatever has
-been awarded.
+Badge definitions and awards use `badge_definitions` / `user_badges`.
+`RECEIPT_MASTER` (10 consecutive verified reviews) and `EXPLORER` (first
+verified reviewer for 5 restaurants) are awarded after an automated verified
+review decision. The API lists persisted awards from `user_badges`.

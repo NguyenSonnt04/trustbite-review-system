@@ -9,6 +9,11 @@ import {
   getMyGamification,
   updateMe
 } from '../controllers/user.js';
+import {
+  listFavoritesHandler,
+  removeFavoriteHandler,
+  saveFavoriteHandler,
+} from '../controllers/favorite.js';
 import { blockUserById, unblockUserById } from '../controllers/userBlock.js';
 
 const router = Router();
@@ -17,6 +22,9 @@ router.use(authMiddleware);
 router.get('/me', getMe);
 router.patch('/me', updateMe);
 router.get('/me/gamification', getMyGamification);
+router.get('/me/favorites', listFavoritesHandler);
+router.put('/me/favorites/:restaurantId', saveFavoriteHandler);
+router.delete('/me/favorites/:restaurantId', removeFavoriteHandler);
 router.post('/me/avatar-upload-url', createAvatarUploadUrl);
 router.post('/me/deletion-request', createDeletionRequest);
 router.get('/me/deletion-request', getDeletionRequest);

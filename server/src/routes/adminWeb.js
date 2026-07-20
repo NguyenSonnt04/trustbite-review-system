@@ -6,6 +6,7 @@ import {
   updateAdminUser,
 } from '../controllers/adminUserManagement.js';
 import { reactivateUser, suspendUser } from '../controllers/adminUser.js';
+import { listRestaurantReviewsHandler } from '../controllers/restaurant.js';
 import {
   deleteAdminRestaurants,
   deleteAdminRestaurantImage,
@@ -30,6 +31,7 @@ router.post('/users/:userId/suspend', suspendUser);
 router.post('/users/:userId/reactivate', reactivateUser);
 router.get('/restaurants', listAdminRestaurants);
 router.post('/restaurants/bulk-delete', deleteAdminRestaurants);
+router.get('/restaurants/:restaurantId/reviews', listRestaurantReviewsHandler);
 router.get('/restaurants/:restaurantId', getAdminRestaurant);
 router.patch('/restaurants/:restaurantId', updateAdminRestaurant);
 router.post(

@@ -4,11 +4,16 @@ import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/features/auth/cognito_auth_gateway.dart';
 import 'package:trustbite_mobile/src/features/auth/login_screen.dart';
 import 'package:trustbite_mobile/src/features/auth/mobile_auth_service.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_pages.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_service.dart';
 import 'package:trustbite_mobile/src/features/auth/profile_onboarding_screen.dart';
+import 'package:trustbite_mobile/src/features/home/data/favorites_service.dart';
 import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_screen.dart';
 import 'package:trustbite_mobile/src/features/home/models/home_models.dart';
 import 'package:trustbite_mobile/src/features/launch/brand_launch_screen.dart';
+import 'package:trustbite_mobile/src/features/notifications/notification_models.dart';
+import 'package:trustbite_mobile/src/features/notifications/notification_service.dart';
 
 void main() {
   testWidgets('shows branded launch screen before handing off', (tester) async {
@@ -139,17 +144,22 @@ void main() {
     expect(find.text('Đăng nhập ngay'), findsOneWidget);
   });
 
-  testWidgets('shows the polished favorites empty state and suggestions', (
+  testWidgets('loads real favorites and saves an API suggestion', (
     tester,
   ) async {
+    final favoritesRepository = _FakeFavoritesRepository();
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
           authService: _FakeMobileAuthService(),
+          cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
           restaurantRepository: const _FakeRestaurantRepository(),
+          favoritesRepository: favoritesRepository,
+          notificationRepository: _FakeNotificationRepository(),
         ),
       ),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Yêu thích'));
     await tester.pumpAndSettle();
@@ -157,18 +167,233 @@ void main() {
     expect(find.byKey(const ValueKey('favorites-page')), findsOneWidget);
     expect(find.text('Chưa có quán yêu thích'), findsOneWidget);
     expect(find.text('Gợi ý để lưu'), findsOneWidget);
-    expect(find.text('Phở Thìn Bờ Hồ'), findsOneWidget);
-    expect(find.text('Có review xác thực'), findsWidgets);
+    expect(find.text('Quán API thử nghiệm'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('save-favorite-restaurant-test')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(favoritesRepository.savedIds, ['restaurant-test']);
+    expect(find.text('Đã lưu'), findsWidgets);
   });
 
-  testWidgets('opens the mock notifications page from the home header', (
+  testWidgets('opens working profile management actions', (tester) async {
+    final profileRepository = _FakeProfileManagementRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authService: _FakeMobileAuthService(),
+          cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
+          restaurantRepository: const _FakeRestaurantRepository(),
+          notificationRepository: _FakeNotificationRepository(),
+          profileRepository: profileRepository,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tôi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Quét bill'), findsOneWidget);
+    expect(find.text('Mã ưu đãi'), findsOneWidget);
+    expect(find.text('Hỗ trợ'), findsOneWidget);
+    expect(find.text('Bảo mật'), findsOneWidget);
+    expect(find.text('Hội viên'), findsOneWidget);
+    expect(find.text('Thẻ quà tặng'), findsOneWidget);
+    expect(find.text('Giới thiệu bạn bè'), findsOneWidget);
+    expect(find.text('Địa chỉ đã lưu'), findsOneWidget);
+    expect(find.text('Hóa đơn'), findsOneWidget);
+    expect(find.text('Đánh giá ứng dụng'), findsOneWidget);
+    expect(find.text('Sửa hồ sơ'), findsNothing);
+    expect(find.text('Xóa tài khoản'), findsNothing);
+    await tester.tap(find.text('Hạng thành viên'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('gamification-summary')), findsOneWidget);
+    expect(find.text('Tập sự'), findsOneWidget);
+    expect(find.text('120/500'), findsOneWidget);
+    expect(find.text('3/10'), findsOneWidget);
+    expect(find.text('Điểm kinh nghiệm'), findsOneWidget);
+    expect(find.text('Review xác thực'), findsWidgets);
+  });
+
+  testWidgets('opens profile editing and deletion from the signed-in header', (
     tester,
   ) async {
     await tester.pumpWidget(
       MaterialApp(
         home: HomeScreen(
           authService: _FakeMobileAuthService(),
+          cognitoAuthGateway: _FakeCognitoAuthGateway(signedIn: true),
           restaurantRepository: const _FakeRestaurantRepository(),
+          notificationRepository: _FakeNotificationRepository(),
+          profileRepository: _FakeProfileManagementRepository(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Tôi'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Local Test User'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('edit-profile-page')), findsOneWidget);
+    expect(find.text('Hồ sơ cá nhân'), findsOneWidget);
+    expect(find.text('Thông tin cá nhân'), findsOneWidget);
+    expect(find.text('Quản lý tài khoản'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('edit-avatar-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Cập nhật ảnh đại diện'), findsOneWidget);
+    expect(find.byKey(const ValueKey('avatar-source-camera')), findsOneWidget);
+    expect(find.byKey(const ValueKey('avatar-source-gallery')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('avatar-source-cancel')));
+    await tester.pumpAndSettle();
+    await tester.drag(
+      find.byKey(const ValueKey('edit-profile-content')),
+      const Offset(0, -500),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('open-delete-account-button')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('gamification page does not refetch on rebuild', (tester) async {
+    final repository = _FakeProfileManagementRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.light(),
+        home: GamificationPage(repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData.dark(),
+        home: GamificationPage(repository: repository),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.fetchGamificationCalls, 1);
+  });
+
+  testWidgets('gamification page retries after a loading failure', (
+    tester,
+  ) async {
+    final repository = _FakeProfileManagementRepository(
+      gamificationResponses: [Exception('offline')],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: GamificationPage(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Không thể tải hạng thành viên'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('gamification-retry')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('gamification-summary')), findsOneWidget);
+    expect(repository.fetchGamificationCalls, 2);
+  });
+
+  testWidgets('gamification page refreshes progress on demand', (tester) async {
+    final repository = _FakeProfileManagementRepository();
+
+    await tester.pumpWidget(
+      MaterialApp(home: GamificationPage(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Làm mới tiến trình'));
+    await tester.pumpAndSettle();
+
+    expect(repository.fetchGamificationCalls, 2);
+    expect(find.byKey(const ValueKey('gamification-summary')), findsOneWidget);
+  });
+
+  testWidgets('gamification page shows awarded badges and top rank', (
+    tester,
+  ) async {
+    final repository = _FakeProfileManagementRepository(
+      gamificationResponses: [
+        GamificationSummary(
+          expPoints: 2400,
+          verifiedReviewCount: 31,
+          level: const GamificationLevel(
+            code: 'TRUSTED_FOODIE',
+            label: 'Foodie uy tín',
+            minExp: 2000,
+            minVerifiedReviews: 25,
+          ),
+          nextLevel: null,
+          badges: [
+            GamificationBadge(
+              code: 'RECEIPT_MASTER',
+              label: 'Bậc thầy hóa đơn',
+              iconUrl: null,
+              category: 'Xác thực',
+              awardedAt: DateTime.utc(2026, 7, 19),
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: GamificationPage(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Foodie uy tín'), findsOneWidget);
+    expect(
+      find.text('Bạn đã đạt hạng cao nhất trong hệ thống hiện tại.'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Bậc thầy hóa đơn'),
+      250,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Bậc thầy hóa đơn'), findsOneWidget);
+    expect(find.text('19/07/2026'), findsOneWidget);
+  });
+
+  testWidgets('account deletion page shows load failures instead of the form', (
+    tester,
+  ) async {
+    final repository = _FakeProfileManagementRepository(
+      deletionRequestError: Exception('offline'),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AccountDeletionPage(
+          repository: repository,
+          onDeletionAccepted: () async {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Không thể tải yêu cầu xóa'), findsOneWidget);
+    expect(find.byKey(const ValueKey('delete-account-submit')), findsNothing);
+  });
+
+  testWidgets('asks guests to sign in before opening notifications', (
+    tester,
+  ) async {
+    final notificationRepository = _FakeNotificationRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: HomeScreen(
+          authService: _FakeMobileAuthService(),
+          restaurantRepository: const _FakeRestaurantRepository(),
+          notificationRepository: notificationRepository,
         ),
       ),
     );
@@ -176,17 +401,8 @@ void main() {
     await tester.tap(find.byIcon(Icons.notifications_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('Thông báo'), findsOneWidget);
-    expect(find.text('3 mới'), findsOneWidget);
-    expect(find.text('Bill đã được xác thực'), findsOneWidget);
-    expect(find.text('Có ưu đãi gần bạn'), findsOneWidget);
-    expect(find.text('Review được quan tâm'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('notifications-back-button')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const ValueKey('notifications-list')), findsNothing);
-    expect(find.byIcon(Icons.notifications_rounded), findsOneWidget);
+    expect(find.text('Email'), findsOneWidget);
+    expect(notificationRepository.fetchCalls, 0);
   });
 
   testWidgets('shows the separate TrustBite login entry screen', (
@@ -556,6 +772,131 @@ class _FakeRestaurantRepository implements RestaurantDiscoveryRepository {
   }
 }
 
+class _FakeFavoritesRepository implements FavoritesRepository {
+  final savedIds = <String>[];
+
+  @override
+  Future<List<FavoriteRestaurant>> fetchFavorites() async {
+    return [
+      for (final id in savedIds)
+        FavoriteRestaurant(
+          restaurant: HomeRestaurant(
+            id: id,
+            name: 'Quán API thử nghiệm',
+            rating: '4.8',
+            distance: null,
+            status: '2 review xác thực',
+            image: null,
+            featured: false,
+          ),
+          addedAt: DateTime.utc(2026, 7, 19),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> removeFavorite(String restaurantId) async {
+    savedIds.remove(restaurantId);
+  }
+
+  @override
+  Future<void> saveFavorite(String restaurantId) async {
+    if (!savedIds.contains(restaurantId)) savedIds.add(restaurantId);
+  }
+}
+
+class _FakeProfileManagementRepository implements ProfileManagementRepository {
+  _FakeProfileManagementRepository({
+    this.deletionRequestError,
+    List<Object>? gamificationResponses,
+  }) : _gamificationResponses = [...?gamificationResponses];
+
+  final Exception? deletionRequestError;
+  final List<Object> _gamificationResponses;
+  int fetchGamificationCalls = 0;
+
+  @override
+  Future<GamificationSummary> fetchGamification() async {
+    fetchGamificationCalls += 1;
+    if (_gamificationResponses.isNotEmpty) {
+      final response = _gamificationResponses.removeAt(0);
+      if (response is Exception) throw response;
+      return response as GamificationSummary;
+    }
+    return const GamificationSummary(
+      expPoints: 120,
+      verifiedReviewCount: 3,
+      level: GamificationLevel(
+        code: 'APPRENTICE',
+        label: 'Tập sự',
+        minExp: 100,
+        minVerifiedReviews: 2,
+      ),
+      nextLevel: GamificationNextLevel(
+        code: 'FOODIE',
+        label: 'Foodie',
+        minExp: 500,
+        minVerifiedReviews: 10,
+        expToNext: 380,
+        verifiedReviewsToNext: 7,
+      ),
+      badges: [],
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateProfile({
+    required String displayName,
+    required String phoneNumber,
+    required String dateOfBirth,
+  }) async {
+    return {
+      'displayName': displayName,
+      'phoneNumber': phoneNumber,
+      'dateOfBirth': dateOfBirth,
+      'profileComplete': true,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateAvatar({
+    required List<int> bytes,
+    required String contentType,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> blockReviewAuthor(String reviewId) async {}
+
+  @override
+  Future<AccountDeletionRequest> cancelAccountDeletion() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<AccountDeletionRequest?> fetchAccountDeletionRequest() async {
+    if (deletionRequestError case final error?) throw error;
+    return null;
+  }
+
+  @override
+  Future<AccountDeletionRequest> requestAccountDeletion({String? reason}) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> submitReport({
+    required ReportEntityType entityType,
+    required String entityId,
+    required String reasonCode,
+    String? description,
+  }) async {}
+
+  @override
+  Future<void> unblockReviewAuthor(String reviewId) async {}
+}
+
 class _FakeMobileAuthService implements MobileAuthService {
   _FakeMobileAuthService({List<Object>? cognitoResults})
     : _cognitoResults = cognitoResults == null ? null : List.of(cognitoResults);
@@ -670,4 +1011,31 @@ class _FakeCognitoAuthGateway implements CognitoAuthGateway {
 
   @override
   Future<void> signOut() async {}
+}
+
+class _FakeNotificationRepository implements NotificationRepository {
+  int fetchCalls = 0;
+
+  @override
+  Future<int> fetchUnreadCount() async => 0;
+
+  @override
+  Future<NotificationPageData> fetchNotifications({
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    fetchCalls += 1;
+    return const NotificationPageData(
+      items: [],
+      page: 1,
+      pageSize: 20,
+      total: 0,
+      unreadCount: 0,
+    );
+  }
+
+  @override
+  Future<TrustBiteNotification> markRead(String notificationId) {
+    throw UnimplementedError();
+  }
 }

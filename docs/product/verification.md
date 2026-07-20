@@ -47,7 +47,12 @@ Accepted rule for `TB-TRUST-001` (Anti-Fraud §10, Status_Mapping §2). `restaur
 - The same pass recomputes `verified_review_count` (HIGH) and `reference_review_count` (LOW).
 - Every wired aggregate writer locks the restaurant before loading public HIGH/LOW reviews so concurrent review decisions for the same restaurant are reflected without losing an aggregate update.
 
-This is the restaurant trust score. TrustBite has no per-user trust score; user reputation is `exp_points`/`rank_code`. Receipt-free publication and account deletion recompute in their existing transactions; receipt-verification and admin-moderation triggers remain tracked follow-ups.
+This is the restaurant trust score. TrustBite has no per-user trust score; user
+reputation is `exp_points`/`rank_code`. Receipt-free publication, automated
+verified-review decisions, and account deletion recompute affected restaurants
+inside their existing transactions. A rank change also recomputes every
+restaurant containing that user's HIGH-weight reviews. Admin-moderation
+recomputation remains tracked follow-up work.
 
 ## Vietnam Receipt Parsing
 

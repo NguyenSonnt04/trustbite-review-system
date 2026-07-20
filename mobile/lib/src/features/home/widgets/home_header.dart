@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
-import 'package:trustbite_mobile/src/features/home/data/home_mock_data.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
-import 'package:trustbite_mobile/src/features/home/pages/notifications_page.dart';
 
 class HomeHeader extends StatelessWidget {
   const HomeHeader({
@@ -10,11 +8,15 @@ class HomeHeader extends StatelessWidget {
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
+    required this.notificationCount,
+    required this.onNotificationsPressed,
   });
 
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
   final VoidCallback onLogin;
+  final int notificationCount;
+  final VoidCallback onNotificationsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -52,12 +54,8 @@ class HomeHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               _NotificationButton(
-                count: homeNotifications.length,
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const NotificationsPage(),
-                  ),
-                ),
+                count: notificationCount,
+                onPressed: onNotificationsPressed,
               ),
             ],
           ),
@@ -83,11 +81,7 @@ class _LocationPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(
-            Icons.place_rounded,
-            size: 14,
-            color: HomeColors.brand,
-          ),
+          const Icon(Icons.place_rounded, size: 14, color: HomeColors.brand),
           const SizedBox(width: 4),
           Flexible(
             child: Text(
@@ -113,10 +107,7 @@ class _LocationPill extends StatelessWidget {
 }
 
 class _NotificationButton extends StatelessWidget {
-  const _NotificationButton({
-    required this.count,
-    required this.onPressed,
-  });
+  const _NotificationButton({required this.count, required this.onPressed});
 
   final int count;
   final VoidCallback onPressed;
@@ -136,8 +127,8 @@ class _NotificationButton extends StatelessWidget {
             clipBehavior: Clip.none,
             children: [
               const SizedBox(
-                width: 32,
-                height: 32,
+                width: 48,
+                height: 48,
                 child: Icon(
                   Icons.notifications_rounded,
                   size: 24,
@@ -177,10 +168,7 @@ class _NotificationButton extends StatelessWidget {
 }
 
 class _TrustScoreInline extends StatelessWidget {
-  const _TrustScoreInline({
-    required this.score,
-    required this.onPressed,
-  });
+  const _TrustScoreInline({required this.score, required this.onPressed});
 
   final int score;
   final VoidCallback? onPressed;
@@ -190,11 +178,7 @@ class _TrustScoreInline extends StatelessWidget {
     final content = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(
-          Icons.verified_rounded,
-          size: 12,
-          color: HomeColors.brand,
-        ),
+        const Icon(Icons.verified_rounded, size: 12, color: HomeColors.brand),
         const SizedBox(width: 3),
         Text(
           'Trust $score',
@@ -215,10 +199,7 @@ class _TrustScoreInline extends StatelessWidget {
       child: InkWell(
         onTap: onPressed,
         borderRadius: BorderRadius.circular(8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [content],
-        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [content]),
       ),
     );
   }

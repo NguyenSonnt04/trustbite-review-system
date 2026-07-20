@@ -15,6 +15,7 @@
  */
 
 import { pool } from '../config/db.js';
+import appConfig from '../config/app.js';
 import { getFraudRules } from '../config/fraudRules.js';
 import {
   haversineMeters,
@@ -24,6 +25,8 @@ import {
   scoreReceipt,
   decideFromScore,
 } from './receiptVerificationScoring.js';
+import { awardVerifiedReview } from './gamificationAwardService.js';
+import { recomputeRestaurantTrustScore } from './trustScoreService.js';
 
 export class NotFoundError extends Error {
   constructor(message) {
@@ -257,7 +260,13 @@ async function writeDecision(client, {
  * @param {Date}   [opts.now] - injectable server clock for testing.
  * @returns {Promise<object>} The decided state set plus fraudRiskScore.
  */
-export async function verifyReceipt(receiptVerificationId, { now = new Date() } = {}) {
+export async function verifyReceipt(
+  receiptVerificationId,
+  {
+    now = new Date(),
+    notificationsEnabled = appConfig.notifications.enabled,
+  } = {},
+) {
   const rules = getFraudRules();
   const client = await pool.connect();
 
@@ -274,13 +283,60 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
     const receipt = receiptResult.rows[0];
 
     const reviewResult = await client.query(
-      `SELECT id, user_id, restaurant_id, created_at FROM reviews WHERE id = $1`,
+      `SELECT
+         id,
+         user_id,
+         restaurant_id,
+         status,
+         verification_status,
+         trust_label,
+         public_visibility,
+         trust_weight_bucket,
+         created_at
+       FROM reviews
+       WHERE id = $1`,
       [receipt.review_id],
     );
     if (reviewResult.rows.length === 0) {
       throw new NotFoundError('Parent review not found.');
     }
     const review = reviewResult.rows[0];
+
+    if (['VERIFIED', 'REFERENCE_ONLY', 'REJECTED', 'DELETED'].includes(receipt.status)) {
+      await client.query('COMMIT');
+      return {
+        decision: receipt.decision,
+        reviewStatus: review.status,
+        verificationStatus: review.verification_status,
+        receiptStatus: receipt.status,
+        trustLabel: review.trust_label,
+        publicVisibility: review.public_visibility,
+        trustWeightBucket: review.trust_weight_bucket,
+        fraudRiskScore: receipt.fraud_risk_score,
+        breakdown: [],
+        gamification: null,
+        alreadyProcessed: true,
+      };
+    }
+
+    const impactedRestaurantResult = await client.query(
+      `SELECT DISTINCT restaurant_id AS id
+       FROM reviews
+       WHERE user_id = $1
+         AND trust_weight_bucket = 'HIGH'
+       UNION
+       SELECT $2::uuid AS id
+       ORDER BY id`,
+      [review.user_id, receipt.restaurant_id],
+    );
+    await client.query(
+      `SELECT id
+       FROM restaurants
+       WHERE id = ANY($1::uuid[])
+       ORDER BY id
+       FOR UPDATE`,
+      [impactedRestaurantResult.rows.map((row) => row.id)],
+    );
 
     // Prefer branch coordinates when the receipt is tied to a branch.
     let venue;
@@ -408,8 +464,26 @@ export async function verifyReceipt(receiptVerificationId, { now = new Date() } 
       });
     }
 
+    const gamification = states.decision === 'VERIFIED'
+      ? await awardVerifiedReview({
+          client,
+          userId: review.user_id,
+          reviewId: review.id,
+          restaurantId: review.restaurant_id,
+          notificationsEnabled,
+        })
+      : null;
+    if (states.decision === 'REFERENCE_ONLY') {
+      await recomputeRestaurantTrustScore(review.restaurant_id, { client });
+    }
+
     await client.query('COMMIT');
-    return { ...states, fraudRiskScore: Math.min(score, 100), breakdown };
+    return {
+      ...states,
+      fraudRiskScore: Math.min(score, 100),
+      breakdown,
+      gamification,
+    };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

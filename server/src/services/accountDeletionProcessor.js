@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 
 import { pool } from '../config/db.js';
+import { avatarUploadService } from './avatarStorageService.js';
 import { cognitoIdentityProvider } from './identityProviders/cognitoProvider.js';
 import { s3ObjectStorage } from './objectStorage.js';
 import { recomputeRestaurantTrustScore } from './trustScoreService.js';
@@ -217,31 +218,36 @@ const markExhaustedCleanupRequests = async (client, limit) => {
 
 const listObjectCleanupTargets = async (client, userId) => {
   const result = await client.query(
-    `SELECT avatar_url AS url
+    `SELECT avatar_url AS url, 'AVATAR' AS target_type
        FROM users
       WHERE id = $1 AND avatar_url IS NOT NULL
      UNION ALL
-     SELECT file_url AS url
+     SELECT file_url AS url, 'RECEIPT' AS target_type
        FROM receipt_verifications
       WHERE user_id = $1
      UNION ALL
-     SELECT redacted_file_url AS url
+     SELECT redacted_file_url AS url, 'RECEIPT' AS target_type
        FROM receipt_verifications
       WHERE user_id = $1 AND redacted_file_url IS NOT NULL
      UNION ALL
-     SELECT rm.url
+     SELECT rm.url, 'REVIEW_MEDIA' AS target_type
        FROM review_media rm
        JOIN reviews r ON r.id = rm.review_id
       WHERE r.user_id = $1
      UNION ALL
-     SELECT rc.evidence_url
+     SELECT rc.evidence_url, 'MERCHANT_CLAIM' AS target_type
        FROM restaurant_claims rc
        JOIN merchants m ON m.id = rc.merchant_id
       WHERE m.user_id = $1`,
     [userId],
   );
 
-  return result.rows.map((row) => row.url);
+  return result.rows
+    .filter((row) => (
+      row.target_type !== 'AVATAR'
+      || avatarUploadService.hasAvatarOwnerPath(row.url, userId)
+    ))
+    .map((row) => row.url);
 };
 
 const cleanupExternalResources = async (request, { identityProvider, objectStorage }) => {

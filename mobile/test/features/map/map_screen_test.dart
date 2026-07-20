@@ -117,6 +117,41 @@ void main() {
       isEmpty,
     );
   });
+
+  testWidgets('requires login before paid place search', (tester) async {
+    var loginRequests = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MapScreen(
+          isSignedIn: false,
+          onLogin: () async {
+            loginRequests += 1;
+            return false;
+          },
+          runtimeConfig: const MobileRuntimeConfig(
+            apiBaseUrl: 'http://localhost:5000',
+            awsRegion: 'ap-southeast-1',
+            cognitoUserPoolId: '',
+            cognitoClientId: '',
+            locationMapApiKey: 'test-map-key',
+            locationMapName: 'TrustBiteMap',
+          ),
+          locationGateway: _FakeLocationGateway(),
+          mapSurfaceOverride: const ColoredBox(color: Color(0xFFE5E7EB)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('map-search-field')),
+      'Bún bò',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+
+    expect(loginRequests, 1);
+  });
 }
 
 class _FakeLocationGateway implements MapLocationGateway {

@@ -8,7 +8,12 @@ vi.mock('../../../src/config/db.js', () => ({
 }));
 
 const { pool } = await import('../../../src/config/db.js');
-const { blockUser, unblockUser } = await import('../../../src/services/userBlockService.js');
+const {
+  blockReviewAuthor,
+  blockUser,
+  unblockReviewAuthor,
+  unblockUser,
+} = await import('../../../src/services/userBlockService.js');
 
 const BLOCKER_ID = '11111111-1111-4111-8111-111111111111';
 const TARGET_ID = '22222222-2222-4222-8222-222222222222';
@@ -174,5 +179,97 @@ describe('unblockUser', () => {
 
     await expect(unblockUser(BLOCKER_ID, TARGET_ID)).rejects.toBe(originalErr);
     expect(client.release).toHaveBeenCalled();
+  });
+});
+
+describe('review-author block helpers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('resolves and blocks a public review author in one locked transaction', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    const createdAt = new Date('2026-07-19T10:00:00.000Z');
+    client.query
+      .mockResolvedValueOnce({}) // BEGIN
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ user_id: TARGET_ID }] })
+      .mockResolvedValueOnce({ rows: [{ id: TARGET_ID }], rowCount: 1 })
+      .mockResolvedValueOnce({ rows: [], rowCount: 0 })
+      .mockResolvedValueOnce({
+        rows: [{ blocked_user_id: TARGET_ID, created_at: createdAt }],
+        rowCount: 1,
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(blockReviewAuthor(BLOCKER_ID, REVIEW_ID)).resolves.toEqual({
+      success: true,
+      blockedAt: createdAt,
+    });
+
+    const [lookupSql, lookupParams] = client.query.mock.calls[1];
+    expect(lookupSql).toContain("status IN ('VERIFIED', 'REFERENCE_ONLY')");
+    expect(lookupSql).toContain("public_visibility = 'PUBLIC'");
+    expect(lookupSql).toContain('restaurant.is_deleted = FALSE');
+    expect(lookupSql).toContain('FOR SHARE OF review, restaurant');
+    expect(lookupParams).toEqual([REVIEW_ID]);
+    expect(client.query.mock.calls[4][1]).toEqual([
+      BLOCKER_ID,
+      TARGET_ID,
+      null,
+      REVIEW_ID,
+    ]);
+    expect(client.query).toHaveBeenLastCalledWith('COMMIT');
+    expect(pool.query).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 and rolls back for a private or nonexistent review', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rowCount: 0, rows: [] })
+      .mockResolvedValueOnce({});
+
+    await expect(blockReviewAuthor(BLOCKER_ID, REVIEW_ID))
+      .rejects.toMatchObject({ statusCode: 404, code: 'NOT_FOUND' });
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  it('uses the existing self-block rule when the authenticated user authored the review', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({
+        rowCount: 1,
+        rows: [{ user_id: BLOCKER_ID }],
+      })
+      .mockResolvedValueOnce({});
+
+    await expect(blockReviewAuthor(BLOCKER_ID, REVIEW_ID))
+      .rejects.toMatchObject({ statusCode: 400, code: 'CANNOT_BLOCK_SELF' });
+
+    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK');
+  });
+
+  it('unblocks by resolved review author even when the review is no longer public', async () => {
+    const client = createClient();
+    pool.connect.mockResolvedValue(client);
+    client.query
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ rows: [{ id: BLOCK_ID }], rowCount: 1 })
+      .mockResolvedValueOnce({});
+
+    await expect(unblockReviewAuthor(BLOCKER_ID, REVIEW_ID))
+      .resolves.toEqual({ success: true });
+
+    expect(pool.query).not.toHaveBeenCalled();
+    expect(client.query.mock.calls[1][0]).toContain(
+      'user_blocks.blocked_user_id = review.user_id',
+    );
+    expect(client.query.mock.calls[1][1]).toEqual([BLOCKER_ID, REVIEW_ID]);
   });
 });

@@ -71,3 +71,15 @@ npm run verify:tb-user-avatar-upload
 - `avatarStorageService.test.js` covers malformed URL parsing in addition to
   untrusted and allowlisted-host behavior; the full server unit suite passed
   45 files / 424 tests.
+
+2026-07-20 avatar ownership fix:
+
+- `PATCH /api/v1/users/me` now accepts only cleanup-compatible avatar
+  references under `avatars/<currentUserId>/...`; an allowlisted URL owned by a
+  different user returns `422 AVATAR_REFERENCE_NOT_OWNED`.
+- Account deletion independently skips an avatar cleanup target whose object
+  path does not match the deleted user, preventing cross-user object deletion
+  even if a historical invalid reference exists.
+- Focused ownership proof passed 3 files / 52 tests. The full server suite
+  passed 76 files / 649 tests with 4 provider tests skipped, `server:build`
+  passed for 144 files, and `verify:tb-user-avatar-upload` passed.

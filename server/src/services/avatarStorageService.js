@@ -49,6 +49,32 @@ const buildCleanupCompatibleAvatarUrl = ({ host, bucketName, key }) => {
   return `https://${host}/${path}`;
 };
 
+const isOwnedAvatarKey = (key, userId) => {
+  if (typeof key !== 'string' || typeof userId !== 'string') {
+    return false;
+  }
+  const normalizedUserId = userId.trim();
+  if (!normalizedUserId) return false;
+  const ownerPrefix = `avatars/${normalizedUserId}/`;
+  return key.startsWith(ownerPrefix) && key.length > ownerPrefix.length;
+};
+
+const extractAvatarObjectKey = (avatarReference, bucketName) => {
+  try {
+    const parsed = new URL(avatarReference);
+    const segments = parsed.pathname
+      .split('/')
+      .filter(Boolean)
+      .map((segment) => decodeURIComponent(segment));
+    if (parsed.protocol !== 's3:' && bucketName && segments[0] === bucketName) {
+      return segments.slice(1).join('/');
+    }
+    return segments.join('/');
+  } catch {
+    return null;
+  }
+};
+
 const assertCleanupCompatibleAvatarUrl = (avatarUrl, {
   bucketName,
   region,
@@ -117,6 +143,37 @@ export class AvatarUploadService {
   requireStorageConfig() {
     if (!this.bucketName || this.avatarAllowedHosts.length === 0) {
       throw createHttpError(503, 'PROVIDER_UNAVAILABLE', 'Avatar upload storage is not configured.');
+    }
+  }
+
+  ownsAvatarReference(avatarReference, userId) {
+    try {
+      const parsed = parseOwnedObjectUrl(avatarReference, {
+        bucketName: this.bucketName,
+        region: this.region,
+        allowedHosts: this.cleanupAllowedHosts,
+        allowedPrefixes: ['avatars/'],
+      });
+      return parsed.owned && isOwnedAvatarKey(parsed.key, userId);
+    } catch {
+      return false;
+    }
+  }
+
+  hasAvatarOwnerPath(avatarReference, userId) {
+    return isOwnedAvatarKey(
+      extractAvatarObjectKey(avatarReference, this.bucketName),
+      userId,
+    );
+  }
+
+  assertOwnedAvatarReference(avatarReference, userId) {
+    if (!this.ownsAvatarReference(avatarReference, userId)) {
+      throw createHttpError(
+        422,
+        'AVATAR_REFERENCE_NOT_OWNED',
+        'Avatar URL must reference an upload owned by the current user.',
+      );
     }
   }
 

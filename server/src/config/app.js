@@ -74,6 +74,12 @@ export default {
   trustProxy: parseTrustProxy(process.env.TRUST_PROXY),
   avatarAllowedHosts,
   trustedAuthHeaders: parseBoolean(process.env.TRUSTBITE_TRUSTED_AUTH_HEADERS),
+  notifications: {
+    enabled: parseBoolean(
+      process.env.TRUSTBITE_NOTIFICATIONS_ENABLED,
+      env !== 'production',
+    ),
+  },
   location: {
     rateLimitMax: parsePositiveInteger('AWS_LOCATION_RATE_LIMIT_MAX', 60),
     rateLimitWindowMs: parsePositiveInteger(

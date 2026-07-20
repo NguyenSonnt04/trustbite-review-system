@@ -55,17 +55,17 @@ Positive:
 
 Tradeoffs:
 
-- Receipt-free publication and account deletion now recompute transactionally.
-  Receipt-verification and admin-moderation decisions still require focused
-  trigger wiring and proof.
+- Receipt-free publication, automated receipt-verification decisions, and
+  account deletion now recompute transactionally. Admin-moderation decisions
+  still require focused trigger wiring and proof.
 - Unseeded ranks fall back to the Newbie weight until rank definitions are seeded.
 - Legacy aliases remain accepted on reads until a separately proven migration
   can backfill them and constrain the column.
 
 ## Follow-Up
 
-- Wire `recomputeRestaurantTrustScore` into receipt-verification and admin
-  moderation decisions (shared client).
+- Wire `recomputeRestaurantTrustScore` into admin-moderation decisions using
+  the shared transaction client.
 - Live DB recompute + rollback proof when local PostgreSQL is available.
 - Backfill `FULL`/`PARTIAL` and add a `trust_weight_bucket` check constraint only
   after deployed-data inventory and migration rollback proof.

@@ -1,0 +1,36 @@
+{
+  "threat_model_version": "1.0.0",
+  "last_updated": "2026-07-15T16:59:40Z",
+  "security_team_contacts": [],
+  "compliance_requirements": [],
+  "scan_frequency": "on_commit",
+  "severity_thresholds": {
+    "block_merge": [
+      "CRITICAL"
+    ],
+    "require_review": [
+      "HIGH",
+      "CRITICAL"
+    ],
+    "notify_security_team": [
+      "CRITICAL"
+    ]
+  },
+  "vulnerability_patterns": {
+    "enabled": [
+      "sql_injection",
+      "xss",
+      "command_injection",
+      "path_traversal",
+      "auth_bypass",
+      "idor",
+      "csrf",
+      "ssrf",
+      "mass_assignment",
+      "sensitive_data_exposure",
+      "insecure_file_upload",
+      "business_logic_race_condition"
+    ],
+    "custom_patterns_path": null
+  }
+}

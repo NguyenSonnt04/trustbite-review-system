@@ -80,6 +80,22 @@ const listRestaurants = ({
   return requestAdminResource('restaurants', `?${params.toString()}`);
 };
 
+const listRestaurantReviews = (restaurantId, {
+  status = 'ALL',
+  page = 1,
+  pageSize = 10,
+} = {}) => {
+  const params = new URLSearchParams({
+    status,
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  return requestAdminResource(
+    'restaurants',
+    `/${encodeURIComponent(restaurantId)}/reviews?${params.toString()}`,
+  );
+};
+
 const requestAdminUsers = async (path = '', { method = 'GET', body } = {}) => {
   const response = await fetch(`/api/admin/users${path}`, {
     method,
@@ -191,8 +207,8 @@ export const adminCapabilities = Object.freeze({
     detail: 'Danh sách, hồ sơ, trạng thái và thư viện ảnh được bảo vệ qua BFF quản trị.',
   },
   reviews: {
-    state: 'blocked',
-    detail: 'Server chưa có API kiểm duyệt hoặc quản lý đánh giá dành cho quản trị viên.',
+    state: 'read-only',
+    detail: 'Có thể đọc đánh giá công khai theo nhà hàng; thao tác kiểm duyệt vẫn chờ API quản trị.',
   },
   verifications: {
     state: 'blocked',
@@ -211,6 +227,7 @@ export const adminCapabilities = Object.freeze({
 export const adminService = {
   readHealth,
   listRestaurants,
+  listRestaurantReviews,
   getRestaurant,
   updateRestaurant,
   deleteRestaurants,

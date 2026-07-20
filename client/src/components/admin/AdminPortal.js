@@ -5,6 +5,7 @@ import { adminCapabilities, adminService } from '@/services/admin.service';
 import { authService } from '@/services/auth.service';
 import AdminIcon from './AdminIcon';
 import AdminRestaurantsSection from './AdminRestaurantsSection';
+import AdminReviewsSection from './AdminReviewsSection';
 import AdminUsersSection from './AdminUsersSection';
 import styles from './AdminPortal.module.css';
 
@@ -529,7 +530,7 @@ export default function AdminPortal() {
               currentUserId={adminUser?.id}
             />
           )}
-          {activeSection === 'reviews' && <LockedState capability={adminCapabilities.reviews} title="Khu vực kiểm duyệt chưa khả dụng" />}
+          {activeSection === 'reviews' && <AdminReviewsSection />}
           {activeSection === 'verifications' && <LockedState capability={adminCapabilities.verifications} title="Hàng đợi xác minh chưa khả dụng" />}
           {activeSection === 'audit' && <LockedState capability={adminCapabilities.audit} title="Nhật ký audit chưa khả dụng" />}
         </div>

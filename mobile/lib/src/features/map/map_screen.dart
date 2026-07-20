@@ -6,6 +6,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:trustbite_mobile/src/core/api/location_api.dart';
 import 'package:trustbite_mobile/src/core/api/restaurant_api.dart';
+import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
 
@@ -65,6 +66,8 @@ class DeviceMapLocationGateway implements MapLocationGateway {
 class MapScreen extends StatefulWidget {
   const MapScreen({
     super.key,
+    this.isSignedIn = false,
+    this.onLogin,
     this.locationApi,
     this.restaurantApi,
     this.runtimeConfig,
@@ -72,6 +75,8 @@ class MapScreen extends StatefulWidget {
     this.mapSurfaceOverride,
   });
 
+  final bool isSignedIn;
+  final Future<bool> Function()? onLogin;
   final LocationApi? locationApi;
   final RestaurantApi? restaurantApi;
   final MobileRuntimeConfig? runtimeConfig;
@@ -109,6 +114,7 @@ class _MapScreenState extends State<MapScreen> {
   bool _styleLoaded = false;
   bool _searching = false;
   bool _loadingNearby = false;
+  bool _nearbyReloadPending = false;
   bool _routing = false;
   String? _error;
   double _sheetExtent = 0.16;
@@ -202,9 +208,14 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _loadNearby() async {
     final controller = _mapController;
-    if (!_styleLoaded || controller == null || _loadingNearby || !mounted) {
+    if (!_styleLoaded || controller == null || !mounted) {
       return;
     }
+    if (_loadingNearby) {
+      _nearbyReloadPending = true;
+      return;
+    }
+    _nearbyReloadPending = false;
     setState(() {
       _loadingNearby = true;
       _error = null;
@@ -241,7 +252,12 @@ class _MapScreenState extends State<MapScreen> {
         setState(() => _error = 'Không thể tải nhà hàng trong khu vực này.');
       }
     } finally {
-      if (mounted) setState(() => _loadingNearby = false);
+      final rerun = _nearbyReloadPending;
+      _nearbyReloadPending = false;
+      if (mounted) {
+        setState(() => _loadingNearby = false);
+        if (rerun) _scheduleNearby(immediate: true);
+      }
     }
   }
 
@@ -354,6 +370,8 @@ class _MapScreenState extends State<MapScreen> {
     FocusScope.of(context).unfocus();
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
     setState(() {
       _searching = true;
       _error = null;
@@ -365,6 +383,8 @@ class _MapScreenState extends State<MapScreen> {
         longitude: _userLocation?.longitude,
       );
       if (mounted) setState(() => _places = places);
+    } on AuthRequiredException {
+      await _handleAuthenticationRequired();
     } on Exception {
       if (mounted) setState(() => _error = 'Tìm kiếm địa điểm đang gián đoạn.');
     } finally {
@@ -381,6 +401,8 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _routeTo(NearbyRestaurant restaurant) async {
+    if (!await _ensureAuthenticated()) return;
+    if (!mounted) return;
     final origin = _userLocation;
     if (origin == null) {
       _showMessage('Hãy bật quyền vị trí trước khi yêu cầu chỉ đường.');
@@ -402,11 +424,25 @@ class _MapScreenState extends State<MapScreen> {
       });
       await _drawRoute();
       await _fitRoute(route);
+    } on AuthRequiredException {
+      await _handleAuthenticationRequired();
     } on Exception {
       if (mounted) _showMessage('Không thể tính tuyến đường này.');
     } finally {
       if (mounted) setState(() => _routing = false);
     }
+  }
+
+  Future<bool> _ensureAuthenticated() async {
+    if (widget.isSignedIn) return true;
+    return await widget.onLogin?.call() ?? false;
+  }
+
+  Future<void> _handleAuthenticationRequired() async {
+    if (!mounted) return;
+    final signedIn = await widget.onLogin?.call() ?? false;
+    if (!mounted || signedIn) return;
+    _showMessage('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
   }
 
   Future<void> _fitRoute(LocationRoute route) async {

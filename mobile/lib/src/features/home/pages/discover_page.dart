@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 import 'package:trustbite_mobile/src/core/theme/app_typography.dart';
+import 'package:trustbite_mobile/src/features/auth/profile_management_service.dart';
 import 'package:trustbite_mobile/src/features/home/data/home_mock_data.dart';
 import 'package:trustbite_mobile/src/features/home/data/restaurant_discovery_service.dart';
 import 'package:trustbite_mobile/src/features/home/home_tokens.dart';
@@ -20,7 +21,10 @@ class DiscoverPage extends StatelessWidget {
     required this.currentUser,
     required this.onLogin,
     required this.restaurantRepository,
+    this.safetyRepository,
     this.reviewReactionRepository,
+    this.notificationCount = 0,
+    this.onNotificationsPressed,
   });
 
   final int activeServiceIndex;
@@ -29,7 +33,10 @@ class DiscoverPage extends StatelessWidget {
   final Map<String, dynamic>? currentUser;
   final Future<bool> Function() onLogin;
   final RestaurantDiscoveryRepository restaurantRepository;
+  final ProfileManagementRepository? safetyRepository;
   final ReviewReactionRepository? reviewReactionRepository;
+  final int notificationCount;
+  final VoidCallback? onNotificationsPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +50,12 @@ class DiscoverPage extends StatelessWidget {
           onLogin: () {
             onLogin();
           },
+          notificationCount: notificationCount,
+          onNotificationsPressed:
+              onNotificationsPressed ??
+              () {
+                onLogin();
+              },
         ),
         const _TitleAndSearch(),
         const SizedBox(height: 6),
@@ -50,6 +63,7 @@ class DiscoverPage extends StatelessWidget {
           repository: restaurantRepository,
           isSignedIn: isSignedIn,
           onLogin: onLogin,
+          safetyRepository: safetyRepository,
           reviewReactionRepository: reviewReactionRepository,
         ),
         const SizedBox(height: 20),
@@ -141,12 +155,14 @@ class _NearbySection extends StatefulWidget {
     required this.repository,
     required this.isSignedIn,
     required this.onLogin,
+    required this.safetyRepository,
     required this.reviewReactionRepository,
   });
 
   final RestaurantDiscoveryRepository repository;
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
+  final ProfileManagementRepository? safetyRepository;
   final ReviewReactionRepository? reviewReactionRepository;
 
   @override
@@ -264,6 +280,7 @@ class _NearbySectionState extends State<_NearbySection> {
                           initialRestaurant: restaurant,
                           isSignedIn: widget.isSignedIn,
                           onLogin: widget.onLogin,
+                          safetyRepository: widget.safetyRepository,
                           reviewReactionRepository:
                               widget.reviewReactionRepository,
                         ),

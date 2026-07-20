@@ -19,6 +19,9 @@ async function loadAppConfig(caseName) {
     'trust-proxy-hops': () => import('../../../src/config/app.js?trust-proxy-hops'),
     'trust-proxy-subnet': () => import('../../../src/config/app.js?trust-proxy-subnet'),
     'admin-web': () => import('../../../src/config/app.js?admin-web'),
+    'notifications-development-default': () => import('../../../src/config/app.js?notifications-development-default'),
+    'notifications-production-default': () => import('../../../src/config/app.js?notifications-production-default'),
+    'notifications-production-enabled': () => import('../../../src/config/app.js?notifications-production-enabled'),
     'location-rate-limit': () => import('../../../src/config/app.js?location-rate-limit'),
   };
   return (await imports[caseName]()).default;
@@ -29,6 +32,7 @@ function setBaseEnv() {
   process.env.AWS_COGNITO_CLIENT_ID = 'local-test-client';
   process.env.AWS_REGION = 'us-east-1';
   delete process.env.AUTH_PHONE_FALLBACK_ENABLED;
+  delete process.env.TRUSTBITE_NOTIFICATIONS_ENABLED;
 }
 
 describe('app auth config', () => {
@@ -182,6 +186,42 @@ describe('admin web auth config', () => {
         },
       },
     });
+  });
+});
+
+describe('app notification config', () => {
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV };
+  });
+
+  it('defaults in-app notification creation on in development', async () => {
+    setBaseEnv();
+    process.env.NODE_ENV = 'development';
+
+    await expect(loadAppConfig('notifications-development-default'))
+      .resolves
+      .toMatchObject({ notifications: { enabled: true } });
+  });
+
+  it('defaults in-app notification creation off in production', async () => {
+    setBaseEnv();
+    process.env.NODE_ENV = 'production';
+    process.env.ALLOWED_ORIGINS = 'https://trustbite.test';
+
+    await expect(loadAppConfig('notifications-production-default'))
+      .resolves
+      .toMatchObject({ notifications: { enabled: false } });
+  });
+
+  it('supports explicit production enablement', async () => {
+    setBaseEnv();
+    process.env.NODE_ENV = 'production';
+    process.env.ALLOWED_ORIGINS = 'https://trustbite.test';
+    process.env.TRUSTBITE_NOTIFICATIONS_ENABLED = 'true';
+
+    await expect(loadAppConfig('notifications-production-enabled'))
+      .resolves
+      .toMatchObject({ notifications: { enabled: true } });
   });
 });
 

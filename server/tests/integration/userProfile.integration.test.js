@@ -9,6 +9,7 @@ process.env.AWS_S3_BUCKET_NAME = 'trustbite-test-media';
 const { default: appConfig } = await import('../../src/config/app.js');
 const { cognitoIdentityProvider } = await import('../../src/services/identityProviders/cognitoProvider.js');
 const {
+  avatarUploadService,
   resetAvatarUploadSignerForTests,
   setAvatarUploadSignerForTests,
 } = await import('../../src/services/avatarStorageService.js');
@@ -121,7 +122,6 @@ describe('current user profile API', () => {
           displayName: 'Updated Profile',
           phoneNumber: onboardingPhone,
           dateOfBirth: '2004-11-20',
-          avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
         })
         .expect(200);
 
@@ -131,7 +131,7 @@ describe('current user profile API', () => {
         phoneNumber: toE164VietnamPhone(onboardingPhone),
         dateOfBirth: '2004-11-20',
         profileComplete: true,
-        avatarUrl: 'https://cdn.trustbite.test/avatars/profile-user.webp',
+        avatarUrl: null,
       });
 
       const persisted = await query(
@@ -141,11 +141,67 @@ describe('current user profile API', () => {
       expect(persisted.rows[0]).toMatchObject({
         display_name: 'Updated Profile',
         phone_number: toE164VietnamPhone(onboardingPhone),
-        avatar_url: 'https://cdn.trustbite.test/avatars/profile-user.webp',
+        avatar_url: null,
       });
       expect(mapDateOnly(persisted.rows[0].date_of_birth)).toBe('2004-11-20');
     } finally {
       await cleanupUser(user.id);
+    }
+  });
+
+  it('returns a signed display URL while preserving the owned avatar reference', async () => {
+    const user = await createUser({ displayName: 'Avatar Display User' });
+    const avatarReference =
+      `https://localhost:4566/trustbite-test-media/avatars/${user.id}/profile.webp`;
+    const signedAvatarUrl = 'https://signed.trustbite.test/avatar-read';
+    vi.spyOn(avatarUploadService, 'resolveReadUrl').mockResolvedValue(signedAvatarUrl);
+
+    try {
+      const patchResponse = await requestApp()
+        .patch('/api/v1/users/me')
+        .set(authHeaders(user.id))
+        .send({ avatarUrl: avatarReference })
+        .expect(200);
+
+      expect(patchResponse.body.avatarUrl).toBe(signedAvatarUrl);
+      expect(avatarUploadService.resolveReadUrl).toHaveBeenCalledWith(avatarReference);
+
+      const getResponse = await requestApp()
+        .get('/api/v1/users/me')
+        .set(authHeaders(user.id))
+        .expect(200);
+
+      expect(getResponse.body.avatarUrl).toBe(signedAvatarUrl);
+      const persisted = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
+      expect(persisted.rows[0].avatar_url).toBe(avatarReference);
+    } finally {
+      await cleanupUser(user.id);
+    }
+  });
+
+  it('rejects an avatar reference owned by another user', async () => {
+    const user = await createUser({ displayName: 'Avatar Owner Check User' });
+    const otherUser = await createUser({ displayName: 'Other Avatar Owner' });
+    const foreignAvatarReferences = [
+      `https://localhost:4566/trustbite-test-media/avatars/${otherUser.id}/profile.webp`,
+      `https://localhost:4566/trustbite-test-media/avatars/${otherUser.id}/avatars/${user.id}/profile.webp`,
+    ];
+
+    try {
+      for (const avatarUrl of foreignAvatarReferences) {
+        const response = await requestApp()
+          .patch('/api/v1/users/me')
+          .set(authHeaders(user.id))
+          .send({ avatarUrl })
+          .expect(422);
+
+        expect(response.body.error.code).toBe('AVATAR_REFERENCE_NOT_OWNED');
+      }
+      const persisted = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
+      expect(persisted.rows[0].avatar_url).toBeNull();
+    } finally {
+      await cleanupUser(user.id);
+      await cleanupUser(otherUser.id);
     }
   });
 
@@ -377,6 +433,10 @@ describe('current user profile API', () => {
   it('creates an avatar upload URL that can be persisted through profile PATCH', async () => {
     const user = await createUser({ displayName: 'Avatar Upload User' });
     const signer = vi.fn().mockResolvedValue('https://upload.trustbite.test/avatar-put-url');
+    const signedReadUrl = 'https://signed.trustbite.test/avatar-read';
+    const resolveReadUrl = vi
+      .spyOn(avatarUploadService, 'resolveReadUrl')
+      .mockResolvedValue(signedReadUrl);
     setAvatarUploadSignerForTests(signer);
 
     try {
@@ -417,7 +477,8 @@ describe('current user profile API', () => {
         .send({ avatarUrl: response.body.avatarUrl })
         .expect(200);
 
-      expect(patchResponse.body.avatarUrl).toBe(response.body.avatarUrl);
+      expect(patchResponse.body.avatarUrl).toBe(signedReadUrl);
+      expect(resolveReadUrl).toHaveBeenCalledWith(response.body.avatarUrl);
 
       const updated = await query('SELECT avatar_url FROM users WHERE id = $1', [user.id]);
       expect(updated.rows[0].avatar_url).toBe(response.body.avatarUrl);

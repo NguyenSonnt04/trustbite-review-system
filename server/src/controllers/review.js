@@ -7,6 +7,10 @@ import {
   deleteReviewReaction,
   setReviewReaction,
 } from '../services/reviewReactionService.js';
+import {
+  blockReviewAuthor,
+  unblockReviewAuthor,
+} from '../services/userBlockService.js';
 import { createHttpError } from '../utils/httpErrors.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -91,6 +95,30 @@ export async function deleteReviewReactionHandler(req, res, next) {
       userId: req.user.id,
       reviewId: parseReviewIdParam(req.params.reviewId),
     });
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function blockReviewAuthorHandler(req, res, next) {
+  try {
+    const result = await blockReviewAuthor(
+      req.user.id,
+      parseReviewIdParam(req.params.reviewId),
+    );
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function unblockReviewAuthorHandler(req, res, next) {
+  try {
+    const result = await unblockReviewAuthor(
+      req.user.id,
+      parseReviewIdParam(req.params.reviewId),
+    );
     res.status(200).json(result);
   } catch (err) {
     next(err);

@@ -135,8 +135,19 @@ describe('restaurant detail and public reviews API', () => {
     const merchant = await createMerchant(merchantUser.id);
     const reviewIds = [];
     const claimIds = [];
+    const primaryImageUrl = 'https://cdn.trustbite.test/restaurants/detail-cover.jpg';
 
     try {
+      await query(
+        `
+        INSERT INTO restaurant_images (
+          restaurant_id, image_url, caption, is_primary
+        )
+        VALUES ($1, $2, 'Detail cover', TRUE)
+        `,
+        [restaurant.id, primaryImageUrl],
+      );
+
       const olderClaim = await createRestaurantClaim({
         merchantId: merchant.id,
         restaurantId: restaurant.id,
@@ -200,6 +211,7 @@ describe('restaurant detail and public reviews API', () => {
       expect(response.body).toMatchObject({
         id: restaurant.id,
         name: restaurant.name,
+        primaryImageUrl,
         ownerClaimStatus: 'UNDER_REVIEW',
         ratingBreakdown: {
           avgFood: 4,

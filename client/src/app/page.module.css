@@ -280,6 +280,29 @@
   font-weight: 650;
   box-shadow: 0 10px 22px oklch(0.2 0.008 285 / 0.14);
   transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), background 160ms ease, box-shadow 160ms ease;
+  text-decoration: none;
+}
+
+.merchantButton {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.merchantButton:hover {
+  border-color: oklch(0.28 0.004 285 / 0.36);
+  background: var(--surface-muted);
+  transform: translateY(-1px);
 }
 
 .loginButton > svg {

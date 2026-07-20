@@ -50,10 +50,19 @@ export default {
     forcePathStyle: parseBoolean(process.env.AWS_S3_FORCE_PATH_STYLE, Boolean(endpointUrl)),
   },
   restaurantImages: {
-    bucketName: process.env.AWS_RESTAURANT_IMAGES_BUCKET_NAME
-      || process.env.AWS_S3_BUCKET_NAME,
+    bucketName: process.env.AWS_RESTAURANT_IMAGES_BUCKET_NAME,
     signedUrlTtlSeconds: parseBoundedInteger(
       process.env.TRUSTBITE_RESTAURANT_IMAGE_SIGNED_URL_TTL_SECONDS,
+      {
+        defaultValue: 900,
+        min: 60,
+        max: 3600,
+      },
+    ),
+  },
+  merchantClaims: {
+    signedUrlTtlSeconds: parseBoundedInteger(
+      process.env.TRUSTBITE_MERCHANT_CLAIM_SIGNED_URL_TTL_SECONDS,
       {
         defaultValue: 900,
         min: 60,
