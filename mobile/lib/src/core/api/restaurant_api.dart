@@ -7,6 +7,7 @@ class NearbyRestaurant {
     required this.latitude,
     required this.longitude,
     this.address,
+    this.primaryImageUrl,
     this.trustScore,
     this.verifiedReviewCount,
   });
@@ -16,6 +17,7 @@ class NearbyRestaurant {
   final double latitude;
   final double longitude;
   final String? address;
+  final String? primaryImageUrl;
   final double? trustScore;
   final int? verifiedReviewCount;
 
@@ -35,6 +37,9 @@ class NearbyRestaurant {
       latitude: _requiredDouble(json['latitude'], 'restaurant latitude'),
       longitude: _requiredDouble(json['longitude'], 'restaurant longitude'),
       address: json['address'] is String ? json['address'] as String : null,
+      primaryImageUrl: json['primaryImageUrl'] is String
+          ? json['primaryImageUrl'] as String
+          : null,
       trustScore: _optionalDouble(json['trustScore']),
       verifiedReviewCount: json['verifiedReviewCount'] is num
           ? (json['verifiedReviewCount'] as num).toInt()

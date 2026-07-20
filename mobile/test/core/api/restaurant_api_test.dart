@@ -10,7 +10,7 @@ void main() {
       const ApiTransportResponse(
         statusCode: 200,
         body:
-            '{"items":[{"id":"restaurant-1","name":"Pho","latitude":10.78,"longitude":106.7,"trustScore":4.8}]}',
+            '{"items":[{"id":"restaurant-1","name":"Pho","latitude":10.78,"longitude":106.7,"trustScore":4.8,"primaryImageUrl":"https://images.trustbite.test/pho.jpg"}]}',
       ),
     );
     final api = RestaurantApi(
@@ -35,6 +35,10 @@ void main() {
     );
 
     expect(items.single.name, 'Pho');
+    expect(
+      items.single.primaryImageUrl,
+      'https://images.trustbite.test/pho.jpg',
+    );
     expect(transport.lastUri.path, '/api/v1/restaurants/nearby');
     expect(transport.lastUri.queryParameters['northEastLat'], '10.9');
     expect(transport.lastUri.queryParameters['southWestLng'], '106.5');

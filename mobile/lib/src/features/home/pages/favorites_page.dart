@@ -15,12 +15,14 @@ class FavoritesPage extends StatefulWidget {
     required this.onLogin,
     this.favoritesRepository,
     this.restaurantRepository,
+    this.onAuthenticationRequired,
   });
 
   final bool isSignedIn;
   final Future<bool> Function() onLogin;
   final FavoritesRepository? favoritesRepository;
   final RestaurantDiscoveryRepository? restaurantRepository;
+  final Future<void> Function()? onAuthenticationRequired;
 
   @override
   State<FavoritesPage> createState() => _FavoritesPageState();
@@ -53,20 +55,25 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   Future<_FavoritesData> _fetchData() async {
-    final results = await Future.wait<Object>([
-      _favoritesRepository.fetchFavorites(),
-      _restaurantRepository.fetchRestaurants(),
-    ]);
-    final favorites = results[0] as List<FavoriteRestaurant>;
-    final favoriteIds = favorites
-        .map((item) => item.restaurant.id)
-        .whereType<String>()
-        .toSet();
-    final suggestions = (results[1] as List<HomeRestaurant>)
-        .where((restaurant) => !favoriteIds.contains(restaurant.id))
-        .take(3)
-        .toList(growable: false);
-    return _FavoritesData(favorites: favorites, suggestions: suggestions);
+    try {
+      final results = await Future.wait<Object>([
+        _favoritesRepository.fetchFavorites(),
+        _restaurantRepository.fetchRestaurants(),
+      ]);
+      final favorites = results[0] as List<FavoriteRestaurant>;
+      final favoriteIds = favorites
+          .map((item) => item.restaurant.id)
+          .whereType<String>()
+          .toSet();
+      final suggestions = (results[1] as List<HomeRestaurant>)
+          .where((restaurant) => !favoriteIds.contains(restaurant.id))
+          .take(3)
+          .toList(growable: false);
+      return _FavoritesData(favorites: favorites, suggestions: suggestions);
+    } on AuthRequiredException {
+      await widget.onAuthenticationRequired?.call();
+      rethrow;
+    }
   }
 
   Future<void> _requireLogin() async {
@@ -104,7 +111,11 @@ class _FavoritesPageState extends State<FavoritesPage> {
         context,
       ).showSnackBar(SnackBar(content: Text('Đã lưu ${restaurant.name}.')));
     } on AuthRequiredException {
-      await _requireLogin();
+      if (widget.onAuthenticationRequired != null) {
+        await widget.onAuthenticationRequired!();
+      } else {
+        await _requireLogin();
+      }
     } on Exception {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -138,6 +149,12 @@ class _FavoritesPageState extends State<FavoritesPage> {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Đã bỏ lưu ${restaurant.name}.')));
+    } on AuthRequiredException {
+      if (widget.onAuthenticationRequired != null) {
+        await widget.onAuthenticationRequired!();
+      } else {
+        await _requireLogin();
+      }
     } on Exception {
       if (!mounted) return;
       ScaffoldMessenger.of(

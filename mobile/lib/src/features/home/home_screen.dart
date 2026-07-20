@@ -77,11 +77,15 @@ class _HomeScreenState extends State<HomeScreen> {
           apiClient: appApiClient,
           restaurantRepository: _restaurantRepository,
         );
-    _serviceRegistry = ServiceRegistry.withBillScan(
-      repository: billScanRepository,
+    _serviceRegistry = ServiceRegistry.withServices(
+      billScanRepository: billScanRepository,
       receiptPicker: widget.billReceiptPicker ?? ImagePickerBillReceiptPicker(),
+      restaurantRepository: _restaurantRepository,
+      favoritesRepository: _favoritesRepository,
+      profileRepository: _profileRepository,
       ensureAuthenticated: _ensureAuthenticated,
       onAuthenticationRequired: _handleAuthenticationRequired,
+      isSignedIn: () => _isSignedIn,
     );
     _loadAuthState();
   }

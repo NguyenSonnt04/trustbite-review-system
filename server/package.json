@@ -9,6 +9,7 @@
     "dev": "nodemon src/server.js",
     "build": "node scripts/check-syntax.mjs",
     "db:migrate": "node scripts/migrate.js",
+    "db:seed-map-demo": "node scripts/seed-map-demo.mjs",
     "cognito:configure-admin-web": "node scripts/configure-admin-cognito-client.mjs",
     "smoke:aws-mvp": "node scripts/smoke-aws-mvp.mjs",
     "deletions:process": "node scripts/process-deletions.mjs",

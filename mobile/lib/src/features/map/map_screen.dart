@@ -1,14 +1,20 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
+import 'package:trustbite_mobile/src/common/widgets/optimized_network_image.dart';
 import 'package:trustbite_mobile/src/core/api/location_api.dart';
 import 'package:trustbite_mobile/src/core/api/restaurant_api.dart';
 import 'package:trustbite_mobile/src/core/api/trustbite_api_client.dart';
 import 'package:trustbite_mobile/src/core/auth/app_auth.dart';
 import 'package:trustbite_mobile/src/core/config/mobile_runtime_config.dart';
+
+const _restaurantMarkerImage = 'trustbite-restaurant-marker';
+const _selectedRestaurantMarkerImage = 'trustbite-restaurant-marker-selected';
 
 enum MapLocationIssue { serviceDisabled, denied, deniedForever }
 
@@ -63,6 +69,75 @@ class DeviceMapLocationGateway implements MapLocationGateway {
   }
 }
 
+Future<Uint8List> _createRestaurantMarkerImage({
+  required Color backgroundColor,
+  required Color foregroundColor,
+}) async {
+  const width = 96.0;
+  const height = 112.0;
+  final recorder = ui.PictureRecorder();
+  final canvas = Canvas(recorder);
+  final pinPath = Path()
+    ..moveTo(48, 105)
+    ..cubicTo(42, 93, 22, 72, 18, 55)
+    ..cubicTo(13, 33, 29, 12, 48, 12)
+    ..cubicTo(67, 12, 83, 33, 78, 55)
+    ..cubicTo(74, 72, 54, 93, 48, 105)
+    ..close();
+
+  canvas.save();
+  canvas.translate(0, 4);
+  canvas.drawPath(
+    pinPath,
+    Paint()
+      ..color = const Color(0xFF24160E).withValues(alpha: 0.2)
+      ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 6),
+  );
+  canvas.restore();
+  canvas.drawPath(pinPath, Paint()..color = backgroundColor);
+  canvas.drawPath(
+    pinPath,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6
+      ..strokeJoin = StrokeJoin.round
+      ..color = const Color(0xFFFFFBF7),
+  );
+  canvas.drawCircle(
+    const Offset(48, 48),
+    25,
+    Paint()..color = foregroundColor.withValues(alpha: 0.16),
+  );
+
+  const icon = Icons.restaurant_rounded;
+  final iconPainter = TextPainter(
+    text: TextSpan(
+      text: String.fromCharCode(icon.codePoint),
+      style: TextStyle(
+        color: foregroundColor,
+        fontSize: 34,
+        fontFamily: icon.fontFamily,
+        package: icon.fontPackage,
+      ),
+    ),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  iconPainter.paint(
+    canvas,
+    Offset(48 - iconPainter.width / 2, 48 - iconPainter.height / 2),
+  );
+
+  final image = await recorder.endRecording().toImage(
+    width.toInt(),
+    height.toInt(),
+  );
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  if (bytes == null) {
+    throw StateError('Unable to create restaurant map marker.');
+  }
+  return bytes.buffer.asUint8List();
+}
+
 class MapScreen extends StatefulWidget {
   const MapScreen({
     super.key,
@@ -112,6 +187,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _selectedRestaurantId;
   bool _initializing = true;
   bool _styleLoaded = false;
+  bool _restaurantMarkerImagesLoaded = false;
   bool _searching = false;
   bool _loadingNearby = false;
   bool _nearbyReloadPending = false;
@@ -188,12 +264,12 @@ class _MapScreenState extends State<MapScreen> {
 
   void _onMapCreated(MapLibreMapController controller) {
     _mapController = controller;
-    controller.onCircleTapped.add(_onRestaurantCircleTapped);
     controller.onSymbolTapped.add(_onRestaurantSymbolTapped);
   }
 
   Future<void> _onStyleLoaded() async {
     _styleLoaded = true;
+    _restaurantMarkerImagesLoaded = false;
     await _drawAnnotations();
     _scheduleNearby(immediate: true);
   }
@@ -269,35 +345,21 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _drawRestaurants() async {
     final controller = _mapController;
     if (!_styleLoaded || controller == null) return;
-    await controller.clearCircles();
     await controller.clearSymbols();
     if (_restaurants.isEmpty) return;
+    await _ensureRestaurantMarkerImages(controller);
+    await controller.setSymbolIconAllowOverlap(true);
     final selectedId = _selectedRestaurantId;
-    await controller.addCircles(
-      _restaurants
-          .map((item) {
-            final selected = item.id == selectedId;
-            return CircleOptions(
-              geometry: LatLng(item.latitude, item.longitude),
-              circleColor: selected ? '#111827' : '#FF5E00',
-              circleRadius: selected ? 18 : 14,
-              circleStrokeColor: selected ? '#FF5E00' : '#FFFFFF',
-              circleStrokeWidth: selected ? 4 : 3,
-            );
-          })
-          .toList(growable: false),
-      _restaurantAnnotationData(),
-    );
     await controller.addSymbols(
       _restaurants
           .map(
             (item) => SymbolOptions(
               geometry: LatLng(item.latitude, item.longitude),
-              textField: item.trustScore?.toStringAsFixed(1) ?? '✓',
-              textSize: item.id == selectedId ? 12 : 10,
-              textColor: '#FFFFFF',
-              textHaloColor: item.id == selectedId ? '#111827' : '#FF5E00',
-              textHaloWidth: 1,
+              iconImage: item.id == selectedId
+                  ? _selectedRestaurantMarkerImage
+                  : _restaurantMarkerImage,
+              iconSize: item.id == selectedId ? 1.12 : 1,
+              iconAnchor: 'bottom',
               zIndex: item.id == selectedId ? 2 : 1,
             ),
           )
@@ -306,14 +368,27 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Future<void> _ensureRestaurantMarkerImages(
+    MapLibreMapController controller,
+  ) async {
+    if (_restaurantMarkerImagesLoaded) return;
+    final normal = await _createRestaurantMarkerImage(
+      backgroundColor: const Color(0xFFFF5E00),
+      foregroundColor: const Color(0xFFFFF8F2),
+    );
+    final selected = await _createRestaurantMarkerImage(
+      backgroundColor: const Color(0xFF17233A),
+      foregroundColor: const Color(0xFFFFB16A),
+    );
+    await controller.addImage(_restaurantMarkerImage, normal);
+    await controller.addImage(_selectedRestaurantMarkerImage, selected);
+    _restaurantMarkerImagesLoaded = true;
+  }
+
   List<Map<String, dynamic>> _restaurantAnnotationData() {
     return _restaurants
         .map((item) => <String, dynamic>{'restaurantId': item.id})
         .toList(growable: false);
-  }
-
-  void _onRestaurantCircleTapped(Circle circle) {
-    _selectRestaurantById(circle.data?['restaurantId']);
   }
 
   void _onRestaurantSymbolTapped(Symbol symbol) {
@@ -1033,20 +1108,39 @@ class _MapScreenState extends State<MapScreen> {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? const Color(0xFFFF5E00)
-                          : const Color(0xFFFFE4D4),
-                      borderRadius: BorderRadius.circular(16),
+                  if (item.primaryImageUrl?.trim().isNotEmpty == true)
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFFF5E00)
+                            : const Color(0xFFFFE4D4),
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: OptimizedNetworkImage(
+                        imageUrl: item.primaryImageUrl,
+                        width: 54,
+                        height: 54,
+                        borderRadius: 15,
+                        semanticLabel: 'Ảnh nhà hàng ${item.name}',
+                        fallbackIconSize: 22,
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? const Color(0xFFFF5E00)
+                            : const Color(0xFFFFE4D4),
+                        borderRadius: BorderRadius.circular(17),
+                      ),
+                      child: Icon(
+                        Icons.restaurant_rounded,
+                        color: selected ? Colors.white : _brand,
+                      ),
                     ),
-                    child: Icon(
-                      Icons.restaurant_rounded,
-                      color: selected ? Colors.white : _brand,
-                    ),
-                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
