@@ -24,6 +24,14 @@ describe('object storage cleanup', () => {
       bucket: 'trustbite-invoices',
       key: 'avatars/profile.png',
     });
+
+    expect(parseOwnedObjectUrl('s3://trustbite-invoices/bill-scans/user/scan/bill.jpg', {
+      bucketName: 'trustbite-invoices',
+    })).toEqual({
+      owned: true,
+      bucket: 'trustbite-invoices',
+      key: 'bill-scans/user/scan/bill.jpg',
+    });
   });
 
     it('refuses external hosts, buckets, and unapproved prefixes', () => {

@@ -14,12 +14,14 @@ void main() {
     bool isSignedIn = false,
     Future<bool> Function()? onLogin,
     ReviewReactionRepository? reviewReactionRepository,
+    Future<void> Function(String shortcutLabel)? onServicePressed,
   }) {
     return MaterialApp(
       home: Scaffold(
         body: DiscoverPage(
           activeServiceIndex: 0,
           onServiceSelected: (_) {},
+          onServicePressed: onServicePressed,
           isSignedIn: isSignedIn,
           currentUser: null,
           onLogin: onLogin ?? () async => true,
@@ -29,6 +31,29 @@ void main() {
       ),
     );
   }
+
+  testWidgets('opens the Quét bill service from its shortcut', (tester) async {
+    String? openedShortcut;
+    await tester.pumpWidget(
+      buildPage(
+        const _FakeRestaurantRepository([]),
+        onServicePressed: (shortcutLabel) async {
+          openedShortcut = shortcutLabel;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final shortcut = tester.widget<InkWell>(
+      find
+          .ancestor(of: find.text('Quét bill'), matching: find.byType(InkWell))
+          .first,
+    );
+    shortcut.onTap!();
+    await tester.pump();
+
+    expect(openedShortcut, 'Quét bill');
+  });
 
   testWidgets('renders backend restaurants and their image URLs', (
     tester,
@@ -340,10 +365,7 @@ void main() {
     await tester.tap(find.text('Thử lại'));
     await tester.pump();
     expect(find.text('Menu vẫn tải'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('restaurant-menu-loading')),
-      findsNothing,
-    );
+    expect(find.byKey(const ValueKey('restaurant-menu-loading')), findsNothing);
     await tester.pumpAndSettle();
     expect(find.text('Chi tiết đã tải lại.'), findsOneWidget);
     expect(repository.menuCalls, 1);

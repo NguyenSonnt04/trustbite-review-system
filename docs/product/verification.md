@@ -83,3 +83,11 @@ and exposing owner-scoped review/receipt status.
 Known proof boundary: current automated proof uses mock-provider/local adapter
 coverage for Textract behavior. A live AWS Textract end-to-end provider run is
 not claimed by this backend closeout.
+
+## Independent Bill Price Check
+
+`TB-BILL-SCAN-001` reuses the Textract provider boundary without creating a
+review or mutating receipt verification, trust score, fraud flags, or price
+history. It persists a separate owner-scoped scan, requires an active branch,
+uses Bedrock Gemma only for item-name mapping, and applies the deterministic
+price rules in `docs/product/bill-price-check.md`.

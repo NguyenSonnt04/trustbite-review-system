@@ -8,6 +8,7 @@ import adminRoutes from './admin.js';
 import adminWebRoutes from './adminWeb.js';
 import authRoutes from './auth.js';
 import awsRoutes from './aws.js';
+import billScanRoutes from './billScan.js';
 import locationRoutes from './location.js';
 import moderationRoutes from './moderation.js';
 import merchantRoutes from './merchant.js';
@@ -23,6 +24,7 @@ router.use('/admin', adminRoutes);
 router.use('/admin-web', adminWebRoutes);
 router.use('/auth', authRoutes);
 router.use('/aws', awsRoutes);
+router.use('/bill-scans', billScanRoutes);
 router.use('/merchant', merchantRoutes);
 router.use('/location', locationRoutes);
 // Restaurant CRUD — Task 3.1 (PHASE 3 — Restaurant & Search)

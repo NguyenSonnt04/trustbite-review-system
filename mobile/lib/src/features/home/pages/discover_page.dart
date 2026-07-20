@@ -17,6 +17,7 @@ class DiscoverPage extends StatelessWidget {
     super.key,
     required this.activeServiceIndex,
     required this.onServiceSelected,
+    this.onServicePressed,
     required this.isSignedIn,
     required this.currentUser,
     required this.onLogin,
@@ -29,6 +30,7 @@ class DiscoverPage extends StatelessWidget {
 
   final int activeServiceIndex;
   final ValueChanged<int> onServiceSelected;
+  final Future<void> Function(String shortcutLabel)? onServicePressed;
   final bool isSignedIn;
   final Map<String, dynamic>? currentUser;
   final Future<bool> Function() onLogin;
@@ -70,6 +72,7 @@ class DiscoverPage extends StatelessWidget {
         _ServicesSection(
           activeServiceIndex: activeServiceIndex,
           onServiceSelected: onServiceSelected,
+          onServicePressed: onServicePressed,
         ),
         const SizedBox(height: 26),
         const _RecentlyViewedSection(),
@@ -328,10 +331,12 @@ class _ServicesSection extends StatelessWidget {
   const _ServicesSection({
     required this.activeServiceIndex,
     required this.onServiceSelected,
+    required this.onServicePressed,
   });
 
   final int activeServiceIndex;
   final ValueChanged<int> onServiceSelected;
+  final Future<void> Function(String shortcutLabel)? onServicePressed;
 
   @override
   Widget build(BuildContext context) {
@@ -374,7 +379,10 @@ class _ServicesSection extends StatelessWidget {
               return _ServiceShortcutCard(
                 shortcut: shortcut,
                 active: active,
-                onTap: () => onServiceSelected(index),
+                onTap: () {
+                  onServiceSelected(index);
+                  onServicePressed?.call(shortcut.label);
+                },
               );
             },
           ),

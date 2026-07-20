@@ -20,6 +20,7 @@ import {
   listNearbyRestaurantsHandler,
   createRestaurantHandler,
   getRestaurantHandler,
+  listRestaurantBranchesHandler,
   listRestaurantMenuHandler,
   listRestaurantImagesHandler,
   listRestaurantReviewsHandler,
@@ -39,6 +40,7 @@ const router = Router();
 // Public endpoints — no auth required
 router.get('/', listRestaurantsHandler);
 router.get('/nearby', listNearbyRestaurantsHandler);
+router.get('/:restaurantId/branches', listRestaurantBranchesHandler);
 router.get('/:restaurantId/menu', listRestaurantMenuHandler);
 router.get('/:restaurantId/reviews', listRestaurantReviewsHandler);
 router.get('/:restaurantId/images', authMiddleware, listRestaurantImagesHandler);

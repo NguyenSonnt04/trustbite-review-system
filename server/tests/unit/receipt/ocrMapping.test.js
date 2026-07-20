@@ -110,6 +110,19 @@ describe('mapAnalyzeExpense', () => {
     ]);
   });
 
+  it('derives unit price from total and quantity when UNIT_PRICE is absent', () => {
+    const response = analyzeExpenseResponse({
+      items: [['Cà phê sữa', '2', null, '60.000']],
+    });
+    response.ExpenseDocuments[0].LineItemGroups[0].LineItems[0].LineItemExpenseFields =
+      response.ExpenseDocuments[0].LineItemGroups[0].LineItems[0].LineItemExpenseFields
+        .filter((field) => field.Type.Text !== 'UNIT_PRICE');
+
+    expect(mapAnalyzeExpense(response).lineItems).toEqual([
+      { name: 'Cà phê sữa', quantity: 2, unitPrice: 30000, totalPrice: 60000 },
+    ]);
+  });
+
   it('returns nulls for missing summary fields (unreadable)', () => {
     const struct = mapAnalyzeExpense({ ExpenseDocuments: [{ SummaryFields: [], LineItemGroups: [] }] });
     expect(struct.restaurantName).toBeNull();
