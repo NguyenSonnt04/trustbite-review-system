@@ -11,6 +11,9 @@ async function loadAntiFraudConfig(caseName) {
     'invalid-negative': () => import('../../../src/config/antiFraud.js?invalid-negative'),
     'invalid-infinity': () => import('../../../src/config/antiFraud.js?invalid-infinity'),
     'invalid-nan': () => import('../../../src/config/antiFraud.js?invalid-nan'),
+    'bill-default': () => import('../../../src/config/antiFraud.js?bill-default'),
+    'bill-env': () => import('../../../src/config/antiFraud.js?bill-env'),
+    'bill-invalid': () => import('../../../src/config/antiFraud.js?bill-invalid'),
   };
   return imports[caseName]();
 }
@@ -49,4 +52,33 @@ describe('anti-fraud config', () => {
       .rejects
       .toThrow('[Config] GPS_PROXIMITY_THRESHOLD_METERS must be a finite positive number');
   });
+
+  it('defaults bill scan price tolerance to 1000 VND', async () => {
+    delete process.env.BILL_SCAN_PRICE_TOLERANCE_VND;
+
+    const config = await loadAntiFraudConfig('bill-default');
+
+    expect(config.BILL_SCAN_PRICE_TOLERANCE_VND).toBe(1000);
+  });
+
+  it('parses bill scan price tolerance from environment', async () => {
+    process.env.BILL_SCAN_PRICE_TOLERANCE_VND = '1500';
+
+    const config = await loadAntiFraudConfig('bill-env');
+
+    expect(config.BILL_SCAN_PRICE_TOLERANCE_VND).toBe(1500);
+  });
+
+  it.each(['-1', '1.5', 'Infinity', 'not-a-number'])(
+    'rejects invalid bill scan price tolerance env value %s',
+    async (value) => {
+      process.env.BILL_SCAN_PRICE_TOLERANCE_VND = value;
+
+      await expect(loadAntiFraudConfig('bill-invalid'))
+        .rejects
+        .toThrow(
+          '[Config] BILL_SCAN_PRICE_TOLERANCE_VND must be a non-negative safe integer',
+        );
+    },
+  );
 });

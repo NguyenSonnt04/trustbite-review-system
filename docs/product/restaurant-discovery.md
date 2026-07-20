@@ -137,6 +137,18 @@ Default pagination is page `1` with `50` items and a maximum page size of
 `100`. The endpoint does not infer branch-specific prices or dish images.
 Non-active, soft-deleted, or unknown restaurants return `404 NOT_FOUND`.
 
+### GET `/api/v1/restaurants/:restaurantId/branches`
+
+Purpose: select the exact active branch for branch-priced product workflows
+such as bill checking.
+
+The endpoint returns active branches for an active, non-deleted restaurant,
+ordered by name and ID. Each item exposes `id`, `restaurantId`, `name`,
+`address`, nullable `area`, `latitude`, and `longitude`. The current schema
+does not store a separate area field, so clients may derive display-only area
+text from the address while treating the branch ID and address as authoritative.
+Unknown or non-public restaurants return `404 RESTAURANT_NOT_FOUND`.
+
 ### GET, POST `/api/v1/restaurants/:restaurantId/images`
 
 Purpose: protected listing and upload of restaurant profile images.

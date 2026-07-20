@@ -7,6 +7,7 @@ const DEFAULT_ALLOWED_PREFIXES = [
   'review-media/',
   'merchant-claims/',
   'restaurant-images/',
+  'bill-scans/',
 ];
 
 const normalizeHost = (value) => value.toLowerCase();

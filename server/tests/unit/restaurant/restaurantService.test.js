@@ -14,7 +14,10 @@ const { pool } = await import('../../../src/config/db.js');
 const { resolveRestaurantImageUrl } = await import(
   '../../../src/services/s3RestaurantImageStorageService.js'
 );
-const { listRestaurants } = await import('../../../src/services/restaurantService.js');
+const {
+  listActiveRestaurantBranches,
+  listRestaurants,
+} = await import('../../../src/services/restaurantService.js');
 
 function restaurantRow(overrides = {}) {
   return {
@@ -63,6 +66,41 @@ describe('listRestaurants', () => {
         },
       ],
       total: 1,
+    });
+  });
+});
+
+describe('listActiveRestaurantBranches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns active branches from the restaurant domain service', async () => {
+    pool.query
+      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: 'restaurant-id' }] })
+      .mockResolvedValueOnce({
+        rows: [{
+          id: '22222222-2222-4222-8222-222222222222',
+          parent_restaurant_id: '11111111-1111-4111-8111-111111111111',
+          name: 'District 1',
+          address: '123 Test Street',
+          latitude: '10.123',
+          longitude: '106.456',
+        }],
+      });
+
+    await expect(listActiveRestaurantBranches(
+      '11111111-1111-4111-8111-111111111111',
+    )).resolves.toEqual({
+      items: [{
+        id: '22222222-2222-4222-8222-222222222222',
+        restaurantId: '11111111-1111-4111-8111-111111111111',
+        name: 'District 1',
+        address: '123 Test Street',
+        area: null,
+        latitude: 10.123,
+        longitude: 106.456,
+      }],
     });
   });
 });

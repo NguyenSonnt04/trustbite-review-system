@@ -15,6 +15,9 @@ import 'package:trustbite_mobile/src/features/home/widgets/trustbite_bottom_nav.
 import 'package:trustbite_mobile/src/features/map/map_screen.dart';
 import 'package:trustbite_mobile/src/features/notifications/notification_service.dart';
 import 'package:trustbite_mobile/src/features/notifications/notifications_page.dart';
+import 'package:trustbite_mobile/src/features/services/bill_scan/bill_receipt_picker.dart';
+import 'package:trustbite_mobile/src/features/services/bill_scan/bill_scan_repository.dart';
+import 'package:trustbite_mobile/src/features/services/service_registry.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({
@@ -25,6 +28,8 @@ class HomeScreen extends StatefulWidget {
     this.notificationRepository,
     this.favoritesRepository,
     this.profileRepository,
+    this.billScanRepository,
+    this.billReceiptPicker,
   });
 
   final MobileAuthService? authService;
@@ -33,6 +38,8 @@ class HomeScreen extends StatefulWidget {
   final NotificationRepository? notificationRepository;
   final FavoritesRepository? favoritesRepository;
   final ProfileManagementRepository? profileRepository;
+  final BillScanRepository? billScanRepository;
+  final BillReceiptPicker? billReceiptPicker;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -48,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final ProfileManagementRepository _profileRepository;
   int _notificationUnreadCount = 0;
   late final NotificationRepository _notificationRepository;
+  late final ServiceRegistry _serviceRegistry;
 
   @override
   void initState() {
@@ -63,7 +71,32 @@ class _HomeScreenState extends State<HomeScreen> {
     _notificationRepository =
         widget.notificationRepository ??
         ApiNotificationRepository(apiClient: appApiClient);
+    final billScanRepository =
+        widget.billScanRepository ??
+        ApiBillScanRepository(
+          apiClient: appApiClient,
+          restaurantRepository: _restaurantRepository,
+        );
+    _serviceRegistry = ServiceRegistry.withBillScan(
+      repository: billScanRepository,
+      receiptPicker: widget.billReceiptPicker ?? ImagePickerBillReceiptPicker(),
+      ensureAuthenticated: _ensureAuthenticated,
+      onAuthenticationRequired: _handleAuthenticationRequired,
+    );
     _loadAuthState();
+  }
+
+  Future<bool> _ensureAuthenticated() async {
+    if (_isSignedIn) return true;
+    return _openLogin();
+  }
+
+  Future<void> _openService(String shortcutLabel) async {
+    await _serviceRegistry.open(
+      context,
+      shortcutLabel,
+      ensureAuthenticated: _ensureAuthenticated,
+    );
   }
 
   Future<void> _loadAuthState() async {
@@ -203,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
           !identical(_currentUser, requestedForUser)) {
         return;
       }
-      await _handleNotificationAuthenticationRequired();
+      await _handleAuthenticationRequired();
     } catch (_) {
       if (!mounted ||
           !_isSignedIn ||
@@ -214,7 +247,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _handleNotificationAuthenticationRequired() async {
+  Future<void> _handleAuthenticationRequired() async {
     if (!mounted) return;
     setState(() {
       _isSignedIn = false;
@@ -242,7 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onUnreadCountChanged: (count) {
             if (mounted) setState(() => _notificationUnreadCount = count);
           },
-          onAuthenticationRequired: _handleNotificationAuthenticationRequired,
+          onAuthenticationRequired: _handleAuthenticationRequired,
         ),
       ),
     );
@@ -328,6 +361,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onServiceSelected: (index) => setState(() {
           _activeServiceIndex = index;
         }),
+        onServicePressed: _openService,
         isSignedIn: _isSignedIn,
         currentUser: _currentUser,
         onLogin: _openLogin,

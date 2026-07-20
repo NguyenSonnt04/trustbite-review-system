@@ -190,12 +190,18 @@ export function mapAnalyzeExpense(response) {
       const name = strOrNull(lineItemValue(fields, 'ITEM'));
       if (!name) continue;
       const quantity = quantityOrNull(lineItemValue(fields, 'QUANTITY'));
-      const unitPrice = amountOrNull(lineItemValue(fields, 'UNIT_PRICE'));
       const totalPrice = amountOrNull(lineItemValue(fields, 'PRICE'));
+      const normalizedQuantity = quantity != null && quantity > 0 ? quantity : 1;
+      const explicitUnitPrice = amountOrNull(lineItemValue(fields, 'UNIT_PRICE'));
+      const derivedUnitPrice = totalPrice != null && totalPrice >= 0
+        ? totalPrice / normalizedQuantity
+        : null;
       lineItems.push({
         name,
-        quantity: quantity != null && quantity > 0 ? quantity : 1,
-        unitPrice: unitPrice != null && unitPrice >= 0 ? unitPrice : (totalPrice ?? 0),
+        quantity: normalizedQuantity,
+        unitPrice: explicitUnitPrice != null && explicitUnitPrice >= 0
+          ? explicitUnitPrice
+          : derivedUnitPrice,
         totalPrice: totalPrice != null && totalPrice >= 0 ? totalPrice : 0,
       });
       rawParts.push(name);

@@ -230,6 +230,10 @@ const listObjectCleanupTargets = async (client, userId) => {
        FROM receipt_verifications
       WHERE user_id = $1 AND redacted_file_url IS NOT NULL
      UNION ALL
+     SELECT file_url AS url, 'BILL_SCAN' AS target_type
+       FROM bill_scans
+      WHERE user_id = $1 AND file_url IS NOT NULL
+     UNION ALL
      SELECT rm.url, 'REVIEW_MEDIA' AS target_type
        FROM review_media rm
        JOIN reviews r ON r.id = rm.review_id
@@ -327,6 +331,10 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
       [request.user_id],
     );
     const idempotencyResult = await client.query('DELETE FROM idempotency_keys WHERE user_id = $1', [request.user_id]);
+    const billScansResult = await client.query(
+      'DELETE FROM bill_scans WHERE user_id = $1',
+      [request.user_id],
+    );
     const notificationsResult = await client.query('DELETE FROM notifications WHERE recipient_user_id = $1', [request.user_id]);
 
       await client.query(
@@ -593,6 +601,7 @@ const completeDeletionRequest = async (client, request, cleanupResult) => {
           removedSystemRows: {
             notifications: notificationsResult.rowCount,
             idempotencyKeys: idempotencyResult.rowCount,
+            billScans: billScansResult.rowCount,
           },
           detachedPriceHistoryRows: priceHistoryResult.rowCount,
           invalidatedReviewSummaries: reviewSummariesResult.rowCount,

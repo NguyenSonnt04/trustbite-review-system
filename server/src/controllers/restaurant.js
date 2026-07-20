@@ -351,6 +351,17 @@ export const listRestaurantMenuHandler = async (req, res, next) => {
   }
 };
 
+export const listRestaurantBranchesHandler = async (req, res, next) => {
+  try {
+    const result = await restaurantService.listActiveRestaurantBranches(
+      req.params.restaurantId,
+    );
+    return res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ---------------------------------------------------------------------------
 // GET /api/v1/restaurants/:restaurantId/reviews
 // ---------------------------------------------------------------------------

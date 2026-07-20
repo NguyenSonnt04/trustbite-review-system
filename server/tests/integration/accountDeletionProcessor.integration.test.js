@@ -11,6 +11,7 @@ const { processDueAccountDeletions } = await import('../../src/services/accountD
 const { S3ObjectStorage } = await import('../../src/services/objectStorage.js');
 
 async function cleanupUser(userId) {
+  await query('DELETE FROM bill_scans WHERE user_id = $1', [userId]);
   await query('DELETE FROM audit_logs WHERE actor_id = $1 OR entity_id IN (SELECT id FROM account_deletion_requests WHERE user_id = $1)', [userId]);
   await query('DELETE FROM account_deletion_requests WHERE user_id = $1', [userId]);
   await query('DELETE FROM notification_delivery_logs WHERE push_token_id IN (SELECT id FROM push_tokens WHERE user_id = $1)', [userId]);
@@ -174,6 +175,48 @@ describe('account deletion processor', () => {
          RETURNING id`,
         [restaurant.id, 'Sensitive mapped menu item', 10000],
       );
+      const billScanBranch = await query(
+        `INSERT INTO restaurant_branches (
+           parent_restaurant_id, name, address, latitude, longitude, geo, status
+         )
+         VALUES (
+           $1, 'Deletion branch', 'Deletion address', 10, 106,
+           ST_SetSRID(ST_MakePoint(106, 10), 4326)::geography, 'ACTIVE'
+         )
+         RETURNING id`,
+        [restaurant.id],
+      );
+      const billScan = await query(
+        `INSERT INTO bill_scans (
+           user_id, restaurant_id, branch_id, idempotency_key, request_hash,
+           file_url, file_hash_sha256, mime_type, file_size_bytes,
+           status, overall_result, completed_at
+         )
+         VALUES (
+           $1, $2, $3, $4, $5,
+           $6, $7, 'image/png', 128,
+           'COMPLETED', 'MATCHED', NOW()
+         )
+         RETURNING id`,
+        [
+          user.id,
+          restaurant.id,
+          billScanBranch.rows[0].id,
+          crypto.randomUUID(),
+          'c'.repeat(64),
+          `s3://trustbite-invoices/bill-scans/${user.id}/scan/delete-me.png`,
+          'd'.repeat(64),
+        ],
+      );
+      await query(
+        `INSERT INTO bill_scan_line_items (
+           bill_scan_id, line_index, observed_name, observed_quantity,
+           observed_unit_price, observed_total_price, menu_item_id,
+           expected_unit_price, price_difference, mapping_confidence, result
+         )
+         VALUES ($1, 0, 'Sensitive bill item', 1, 10000, 10000, $2, 10000, 0, 1, 'MATCHED')`,
+        [billScan.rows[0].id, mappedMenuItem.rows[0].id],
+      );
       await query(
         `INSERT INTO receipt_line_item_menu_maps (receipt_line_item_id, menu_item_id, confidence_score)
          SELECT item.id, $2, $3
@@ -316,10 +359,14 @@ describe('account deletion processor', () => {
          WHERE receipt.user_id = $1`,
         [user.id],
       );
+      const remainingBillScans = await query(
+        'SELECT count(*)::int AS count FROM bill_scans WHERE user_id = $1',
+        [user.id],
+      );
 
       expect(persisted.rowCount).toBe(1);
       expect(identityProvider.deleteUser).toHaveBeenCalledWith({ username: cognitoSub });
-      expect(objectStorage.deleteOwnedObject).toHaveBeenCalledTimes(5);
+      expect(objectStorage.deleteOwnedObject).toHaveBeenCalledTimes(6);
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith(
         `s3://trustbite-invoices/avatars/${user.id}/delete-me.png`,
       );
@@ -327,6 +374,9 @@ describe('account deletion processor', () => {
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/receipts/redacted-receipt.png');
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/review-media/review-photo.png');
       expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith('s3://trustbite-invoices/merchant-claims/claim-evidence.png');
+      expect(objectStorage.deleteOwnedObject).toHaveBeenCalledWith(
+        `s3://trustbite-invoices/bill-scans/${user.id}/scan/delete-me.png`,
+      );
       expect(persisted.rows[0].user_status).toBe('DELETED');
       expect(persisted.rows[0].deleted_at).toBeTruthy();
       expect(persisted.rows[0].deletion_requested_at).toBeNull();
@@ -370,8 +420,8 @@ describe('account deletion processor', () => {
         expect(persisted.rows[0].metadata).toMatchObject({
           anonymizedCoreProfile: true,
         providerCleanup: { deleted: true, signedOut: true },
-        ownedObjectUrlsProcessed: 5,
-        ownedObjectsDeleted: 5,
+        ownedObjectUrlsProcessed: 6,
+        ownedObjectsDeleted: 6,
         retainedCognitoSub: true,
         inactivatedPushTokens: 2,
       });
@@ -390,6 +440,7 @@ describe('account deletion processor', () => {
         admin_note: null,
       });
       expect(remainingReceiptMenuMaps.rows[0].count).toBe(0);
+      expect(remainingBillScans.rows[0].count).toBe(0);
 
       await expect(authService.mapIdentityToUser({
         provider: 'cognito',
