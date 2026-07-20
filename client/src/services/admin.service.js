@@ -1,9 +1,5 @@
 import config from '@/config/config';
 const normalizeRootUrl = (url) => url.replace(/\/+$/u, '');
-const normalizeApiUrl = (url) => {
-  const rootUrl = normalizeRootUrl(url);
-  return rootUrl.endsWith('/api/v1') ? rootUrl : `${rootUrl}/api/v1`;
-};
 const ADMIN_SESSION_ERROR_CODES = new Set([
   'ADMIN_SESSION_INVALID',
   'ADMIN_SESSION_EXPIRED',
@@ -84,7 +80,7 @@ const listRestaurants = ({
   return requestAdminResource('restaurants', `?${params.toString()}`);
 };
 
-const listRestaurantReviews = async (restaurantId, {
+const listRestaurantReviews = (restaurantId, {
   status = 'ALL',
   page = 1,
   pageSize = 10,
@@ -94,18 +90,10 @@ const listRestaurantReviews = async (restaurantId, {
     page: String(page),
     pageSize: String(pageSize),
   });
-  const response = await fetch(
-    `${normalizeApiUrl(config.apiUrl)}/restaurants/${encodeURIComponent(restaurantId)}/reviews?${params.toString()}`,
-    { cache: 'no-store' },
+  return requestAdminResource(
+    'restaurants',
+    `/${encodeURIComponent(restaurantId)}/reviews?${params.toString()}`,
   );
-  const responseBody = await response.json().catch(() => null);
-  if (!response.ok) {
-    const error = new Error(responseBody?.error?.message || 'Không thể tải đánh giá của nhà hàng.');
-    error.code = responseBody?.error?.code || 'RESTAURANT_REVIEWS_REQUEST_FAILED';
-    error.status = response.status;
-    throw error;
-  }
-  return responseBody;
 };
 
 const requestAdminUsers = async (path = '', { method = 'GET', body } = {}) => {
