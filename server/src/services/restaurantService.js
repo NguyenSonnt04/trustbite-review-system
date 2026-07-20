@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { pool } from '../config/db.js';
+import { createHttpError } from '../utils/httpErrors.js';
 import { resolveRestaurantImageUrl } from './s3RestaurantImageStorageService.js';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,7 @@ export class ConflictError extends Error {
 // ---------------------------------------------------------------------------
 
 const MAX_SLUG_ATTEMPTS = 5;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const VIETNAMESE_SEARCH_CHAR_GROUPS = [
   ['a', 'àáạảãâầấậẩẫăằắặẳẵ'],
@@ -205,6 +207,45 @@ async function insertCategoryMappings(client, restaurantId, categoryIds) {
 // ---------------------------------------------------------------------------
 // Service functions
 // ---------------------------------------------------------------------------
+
+export async function listActiveRestaurantBranches(restaurantId) {
+  if (typeof restaurantId !== 'string' || !UUID_RE.test(restaurantId)) {
+    throw createHttpError(400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.');
+  }
+
+  const restaurant = await pool.query(
+    `SELECT id
+     FROM restaurants
+     WHERE id = $1
+       AND status = 'ACTIVE'
+       AND is_deleted = FALSE`,
+    [restaurantId],
+  );
+  if (restaurant.rowCount === 0) {
+    throw createHttpError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found.');
+  }
+
+  const branches = await pool.query(
+    `SELECT id, parent_restaurant_id, name, address, latitude, longitude
+     FROM restaurant_branches
+     WHERE parent_restaurant_id = $1
+       AND status = 'ACTIVE'
+     ORDER BY name, id`,
+    [restaurantId],
+  );
+
+  return {
+    items: branches.rows.map((row) => ({
+      id: row.id,
+      restaurantId: row.parent_restaurant_id,
+      name: row.name,
+      address: row.address,
+      area: null,
+      latitude: row.latitude === null ? null : Number(row.latitude),
+      longitude: row.longitude === null ? null : Number(row.longitude),
+    })),
+  };
+}
 
 /**
  * List restaurants.

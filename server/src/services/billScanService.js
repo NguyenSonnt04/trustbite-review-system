@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { BILL_SCAN_PRICE_TOLERANCE_VND } from '../config/antiFraud.js';
 import { pool } from '../config/db.js';
 import { createHttpError } from '../utils/httpErrors.js';
 import { bedrockGemmaProvider } from './providers/bedrockGemmaProvider.js';
@@ -11,7 +12,6 @@ import {
 } from './s3BillScanStorageService.js';
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
-const PRICE_TOLERANCE_VND = 1000;
 const PROCESSING_LEASE_MINUTES = 5;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -165,7 +165,9 @@ export function compareBillScanLine({
   const priceDifference = Math.abs(observed - expected);
   return {
     priceDifference,
-    result: priceDifference > PRICE_TOLERANCE_VND ? 'PRICE_MISMATCH' : 'MATCHED',
+    result: priceDifference > BILL_SCAN_PRICE_TOLERANCE_VND
+      ? 'PRICE_MISMATCH'
+      : 'MATCHED',
   };
 }
 
@@ -271,44 +273,6 @@ function safeProviderError(error) {
   return createHttpError(503, 'BILL_SCAN_PROVIDER_FAILED', 'Bill scan processing failed.');
 }
 
-export async function listActiveRestaurantBranches(restaurantId) {
-  if (typeof restaurantId !== 'string' || !UUID_RE.test(restaurantId)) {
-    throw createHttpError(400, 'VALIDATION_ERROR', 'restaurantId must be a valid UUID.');
-  }
-
-  const restaurant = await pool.query(
-    `SELECT id
-     FROM restaurants
-     WHERE id = $1
-       AND status = 'ACTIVE'
-       AND is_deleted = FALSE`,
-    [restaurantId],
-  );
-  if (restaurant.rowCount === 0) {
-    throw createHttpError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found.');
-  }
-
-  const branches = await pool.query(
-    `SELECT id, parent_restaurant_id, name, address, latitude, longitude
-     FROM restaurant_branches
-     WHERE parent_restaurant_id = $1
-       AND status = 'ACTIVE'
-     ORDER BY name, id`,
-    [restaurantId],
-  );
-  return {
-    items: branches.rows.map((row) => ({
-      id: row.id,
-      restaurantId: row.parent_restaurant_id,
-      name: row.name,
-      address: row.address,
-      area: null,
-      latitude: numberOrNull(row.latitude),
-      longitude: numberOrNull(row.longitude),
-    })),
-  };
-}
-
 export async function getBillScan({ scanId, userId }) {
   if (typeof scanId !== 'string' || !UUID_RE.test(scanId)) {
     throw createHttpError(400, 'VALIDATION_ERROR', 'scanId must be a valid UUID.');
@@ -392,7 +356,7 @@ export async function createBillScan({
       const takeover = await client.query(
         `UPDATE bill_scans
          SET processing_attempt_token = $3,
-             processing_lease_expires_at = NOW() + ($4 || ' minutes')::interval,
+             processing_lease_expires_at = NOW() + ($4 * interval '1 minute'),
              provider_error_code = NULL,
              completed_at = NULL
          WHERE id = $1
@@ -470,7 +434,7 @@ export async function createBillScan({
        )
        VALUES (
          $1, $2, $3, $4, $5, $6, $7, $8, 'PROCESSING',
-         $9, NOW() + ($10 || ' minutes')::interval
+         $9, NOW() + ($10 * interval '1 minute')
        )
        RETURNING id`,
         [

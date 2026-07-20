@@ -24,8 +24,10 @@ restaurant branch.
 - Expected price uses an available `branch_menu_items.price`.
 - An OCR line item is `MATCHED` when Bedrock maps it to one branch menu item.
 - A matched line item is `PRICE_MISMATCH` when
-  `abs(observed_unit_price - expected_unit_price) > 1000` VND.
-- A difference of exactly 1,000 VND is accepted.
+  `abs(observed_unit_price - expected_unit_price)` exceeds the configured
+  `BILL_SCAN_PRICE_TOLERANCE_VND` threshold.
+- The threshold defaults to 1,000 VND, so a difference of exactly 1,000 VND is
+  accepted by default.
 - Unmatched or unreadable items are `INCONCLUSIVE`; they do not become a price
   mismatch.
 - The overall result is `PRICE_MISMATCH` when any item is mismatched,

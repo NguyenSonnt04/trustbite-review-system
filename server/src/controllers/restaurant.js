@@ -22,7 +22,6 @@ import {
   uploadRestaurantImage,
 } from '../services/restaurantImageService.js';
 import { listPublicReviewsByRestaurant } from '../services/reviewService.js';
-import { listActiveRestaurantBranches } from '../services/billScanService.js';
 
 // ---------------------------------------------------------------------------
 // Validation helpers
@@ -354,7 +353,9 @@ export const listRestaurantMenuHandler = async (req, res, next) => {
 
 export const listRestaurantBranchesHandler = async (req, res, next) => {
   try {
-    const result = await listActiveRestaurantBranches(req.params.restaurantId);
+    const result = await restaurantService.listActiveRestaurantBranches(
+      req.params.restaurantId,
+    );
     return res.status(200).json(result);
   } catch (err) {
     next(err);

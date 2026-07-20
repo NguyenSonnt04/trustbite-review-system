@@ -1,12 +1,56 @@
-import { describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import {
   BedrockGemmaProvider,
+  bedrockGemmaProvider,
+  resetBedrockGemmaClientForTests,
+  setBedrockGemmaClientForTests,
   validateBedrockMappings,
 } from '../../../src/services/providers/bedrockGemmaProvider.js';
 
 const menuId = '00000000-0000-4000-8000-000000000001';
+const originalSingletonModelId = bedrockGemmaProvider.modelId;
 
 describe('BedrockGemmaProvider', () => {
+  afterEach(() => {
+    resetBedrockGemmaClientForTests();
+    bedrockGemmaProvider.modelId = originalSingletonModelId;
+  });
+
+  it('reuses the module-level client across singleton requests', async () => {
+    const send = vi.fn(async () => ({
+      output: {
+        message: {
+          content: [{
+            text: JSON.stringify({
+              mappings: [{
+                lineIndex: 0,
+                menuItemId: menuId,
+                confidence: 1,
+              }],
+            }),
+          }],
+        },
+      },
+    }));
+    setBedrockGemmaClientForTests({ send });
+    bedrockGemmaProvider.modelId = 'google.gemma-test';
+
+    const request = {
+      lines: [{ name: 'Pho bo' }],
+      menuItems: [{ id: menuId, name: 'Phở bò' }],
+    };
+    await bedrockGemmaProvider.mapNames(request);
+    await bedrockGemmaProvider.mapNames(request);
+
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
   it('sends names without prices and returns validated mappings', async () => {
     const send = vi.fn(async (command) => {
       const payload = JSON.parse(command.input.messages[0].content[0].text);

@@ -20,6 +20,16 @@ function createClient() {
   });
 }
 
+let bedrockClient = createClient();
+
+export function setBedrockGemmaClientForTests(client) {
+  bedrockClient = client;
+}
+
+export function resetBedrockGemmaClientForTests() {
+  bedrockClient = createClient();
+}
+
 function normalizedName(value, field) {
   if (typeof value !== 'string') {
     throw createHttpError(422, 'VALIDATION_ERROR', `${field} must be a string.`);
@@ -137,7 +147,7 @@ export class BedrockGemmaProvider {
     const timeout = setTimeout(() => abortController.abort(), this.timeoutMs);
 
     try {
-      const response = await (this.client ?? createClient()).send(
+      const response = await (this.client ?? bedrockClient).send(
         new ConverseCommand({
           modelId: this.modelId,
           system: [{
