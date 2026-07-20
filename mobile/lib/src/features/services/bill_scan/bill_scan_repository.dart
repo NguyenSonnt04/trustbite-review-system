@@ -122,16 +122,25 @@ class ApiBillScanRepository implements BillScanRepository {
     if (rawItems is! List) {
       throw const FormatException('Bill scan items must be an array.');
     }
-    final overallResult = _requiredString(
+    final status = _requiredString(response['status'], 'Bill scan status');
+    if (!const {'PROCESSING', 'COMPLETED', 'FAILED'}.contains(status)) {
+      throw const FormatException('Bill scan status is invalid.');
+    }
+    final overallResult = _optionalString(
       response['overallResult'] ?? response['overallStatus'],
-      'Bill scan overall result',
     );
-    if (!const {
-      'MATCHED',
-      'PRICE_MISMATCH',
-      'INCONCLUSIVE',
-    }.contains(overallResult)) {
+    if (overallResult != null &&
+        !const {
+          'MATCHED',
+          'PRICE_MISMATCH',
+          'INCONCLUSIVE',
+        }.contains(overallResult)) {
       throw const FormatException('Bill scan overall result is invalid.');
+    }
+    if (status == 'COMPLETED' && overallResult == null) {
+      throw const FormatException(
+        'Completed bill scan overall result is required.',
+      );
     }
 
     final restaurant = _optionalMap(response['restaurant']);
@@ -149,6 +158,7 @@ class ApiBillScanRepository implements BillScanRepository {
         response['branchId'] ?? branch?['id'],
         'Bill scan branchId',
       ),
+      status: status,
       overallResult: overallResult,
       items: rawItems.map(_parseLineItem).toList(growable: false),
     );

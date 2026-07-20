@@ -9,7 +9,10 @@ class BillScanResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final presentation = _statusPresentation(result.overallResult);
+    final displayStatus = result.status == 'COMPLETED'
+        ? result.overallResult ?? 'INCONCLUSIVE'
+        : result.status;
+    final presentation = _statusPresentation(displayStatus);
     final unmatchedItems = result.items
         .where((item) => item.isUnmatched)
         .toList(growable: false);
@@ -39,7 +42,7 @@ class BillScanResultPage extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(20, 4, 20, 36),
                       children: [
                         _ResultSummary(
-                          key: ValueKey('bill-overall-${result.overallResult}'),
+                          key: ValueKey('bill-overall-$displayStatus'),
                           presentation: presentation,
                           itemCount: result.items.length,
                         ),
@@ -579,6 +582,22 @@ class _StatusPresentation {
 
 _StatusPresentation _statusPresentation(String status) {
   return switch (status) {
+    'FAILED' => const _StatusPresentation(
+      title: 'Không thể xử lý bill',
+      shortLabel: 'Thất bại',
+      message: 'Bill chưa được xử lý thành công. Vui lòng quét lại ảnh khác.',
+      icon: Icons.error_outline_rounded,
+      color: Color(0xFFB42318),
+      background: Color(0xFFFFECEA),
+    ),
+    'PROCESSING' => const _StatusPresentation(
+      title: 'Đang xử lý bill',
+      shortLabel: 'Đang xử lý',
+      message: 'TrustBite đang đọc và đối chiếu giá trên bill.',
+      icon: Icons.hourglass_top_rounded,
+      color: Color(0xFF175CD3),
+      background: Color(0xFFEAF2FF),
+    ),
     'MATCHED' => const _StatusPresentation(
       title: 'Giá các món khớp',
       shortLabel: 'Khớp giá',

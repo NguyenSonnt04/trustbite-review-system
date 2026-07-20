@@ -106,12 +106,41 @@ void main() {
     expect(multipart, contains('restaurant-1'));
     expect(multipart, contains('name="branchId"'));
     expect(multipart, contains('name="receiptImage"; filename="bill.jpg"'));
+    expect(result.status, 'COMPLETED');
     expect(result.overallResult, 'PRICE_MISMATCH');
     expect(result.items, hasLength(2));
     expect(result.items.first.matchedName, 'Phở bò tái');
     expect(result.items.first.confidence, 0.94);
     expect(result.items.first.priceDifference, 5000);
     expect(result.items.last.isUnmatched, isTrue);
+  });
+
+  test('fetches a failed scan with a null overall result', () async {
+    final transport = _SequencedTransport([
+      const ApiTransportResponse(
+        statusCode: 200,
+        body:
+            '{"id":"scan-failed","status":"FAILED","overallResult":null,"restaurant":{"id":"restaurant-1","name":"Phở TrustBite"},"branch":{"id":"branch-1","restaurantId":"restaurant-1","name":"Chi nhánh Nguyễn Huệ","address":"12 Nguyễn Huệ","area":null},"items":[]}',
+      ),
+    ]);
+    final repository = ApiBillScanRepository(
+      apiClient: TrustBiteApiClient(
+        config: config,
+        sessionStore: InMemoryAuthSessionStore(),
+        transport: transport,
+      ),
+      restaurantRepository: const _RestaurantRepository([]),
+    );
+
+    final result = await repository.fetchScan('scan-failed');
+
+    expect(result.status, 'FAILED');
+    expect(result.overallResult, isNull);
+    expect(result.items, isEmpty);
+    expect(
+      transport.requests.single.uri.path,
+      '/api/v1/bill-scans/scan-failed',
+    );
   });
 
   test(

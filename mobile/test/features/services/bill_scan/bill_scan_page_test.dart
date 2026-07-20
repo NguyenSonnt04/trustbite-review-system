@@ -182,6 +182,24 @@ void main() {
     );
   });
 
+  testWidgets('renders a failed scan without requiring an overall result', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: BillScanResultPage(result: _failedResult)),
+    );
+
+    expect(
+      find.byKey(const ValueKey('bill-overall-FAILED')),
+      findsOneWidget,
+    );
+    expect(find.text('Không thể xử lý bill'), findsOneWidget);
+    expect(
+      find.text('Bill chưa được xử lý thành công. Vui lòng quét lại ảnh khác.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('clears authentication after an expired submit before retrying', (
     tester,
   ) async {
@@ -271,6 +289,7 @@ const _matchedResult = BillScanResult(
   scanId: 'scan-1',
   restaurantId: 'restaurant-1',
   branchId: 'branch-1',
+  status: 'COMPLETED',
   overallResult: 'MATCHED',
   items: [
     BillScanLineItem(
@@ -289,6 +308,7 @@ const _mismatchResult = BillScanResult(
   scanId: 'scan-2',
   restaurantId: 'restaurant-1',
   branchId: 'branch-1',
+  status: 'COMPLETED',
   overallResult: 'PRICE_MISMATCH',
   items: [
     BillScanLineItem(
@@ -310,6 +330,15 @@ const _mismatchResult = BillScanResult(
       result: 'INCONCLUSIVE',
     ),
   ],
+);
+
+const _failedResult = BillScanResult(
+  scanId: 'scan-failed',
+  restaurantId: 'restaurant-1',
+  branchId: 'branch-1',
+  status: 'FAILED',
+  overallResult: null,
+  items: [],
 );
 
 class _FakeReceiptPicker implements BillReceiptPicker {

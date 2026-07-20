@@ -60,6 +60,7 @@ class BillScanResult {
     required this.scanId,
     required this.restaurantId,
     required this.branchId,
+    required this.status,
     required this.overallResult,
     required this.items,
   });
@@ -67,6 +68,7 @@ class BillScanResult {
   final String scanId;
   final String restaurantId;
   final String branchId;
-  final String overallResult;
+  final String status;
+  final String? overallResult;
   final List<BillScanLineItem> items;
 }
