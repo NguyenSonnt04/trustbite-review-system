@@ -49,6 +49,11 @@ resource "aws_elasticache_parameter_group" "this" {
   family      = var.parameter_group_family
   name        = "${var.name_prefix}-redis-params"
 
+  parameter {
+    name  = "maxmemory-policy"
+    value = "noeviction"
+  }
+
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-redis-params"
   })
