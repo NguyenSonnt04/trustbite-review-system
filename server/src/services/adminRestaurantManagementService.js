@@ -9,6 +9,8 @@ import { listRestaurantImages } from './restaurantImageService.js';
 import { resolveRestaurantImageUrl } from './s3RestaurantImageStorageService.js';
 
 const RESTAURANT_STATUSES = new Set(['DRAFT', 'ACTIVE', 'SUSPENDED', 'CLOSED']);
+const MENU_ITEM_STATUSES = new Set(['ACTIVE', 'ARCHIVED']);
+const MENU_ITEM_CURRENCIES = new Set(['VND']);
 const BULK_DELETE_ENDPOINT = 'POST /api/v1/admin-web/restaurants/bulk-delete';
 const BULK_DELETE_LIMIT = 100;
 const IDEMPOTENCY_TTL_HOURS = 24;
@@ -27,6 +29,20 @@ const RESTAURANT_UPDATE_FIELDS = new Set([
   'reason',
 ]);
 const RESTAURANT_DELETE_FIELDS = new Set(['restaurantIds', 'reason']);
+const MENU_ITEM_CREATE_FIELDS = new Set([
+  'name',
+  'price',
+  'currency',
+  'status',
+  'reason',
+]);
+const MENU_ITEM_UPDATE_FIELDS = new Set([
+  'name',
+  'price',
+  'currency',
+  'status',
+  'reason',
+]);
 
 const assertAllowedFields = (body, allowedFields) => {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -73,6 +89,53 @@ const normalizeStatus = (value) => {
     throw createHttpError(422, 'VALIDATION_ERROR', 'status is invalid');
   }
   return status;
+};
+
+const normalizeMenuItemStatus = (value, { required = false } = {}) => {
+  if (value === undefined && !required) return undefined;
+  if (typeof value !== 'string') {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'status must be a string');
+  }
+  const status = value.trim().toUpperCase();
+  if (!MENU_ITEM_STATUSES.has(status)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'status must be ACTIVE or ARCHIVED');
+  }
+  return status;
+};
+
+const normalizeMenuItemCurrency = (value, { required = false } = {}) => {
+  if (value === undefined && !required) return undefined;
+  if (typeof value !== 'string') {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'currency must be a string');
+  }
+  const currency = value.trim().toUpperCase();
+  if (!MENU_ITEM_CURRENCIES.has(currency)) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'currency must be VND');
+  }
+  return currency;
+};
+
+const normalizeMenuItemPrice = (value, { required = false } = {}) => {
+  if (value === undefined && !required) return undefined;
+  if (
+    typeof value !== 'number'
+    || !Number.isFinite(value)
+  ) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'price must be a finite number');
+  }
+  const price = value;
+  if (
+    price < 0
+    || price > 9999999999.99
+    || Math.abs(price * 100 - Math.round(price * 100)) > 1e-7
+  ) {
+    throw createHttpError(
+      422,
+      'VALIDATION_ERROR',
+      'price must be a non-negative amount with at most 2 decimal places',
+    );
+  }
+  return price;
 };
 
 const normalizeCategoryIds = (value) => {
@@ -219,6 +282,18 @@ const parseListQuery = (query = {}) => {
   return { page, pageSize, keyword, status };
 };
 
+const parseMenuListQuery = (query = {}) => {
+  const page = Number(query.page ?? 1);
+  const pageSize = Number(query.pageSize ?? 100);
+  if (!Number.isInteger(page) || page < 1) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'page must be a positive integer');
+  }
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    throw createHttpError(422, 'VALIDATION_ERROR', 'pageSize must be between 1 and 100');
+  }
+  return { page, pageSize };
+};
+
 const mapListRow = async (row) => ({
   id: row.id,
   name: row.name,
@@ -227,6 +302,17 @@ const mapListRow = async (row) => ({
   status: row.status,
   trustScore: row.trust_score == null ? null : Number(row.trust_score),
   primaryImageUrl: await resolveRestaurantImageUrl(row.primary_image_url),
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
+const mapMenuItemRow = (row) => ({
+  id: row.id,
+  restaurantId: row.restaurant_id,
+  name: row.name,
+  price: Number(row.price_default),
+  currency: row.currency,
+  status: row.status,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -294,6 +380,215 @@ export class AdminRestaurantManagementService {
       images: images.items,
       availableCategories: categories.rows,
     };
+  }
+
+  async listMenuItems(actor, restaurantId, query = {}) {
+    getActorRole(actor);
+    const { page, pageSize } = parseMenuListQuery(query);
+    const restaurant = await pool.query(
+      `SELECT id
+       FROM restaurants
+       WHERE id = $1
+         AND is_deleted = FALSE`,
+      [restaurantId],
+    );
+    if (restaurant.rowCount === 0) {
+      throw createHttpError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found');
+    }
+
+    const result = await pool.query(
+      `WITH filtered AS (
+         SELECT id, restaurant_id, name, price_default, currency, status,
+                created_at, updated_at
+         FROM menu_items
+         WHERE restaurant_id = $1
+       )
+       SELECT page_rows.*, total.total_count
+       FROM (SELECT count(*)::integer AS total_count FROM filtered) total
+       LEFT JOIN LATERAL (
+         SELECT *
+         FROM filtered
+         ORDER BY
+           CASE status WHEN 'ACTIVE' THEN 0 ELSE 1 END,
+           name ASC,
+           id ASC
+         LIMIT $2 OFFSET $3
+       ) page_rows ON true`,
+      [restaurantId, pageSize, (page - 1) * pageSize],
+    );
+
+    return {
+      items: result.rows.filter((row) => row.id).map(mapMenuItemRow),
+      page,
+      pageSize,
+      total: result.rows[0]?.total_count ?? 0,
+    };
+  }
+
+  async createMenuItem(actor, restaurantId, body = {}) {
+    const actorRole = getActorRole(actor);
+    assertAllowedFields(body, MENU_ITEM_CREATE_FIELDS);
+    const reason = normalizeReason(body.reason);
+    const name = normalizeName(body.name);
+    if (name === undefined) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'name is required');
+    }
+    const price = normalizeMenuItemPrice(body.price, { required: true });
+    const currency = normalizeMenuItemCurrency(body.currency ?? 'VND', { required: true });
+    const status = normalizeMenuItemStatus(body.status ?? 'ACTIVE', { required: true });
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const restaurant = await client.query(
+        `SELECT id
+         FROM restaurants
+         WHERE id = $1
+           AND is_deleted = FALSE
+         FOR SHARE`,
+        [restaurantId],
+      );
+      if (restaurant.rowCount === 0) {
+        throw createHttpError(404, 'RESTAURANT_NOT_FOUND', 'Restaurant not found');
+      }
+
+      const inserted = await client.query(
+        `INSERT INTO menu_items (
+           restaurant_id, name, price_default, currency, status
+         )
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id, restaurant_id, name, price_default, currency, status,
+                   created_at, updated_at`,
+        [restaurantId, name, price, currency, status],
+      );
+      const menuItem = inserted.rows[0];
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_id, actor_role, action, entity_type, entity_id,
+           previous_status, new_status, reason, metadata
+         )
+         VALUES ($1, $2, 'MENU_ITEM_CREATE', 'MENU_ITEM', $3, NULL, $4, $5, $6::jsonb)`,
+        [
+          actor.id,
+          actorRole,
+          menuItem.id,
+          status,
+          reason,
+          JSON.stringify({
+            restaurantId,
+            name,
+            price,
+            currency,
+          }),
+        ],
+      );
+
+      await client.query('COMMIT');
+      return mapMenuItemRow(menuItem);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  async updateMenuItem(actor, restaurantId, menuItemId, body = {}) {
+    const actorRole = getActorRole(actor);
+    assertAllowedFields(body, MENU_ITEM_UPDATE_FIELDS);
+    const reason = normalizeReason(body.reason);
+    const updates = {
+      name: normalizeName(body.name),
+      price: normalizeMenuItemPrice(body.price),
+      currency: normalizeMenuItemCurrency(body.currency),
+      status: normalizeMenuItemStatus(body.status),
+    };
+    const changedFields = Object.keys(updates).filter(
+      (field) => updates[field] !== undefined,
+    );
+    if (changedFields.length === 0) {
+      throw createHttpError(422, 'VALIDATION_ERROR', 'At least one menu item field is required');
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const current = await client.query(
+        `SELECT mi.id, mi.restaurant_id, mi.name, mi.price_default,
+                mi.currency, mi.status, mi.created_at, mi.updated_at
+         FROM menu_items mi
+         JOIN restaurants r ON r.id = mi.restaurant_id
+         WHERE mi.id = $1
+           AND mi.restaurant_id = $2
+           AND r.is_deleted = FALSE
+         FOR UPDATE OF mi, r`,
+        [menuItemId, restaurantId],
+      );
+      if (current.rowCount === 0) {
+        throw createHttpError(404, 'MENU_ITEM_NOT_FOUND', 'Menu item not found');
+      }
+      const previous = current.rows[0];
+
+      const updated = await client.query(
+        `UPDATE menu_items
+         SET name = COALESCE($1, name),
+             price_default = COALESCE($2, price_default),
+             currency = COALESCE($3, currency),
+             status = COALESCE($4, status)
+         WHERE id = $5
+           AND restaurant_id = $6
+         RETURNING id, restaurant_id, name, price_default, currency, status,
+                   created_at, updated_at`,
+        [
+          updates.name ?? null,
+          updates.price ?? null,
+          updates.currency ?? null,
+          updates.status ?? null,
+          menuItemId,
+          restaurantId,
+        ],
+      );
+      const menuItem = updated.rows[0];
+
+      await client.query(
+        `INSERT INTO audit_logs (
+           actor_id, actor_role, action, entity_type, entity_id,
+           previous_status, new_status, reason, metadata
+         )
+         VALUES ($1, $2, 'MENU_ITEM_UPDATE', 'MENU_ITEM', $3, $4, $5, $6, $7::jsonb)`,
+        [
+          actor.id,
+          actorRole,
+          menuItemId,
+          previous.status,
+          menuItem.status,
+          reason,
+          JSON.stringify({
+            restaurantId,
+            changedFields,
+            previous: {
+              name: previous.name,
+              price: Number(previous.price_default),
+              currency: previous.currency,
+            },
+            current: {
+              name: menuItem.name,
+              price: Number(menuItem.price_default),
+              currency: menuItem.currency,
+            },
+          }),
+        ],
+      );
+
+      await client.query('COMMIT');
+      return mapMenuItemRow(menuItem);
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
   }
 
   async updateRestaurant(actor, restaurantId, body = {}) {

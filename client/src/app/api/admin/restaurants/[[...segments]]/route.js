@@ -38,12 +38,27 @@ const validateSegments = (segments, method) => {
     return method === 'POST';
   }
   if (
+    segments.length === 2
+    && UUID_PATTERN.test(segments[0])
+    && segments[1] === 'menu'
+  ) {
+    return ['GET', 'POST'].includes(method);
+  }
+  if (
     segments.length === 3
     && UUID_PATTERN.test(segments[0])
     && segments[1] === 'images'
     && UUID_PATTERN.test(segments[2])
   ) {
     return ['PATCH', 'DELETE'].includes(method);
+  }
+  if (
+    segments.length === 3
+    && UUID_PATTERN.test(segments[0])
+    && segments[1] === 'menu'
+    && UUID_PATTERN.test(segments[2])
+  ) {
+    return method === 'PATCH';
   }
   return (
     segments.length === 4

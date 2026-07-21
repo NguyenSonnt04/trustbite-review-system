@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   getRestaurant: vi.fn(),
   updateRestaurant: vi.fn(),
   deleteRestaurants: vi.fn(),
+  listMenuItems: vi.fn(),
+  createMenuItem: vi.fn(),
+  updateMenuItem: vi.fn(),
   uploadImage: vi.fn(),
   updateImage: vi.fn(),
   replaceImage: vi.fn(),
@@ -25,6 +28,9 @@ vi.mock('../../../src/services/adminRestaurantManagementService.js', () => ({
     getRestaurant: mocks.getRestaurant,
     updateRestaurant: mocks.updateRestaurant,
     deleteRestaurants: mocks.deleteRestaurants,
+    listMenuItems: mocks.listMenuItems,
+    createMenuItem: mocks.createMenuItem,
+    updateMenuItem: mocks.updateMenuItem,
   },
 }));
 
@@ -109,6 +115,94 @@ describe('admin restaurant management BFF routes', () => {
       expect.objectContaining({ name: 'Updated Restaurant' }),
     );
     expect(response.body.name).toBe('Updated Restaurant');
+  });
+
+  it('lists and creates menu items through the admin boundary', async () => {
+    mocks.listMenuItems.mockResolvedValue({
+      items: [{ id: '33333333-3333-4333-8333-333333333333', name: 'Phở bò' }],
+      page: 1,
+      pageSize: 100,
+      total: 1,
+    });
+    mocks.createMenuItem.mockResolvedValue({
+      id: '44444444-4444-4444-8444-444444444444',
+      restaurantId,
+      name: 'Bún bò',
+      price: 65000,
+      currency: 'VND',
+      status: 'ACTIVE',
+    });
+
+    const listResponse = await request(app)
+      .get(`/api/v1/admin-web/restaurants/${restaurantId}/menu?pageSize=100`)
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .expect(200);
+
+    expect(mocks.listMenuItems).toHaveBeenCalledWith(
+      sessionUser,
+      restaurantId,
+      { pageSize: '100' },
+    );
+    expect(listResponse.body.total).toBe(1);
+
+    const createResponse = await request(app)
+      .post(`/api/v1/admin-web/restaurants/${restaurantId}/menu`)
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .send({
+        name: 'Bún bò',
+        price: 65000,
+        currency: 'VND',
+        reason: 'Thêm món theo thực đơn đã xác minh',
+      })
+      .expect(201);
+
+    expect(mocks.createMenuItem).toHaveBeenCalledWith(
+      sessionUser,
+      restaurantId,
+      expect.objectContaining({ name: 'Bún bò', price: 65000 }),
+    );
+    expect(createResponse.body.name).toBe('Bún bò');
+  });
+
+  it('updates a menu item and rejects malformed item ids', async () => {
+    const menuItemId = '33333333-3333-4333-8333-333333333333';
+    mocks.updateMenuItem.mockResolvedValue({
+      id: menuItemId,
+      restaurantId,
+      name: 'Phở bò đặc biệt',
+      price: 79000,
+      currency: 'VND',
+      status: 'ACTIVE',
+    });
+
+    const response = await request(app)
+      .patch(`/api/v1/admin-web/restaurants/${restaurantId}/menu/${menuItemId}`)
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .send({
+        price: 79000,
+        reason: 'Cập nhật giá theo thực đơn mới',
+      })
+      .expect(200);
+
+    expect(mocks.updateMenuItem).toHaveBeenCalledWith(
+      sessionUser,
+      restaurantId,
+      menuItemId,
+      expect.objectContaining({ price: 79000 }),
+    );
+    expect(response.body.price).toBe(79000);
+
+    await request(app)
+      .patch(`/api/v1/admin-web/restaurants/${restaurantId}/menu/not-a-uuid`)
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .send({ status: 'ARCHIVED', reason: 'Ẩn món không còn phục vụ' })
+      .expect(400);
+
+    expect(mocks.updateMenuItem).toHaveBeenCalledTimes(1);
   });
 
   it('soft-deletes selected restaurants through the admin boundary', async () => {

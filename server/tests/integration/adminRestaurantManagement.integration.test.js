@@ -241,6 +241,240 @@ describe('admin restaurant management', () => {
     }
   });
 
+  it('creates, lists, archives, and reactivates menu items with audit records', async () => {
+    const actor = await createUser({ displayName: 'Menu Admin' });
+    const restaurant = await createRestaurant({
+      name: 'Admin Menu Restaurant',
+      status: 'DRAFT',
+    });
+
+    try {
+      const created = await adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        restaurant.id,
+        {
+          name: 'Bún bò Huế',
+          price: 65000,
+          currency: 'VND',
+          reason: 'Thêm món từ thực đơn đã được xác minh',
+        },
+      );
+      expect(created).toMatchObject({
+        restaurantId: restaurant.id,
+        name: 'Bún bò Huế',
+        price: 65000,
+        currency: 'VND',
+        status: 'ACTIVE',
+      });
+
+      const listed = await adminRestaurantManagementService.listMenuItems(
+        { id: actor.id, roles: ['SUPER_ADMIN'] },
+        restaurant.id,
+        { page: 1, pageSize: 100 },
+      );
+      expect(listed).toMatchObject({ page: 1, pageSize: 100, total: 1 });
+      expect(listed.items).toEqual([
+        expect.objectContaining({
+          id: created.id,
+          name: 'Bún bò Huế',
+          status: 'ACTIVE',
+        }),
+      ]);
+
+      const archived = await adminRestaurantManagementService.updateMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        restaurant.id,
+        created.id,
+        {
+          name: 'Bún bò đặc biệt',
+          price: 72000,
+          status: 'ARCHIVED',
+          reason: 'Tạm ẩn món trong thời gian cập nhật',
+        },
+      );
+      expect(archived).toMatchObject({
+        name: 'Bún bò đặc biệt',
+        price: 72000,
+        status: 'ARCHIVED',
+      });
+
+      const reactivated = await adminRestaurantManagementService.updateMenuItem(
+        { id: actor.id, roles: ['SUPER_ADMIN'] },
+        restaurant.id,
+        created.id,
+        {
+          status: 'ACTIVE',
+          reason: 'Mở lại món sau khi xác nhận phục vụ',
+        },
+      );
+      expect(reactivated.status).toBe('ACTIVE');
+
+      const audits = await query(
+        `SELECT action, entity_id, previous_status, new_status, reason, metadata
+         FROM audit_logs
+         WHERE actor_id = $1
+           AND entity_id = $2
+         ORDER BY created_at, id`,
+        [actor.id, created.id],
+      );
+      expect(audits.rows).toHaveLength(3);
+      expect(audits.rows.map((row) => row.action)).toEqual([
+        'MENU_ITEM_CREATE',
+        'MENU_ITEM_UPDATE',
+        'MENU_ITEM_UPDATE',
+      ]);
+      expect(audits.rows[1]).toMatchObject({
+        previous_status: 'ACTIVE',
+        new_status: 'ARCHIVED',
+        metadata: expect.objectContaining({
+          restaurantId: restaurant.id,
+          changedFields: expect.arrayContaining(['name', 'price', 'status']),
+        }),
+      });
+    } finally {
+      await cleanup({ userIds: [actor.id], restaurantIds: [restaurant.id] });
+    }
+  });
+
+  it('rejects unauthorized, invalid, and cross-restaurant menu mutations without residue', async () => {
+    const actor = await createUser({ displayName: 'Rejected Menu Actor' });
+    const firstRestaurant = await createRestaurant({ name: 'First Menu Restaurant' });
+    const secondRestaurant = await createRestaurant({ name: 'Second Menu Restaurant' });
+    const menuItemId = crypto.randomUUID();
+    await query(
+      `INSERT INTO menu_items (id, restaurant_id, name, price_default, currency, status)
+       VALUES ($1, $2, 'Existing item', 50000, 'VND', 'ACTIVE')`,
+      [menuItemId, firstRestaurant.id],
+    );
+
+    try {
+      await expect(adminRestaurantManagementService.listMenuItems(
+        { id: actor.id, roles: ['USER'] },
+        firstRestaurant.id,
+      )).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['USER'] },
+        firstRestaurant.id,
+        {
+          name: 'Unauthorized item',
+          price: 10000,
+          reason: 'Người dùng thường không được phép thêm món',
+        },
+      )).rejects.toMatchObject({ statusCode: 403, code: 'FORBIDDEN' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        {
+          name: 'Invalid price item',
+          price: -1,
+          reason: 'Giá âm phải bị từ chối an toàn',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        {
+          name: 'Coerced price item',
+          price: [10000],
+          reason: 'Không ép kiểu mảng thành giá món',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        {
+          name: 'Coerced currency item',
+          price: 10000,
+          currency: ['VND'],
+          reason: 'Không ép kiểu mảng thành loại tiền',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        {
+          name: 'Unsupported currency item',
+          price: 10000,
+          currency: 'USD',
+          reason: 'Từ chối loại tiền không được hỗ trợ',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.createMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        {
+          name: 'Unknown field item',
+          price: 10000,
+          unexpected: true,
+          reason: 'Từ chối trường thực đơn không hỗ trợ',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.updateMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        menuItemId,
+        {
+          status: ['ARCHIVED'],
+          reason: 'Không ép kiểu mảng thành trạng thái món',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.updateMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        firstRestaurant.id,
+        menuItemId,
+        {
+          reason: 'Không có trường thực đơn để cập nhật',
+        },
+      )).rejects.toMatchObject({ statusCode: 422, code: 'VALIDATION_ERROR' });
+
+      await expect(adminRestaurantManagementService.updateMenuItem(
+        { id: actor.id, roles: ['ADMIN'] },
+        secondRestaurant.id,
+        menuItemId,
+        {
+          status: 'ARCHIVED',
+          reason: 'Không được sửa món của nhà hàng khác',
+        },
+      )).rejects.toMatchObject({ statusCode: 404, code: 'MENU_ITEM_NOT_FOUND' });
+
+      const rows = await query(
+        `SELECT name, price_default, status
+         FROM menu_items
+         WHERE restaurant_id = ANY($1::uuid[])
+         ORDER BY restaurant_id`,
+        [[firstRestaurant.id, secondRestaurant.id]],
+      );
+      expect(rows.rows).toEqual([
+        expect.objectContaining({
+          name: 'Existing item',
+          price_default: '50000.00',
+          status: 'ACTIVE',
+        }),
+      ]);
+      const auditCount = await query(
+        `SELECT count(*)::integer AS count
+         FROM audit_logs
+         WHERE actor_id = $1
+           AND entity_type = 'MENU_ITEM'`,
+        [actor.id],
+      );
+      expect(auditCount.rows[0].count).toBe(0);
+    } finally {
+      await cleanup({
+        userIds: [actor.id],
+        restaurantIds: [firstRestaurant.id, secondRestaurant.id],
+      });
+    }
+  });
+
   it('soft-deletes selected restaurants atomically with audit and idempotent replay', async () => {
     const actor = await createUser({ displayName: 'Bulk Delete Admin' });
     const first = await createRestaurant({ name: 'Bulk Delete First' });

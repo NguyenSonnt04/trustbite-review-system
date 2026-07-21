@@ -231,6 +231,18 @@ collections remain out of scope.
   images. Removing a primary image promotes the newest remaining image.
 - TrustBite deletes only allowlisted owned objects under
   `restaurant-images/<restaurantId>/`; external legacy URLs are never deleted.
+- Admin menu reads use
+  `GET /api/v1/admin-web/restaurants/:restaurantId/menu` and include both
+  `ACTIVE` and `ARCHIVED` items for non-deleted restaurants.
+- Admins add items through
+  `POST /api/v1/admin-web/restaurants/:restaurantId/menu` and edit, archive, or
+  reactivate them through
+  `PATCH /api/v1/admin-web/restaurants/:restaurantId/menu/:menuItemId`.
+- Menu mutations are limited to the existing `name`, `price_default`,
+  `currency`, and `status` fields. They require a 10 to 500 character reason
+  and write transactional menu-item audit records.
+- Public menu reads remain active-only. Admin menu operations do not grant
+  merchant or generic authenticated restaurant-mutation access.
 
 ## Current Code Baseline
 

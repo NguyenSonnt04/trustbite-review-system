@@ -12,7 +12,16 @@ const STATUS_OPTIONS = [
   ['SUSPENDED', 'Tạm khóa'],
   ['CLOSED', 'Đã đóng'],
 ];
+const MENU_STATUS_OPTIONS = [
+  ['ACTIVE', 'Đang phục vụ'],
+  ['ARCHIVED', 'Tạm ẩn'],
+];
 const MAX_BULK_DELETE_RESTAURANTS = 100;
+const VND_FORMATTER = new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: 'VND',
+  maximumFractionDigits: 0,
+});
 
 const formatRestaurantStatus = (status) => {
   if (status === 'ACTIVE') return { label: 'Hoạt động', tone: 'success' };
@@ -26,6 +35,10 @@ const formatScore = (value) => {
   const number = Number(value);
   return Number.isFinite(number) ? number.toFixed(1) : null;
 };
+
+const formatMenuPrice = (value) => (
+  Number.isFinite(Number(value)) ? VND_FORMATTER.format(Number(value)) : 'Chưa có giá'
+);
 
 const sameNumbers = (left = [], right = []) => (
   [...left].map(Number).sort((a, b) => a - b).join('|')
@@ -185,6 +198,386 @@ function BulkDeleteConfirmationModal({
         </div>
       </section>
     </div>
+  );
+}
+
+function MenuItemEditor({ item, disabled, onSave }) {
+  const [draft, setDraft] = useState({
+    name: item.name,
+    price: String(item.price),
+    status: item.status,
+    reason: '',
+  });
+  const [attempted, setAttempted] = useState(false);
+
+  const changed = (
+    draft.name.trim() !== item.name
+    || Number(draft.price) !== Number(item.price)
+    || draft.status !== item.status
+  );
+  const reasonValid = draft.reason.trim().length >= 10;
+  const priceValid = draft.price !== '' && Number(draft.price) >= 0;
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setAttempted(true);
+    if (!changed || !reasonValid || !draft.name.trim() || !priceValid) return;
+    const body = { reason: draft.reason.trim() };
+    if (draft.name.trim() !== item.name) body.name = draft.name.trim();
+    if (Number(draft.price) !== Number(item.price)) body.price = Number(draft.price);
+    if (draft.status !== item.status) body.status = draft.status;
+    await onSave(item.id, body);
+  };
+
+  return (
+    <form className={styles.menuItemCard} onSubmit={submit}>
+      <div className={styles.menuItemCardHeader}>
+        <div>
+          <Badge tone={item.status === 'ACTIVE' ? 'success' : 'neutral'}>
+            {item.status === 'ACTIVE' ? 'Đang phục vụ' : 'Tạm ẩn'}
+          </Badge>
+          <span>{formatMenuPrice(item.price)}</span>
+        </div>
+        <button
+          className={styles.menuStatusToggle}
+          disabled={disabled}
+          onClick={() => setDraft((current) => ({
+            ...current,
+            status: current.status === 'ACTIVE' ? 'ARCHIVED' : 'ACTIVE',
+          }))}
+          type="button"
+        >
+          {draft.status === 'ACTIVE' ? 'Chuyển sang tạm ẩn' : 'Mở phục vụ lại'}
+        </button>
+      </div>
+
+      <div className={styles.menuItemFields}>
+        <Field
+          label="Tên món"
+          maxLength={200}
+          onChange={(event) => setDraft((current) => ({
+            ...current,
+            name: event.target.value,
+          }))}
+          required
+          value={draft.name}
+        />
+        <Field
+          label="Giá mặc định"
+          min="0"
+          onChange={(event) => setDraft((current) => ({
+            ...current,
+            price: event.target.value,
+          }))}
+          required
+          step="1"
+          type="number"
+          value={draft.price}
+        />
+        <label className={styles.formField}>
+          <span>Trạng thái</span>
+          <select
+            onChange={(event) => setDraft((current) => ({
+              ...current,
+              status: event.target.value,
+            }))}
+            value={draft.status}
+          >
+            {MENU_STATUS_OPTIONS.map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className={styles.formField}>
+        <span>Lý do thay đổi</span>
+        <textarea
+          aria-invalid={attempted && !reasonValid}
+          maxLength={500}
+          onChange={(event) => setDraft((current) => ({
+            ...current,
+            reason: event.target.value,
+          }))}
+          placeholder="Ví dụ: cập nhật theo thực đơn tại quầy ngày hôm nay"
+          value={draft.reason}
+        />
+        <span className={styles.formFieldHelp}>
+          {attempted && !reasonValid
+            ? `Cần nhập thêm ${Math.max(0, 10 - draft.reason.trim().length)} ký tự.`
+            : `${draft.reason.trim().length}/500 ký tự`}
+        </span>
+      </label>
+
+      <div className={styles.menuItemActions}>
+        <button
+          className={styles.primaryButton}
+          disabled={disabled || !changed}
+          type="submit"
+        >
+          <AdminIcon name="check" size={15} />
+          Lưu món
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RestaurantMenuManager({ restaurantId, restaurantName }) {
+  const [menu, setMenu] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [createAttempted, setCreateAttempted] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    price: '',
+    status: 'ACTIVE',
+    reason: '',
+  });
+
+  const loadMenu = useCallback(async (targetPage = 1) => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await adminService.listRestaurantMenu(restaurantId, {
+        page: targetPage,
+        pageSize: 100,
+      });
+      setMenu(result.items || []);
+      setTotal(result.total || 0);
+      setPage(result.page || targetPage);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [restaurantId]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => loadMenu(1), 0);
+    return () => clearTimeout(timer);
+  }, [loadMenu]);
+
+  const createItem = async (event) => {
+    event.preventDefault();
+    setCreateAttempted(true);
+    const normalizedReason = createForm.reason.trim();
+    if (
+      !createForm.name.trim()
+      || createForm.price === ''
+      || Number(createForm.price) < 0
+      || normalizedReason.length < 10
+    ) return;
+
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
+    try {
+      await adminService.createRestaurantMenuItem(restaurantId, {
+        name: createForm.name.trim(),
+        price: Number(createForm.price),
+        currency: 'VND',
+        status: createForm.status,
+        reason: normalizedReason,
+      });
+      setCreateForm({
+        name: '',
+        price: '',
+        status: 'ACTIVE',
+        reason: '',
+      });
+      setCreateAttempted(false);
+      await loadMenu(1);
+      setSuccess('Đã thêm món mới vào thực đơn điện tử.');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const updateItem = async (menuItemId, body) => {
+    setSubmitting(true);
+    setError('');
+    setSuccess('');
+    try {
+      await adminService.updateRestaurantMenuItem(restaurantId, menuItemId, body);
+      await loadMenu(page);
+      setSuccess('Thực đơn đã được cập nhật.');
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const hasMore = page * 100 < total;
+
+  return (
+    <section className={styles.restaurantMenuSection}>
+      <div className={styles.restaurantModalSectionHeader}>
+        <div>
+          <span className={styles.sectionKicker}>Thực đơn điện tử</span>
+          <h3>Quản lý món của {restaurantName}</h3>
+          <p>
+            {total} món · Giá mặc định bằng VND · Món tạm ẩn không xuất hiện với khách hàng.
+          </p>
+        </div>
+        <div className={styles.menuSectionMark}>
+          <AdminIcon name="receipt" size={22} />
+        </div>
+      </div>
+
+      {error && (
+        <div className={styles.errorBanner} role="alert">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div aria-live="polite" className={styles.successBanner} role="status">
+          <AdminIcon name="check" size={16} />
+          {success}
+        </div>
+      )}
+
+      <form className={styles.menuCreatePanel} onSubmit={createItem}>
+        <div className={styles.menuCreateHeading}>
+          <div>
+            <span>Thêm món mới</span>
+            <strong>Tạo một mục thực đơn có thể hiển thị ngay</strong>
+          </div>
+          <Badge tone="success">VND</Badge>
+        </div>
+        <div className={styles.menuCreateGrid}>
+          <Field
+            label="Tên món"
+            maxLength={200}
+            onChange={(event) => setCreateForm((current) => ({
+              ...current,
+              name: event.target.value,
+            }))}
+            placeholder="Ví dụ: Phở bò đặc biệt"
+            required
+            value={createForm.name}
+          />
+          <Field
+            label="Giá mặc định"
+            min="0"
+            onChange={(event) => setCreateForm((current) => ({
+              ...current,
+              price: event.target.value,
+            }))}
+            placeholder="65000"
+            required
+            step="1"
+            type="number"
+            value={createForm.price}
+          />
+          <label className={styles.formField}>
+            <span>Trạng thái ban đầu</span>
+            <select
+              onChange={(event) => setCreateForm((current) => ({
+                ...current,
+                status: event.target.value,
+              }))}
+              value={createForm.status}
+            >
+              {MENU_STATUS_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className={styles.formField}>
+          <span>Lý do thêm món</span>
+          <textarea
+            aria-invalid={
+              createAttempted && createForm.reason.trim().length < 10
+            }
+            maxLength={500}
+            onChange={(event) => setCreateForm((current) => ({
+              ...current,
+              reason: event.target.value,
+            }))}
+            placeholder="Ghi rõ nguồn thực đơn hoặc căn cứ cập nhật"
+            value={createForm.reason}
+          />
+          <span className={styles.formFieldHelp}>
+            {createAttempted && createForm.reason.trim().length < 10
+              ? `Cần nhập thêm ${Math.max(0, 10 - createForm.reason.trim().length)} ký tự.`
+              : `${createForm.reason.trim().length}/500 ký tự`}
+          </span>
+        </label>
+        <div className={styles.menuCreateActions}>
+          <button className={styles.primaryButton} disabled={submitting} type="submit">
+            <AdminIcon name="check" size={16} />
+            {submitting ? 'Đang thêm...' : 'Thêm vào thực đơn'}
+          </button>
+        </div>
+      </form>
+
+      <div className={styles.menuListHeader}>
+        <div>
+          <span>Danh sách món</span>
+          <strong>{loading ? 'Đang đồng bộ...' : `${menu.length} mục đang hiển thị`}</strong>
+        </div>
+        <button
+          className={styles.secondaryButton}
+          disabled={loading || submitting}
+          onClick={() => loadMenu(page)}
+          type="button"
+        >
+          <AdminIcon name="refresh" size={15} />
+          Làm mới
+        </button>
+      </div>
+
+      {loading && <div className={styles.emptyInline}>Đang tải thực đơn điện tử...</div>}
+      {!loading && menu.length === 0 && (
+        <div className={styles.menuEmptyState}>
+          <div><AdminIcon name="receipt" size={24} /></div>
+          <strong>Nhà hàng chưa có món nào</strong>
+          <span>Điền biểu mẫu phía trên để tạo mục thực đơn đầu tiên.</span>
+        </div>
+      )}
+      {!loading && menu.length > 0 && (
+        <div className={styles.menuItemGrid}>
+          {menu.map((item) => (
+            <MenuItemEditor
+              disabled={submitting}
+              item={item}
+              key={`${item.id}:${item.updatedAt}`}
+              onSave={updateItem}
+            />
+          ))}
+        </div>
+      )}
+      {(page > 1 || hasMore) && (
+        <div className={styles.menuPagination}>
+          <button
+            className={styles.secondaryButton}
+            disabled={loading || submitting || page === 1}
+            onClick={() => loadMenu(page - 1)}
+            type="button"
+          >
+            Trang trước
+          </button>
+          <span>Trang {page}</span>
+          <button
+            className={styles.secondaryButton}
+            disabled={loading || submitting || !hasMore}
+            onClick={() => loadMenu(page + 1)}
+            type="button"
+          >
+            Trang sau
+          </button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -504,12 +897,13 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
           {error && <div className={styles.errorBanner}>{error}</div>}
           {loading && <div className={styles.emptyInline}>Đang tải chi tiết nhà hàng...</div>}
           {!loading && restaurant && form && (
-            <div className={styles.restaurantDetailLayout}>
-              <form
-                className={styles.restaurantProfileForm}
-                id="restaurant-profile-form"
-                onSubmit={save}
-              >
+            <div className={styles.restaurantDetailContent}>
+              <div className={styles.restaurantDetailLayout}>
+                <form
+                  className={styles.restaurantProfileForm}
+                  id="restaurant-profile-form"
+                  onSubmit={save}
+                >
                 <div className={styles.restaurantModalSectionHeader}>
                   <div>
                     <h3>Thông tin nhà hàng</h3>
@@ -620,9 +1014,9 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                   </div>
                 )}
 
-              </form>
+                </form>
 
-              <div className={styles.restaurantMediaColumn}>
+                <div className={styles.restaurantMediaColumn}>
                 <section className={styles.restaurantAvatarSection}>
                   <div className={styles.restaurantModalSectionHeader}>
                     <div>
@@ -832,7 +1226,12 @@ function RestaurantDetailModal({ restaurantId, onClose, onUpdated }) {
                     )}
                   </div>
                 </section>
+                </div>
               </div>
+              <RestaurantMenuManager
+                restaurantId={restaurant.id}
+                restaurantName={restaurant.name}
+              />
             </div>
           )}
         </div>
