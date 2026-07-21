@@ -206,6 +206,16 @@ try {
 
 runNpm('server syntax build', ['run', 'server:build']);
 run('server Docker image build', 'docker', ['build', '-t', 'trustbite-server:tb-infra-static', 'server']);
+run('web Docker image build', 'docker', [
+  'build',
+  '--build-arg',
+  'NEXT_PUBLIC_API_URL=https://api.example.invalid',
+  '--build-arg',
+  'NEXT_PUBLIC_AWS_REGION=ap-southeast-1',
+  '-t',
+  'trustbite-web:tb-infra-static',
+  'client',
+]);
 runGitWhitespaceCheck();
 
 console.log('[tb-infra] static infrastructure verification passed');

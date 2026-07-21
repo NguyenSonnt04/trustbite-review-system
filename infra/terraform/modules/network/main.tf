@@ -12,8 +12,8 @@ locals {
     enable_nat_gateway      = var.enable_nat_gateway
     environment             = var.environment
     module                  = "network"
-    planned_public_ingress  = "api-load-balancer-only"
-    planned_private_runtime = ["rds", "redis", "ecs-api-task", "ecs-worker-task"]
+    planned_public_ingress  = "shared-api-and-web-load-balancer"
+    planned_private_runtime = ["rds", "redis", "ecs-api-task", "ecs-web-task", "ecs-worker-task"]
     public_ingress_cidrs    = var.public_ingress_cidrs
     subnet_az_count         = var.availability_zone_count
     vpc_cidr                = var.vpc_cidr
@@ -189,6 +189,16 @@ resource "aws_vpc_security_group_egress_rule" "alb_to_api" {
   to_port                      = var.api_container_port
 }
 
+resource "aws_vpc_security_group_egress_rule" "alb_to_web" {
+  count = var.create_live_resources ? 1 : 0
+
+  from_port                    = var.web_container_port
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.web[0].id
+  security_group_id            = aws_security_group.alb[0].id
+  to_port                      = var.web_container_port
+}
+
 resource "aws_security_group" "api" {
   count = var.create_live_resources ? 1 : 0
 
@@ -217,6 +227,36 @@ resource "aws_vpc_security_group_egress_rule" "api_all_egress" {
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
   security_group_id = aws_security_group.api[0].id
+}
+
+resource "aws_security_group" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  description = "TrustBite web ECS task ingress from ALB only"
+  name        = "${var.name_prefix}-web-sg"
+  vpc_id      = aws_vpc.this[0].id
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-web-sg"
+  })
+}
+
+resource "aws_vpc_security_group_ingress_rule" "web_from_alb" {
+  count = var.create_live_resources ? 1 : 0
+
+  from_port                    = var.web_container_port
+  ip_protocol                  = "tcp"
+  referenced_security_group_id = aws_security_group.alb[0].id
+  security_group_id            = aws_security_group.web[0].id
+  to_port                      = var.web_container_port
+}
+
+resource "aws_vpc_security_group_egress_rule" "web_all_egress" {
+  count = var.create_live_resources ? 1 : 0
+
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+  security_group_id = aws_security_group.web[0].id
 }
 
 resource "aws_security_group" "worker" {
@@ -318,6 +358,7 @@ output "ids" {
     rds_security_group_id    = try(aws_security_group.rds[0].id, null)
     redis_security_group_id  = try(aws_security_group.redis[0].id, null)
     vpc_id                   = try(aws_vpc.this[0].id, null)
+    web_security_group_id    = try(aws_security_group.web[0].id, null)
     worker_security_group_id = try(aws_security_group.worker[0].id, null)
   }
 }

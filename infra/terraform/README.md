@@ -98,10 +98,10 @@ Live resource creation is intentionally phased:
 
 1. `create_live_resources=true`, `create_ecs_resources=false` creates the
    platform foundations, including ECR repositories, without starting ECS tasks.
-2. Build and push API and worker images with the commit SHA tag.
+2. Build and push API, Next.js web, and worker images with the commit SHA tag.
 3. `create_live_resources=true`, `create_ecs_resources=true` creates or updates
    ECS task definitions, services, ECS service alarms, and NAT egress for the
-   private API/worker tasks unless a future VPC endpoint slice replaces NAT.
+   private API/web/worker tasks unless a future VPC endpoint slice replaces NAT.
 
 ## Live Plan Gate
 
@@ -111,8 +111,9 @@ Before any live `terraform plan`:
 2. Verify the caller identity without printing secrets.
 3. Confirm region, environment, state backend, locking, budget, and apply gate.
 4. Confirm `ALLOWED_ORIGINS` is approved for API CORS and S3 presigned upload
-   CORS. For ECS runtime creation, confirm `API_CERTIFICATE_ARN` points to an
-   approved ACM certificate for the public HTTPS listener.
+   CORS. For ECS runtime creation, confirm `API_CERTIFICATE_ARN` and
+   `WEB_CERTIFICATE_ARN` are issued ACM certificates, `WEB_DOMAIN` is the exact
+   public web host, and `WEB_API_BASE_URL` is the public HTTPS API origin.
 5. Add the approved `backend "s3"` block and run `terraform init` with an
    approved backend config outside git.
 6. Confirm the non-production Redis AUTH token plaintext-in-state exception,

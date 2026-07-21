@@ -1,6 +1,7 @@
 locals {
   log_groups = {
     api    = "/aws/ecs/${var.name_prefix}/api"
+    web    = "/aws/ecs/${var.name_prefix}/web"
     worker = "/aws/ecs/${var.name_prefix}/worker"
   }
 
@@ -8,6 +9,10 @@ locals {
     api = {
       cluster = var.api_ecs_cluster_name
       service = var.api_ecs_service_name
+    }
+    web = {
+      cluster = var.web_ecs_cluster_name
+      service = var.web_ecs_service_name
     }
     worker = {
       cluster = var.worker_ecs_cluster_name
@@ -23,7 +28,7 @@ locals {
 
   contract = {
     alarm_actions_count   = length(var.alarm_actions)
-    alarm_baseline        = ["api-cpu", "worker-cpu", "rds-storage", "redis-cpu"]
+    alarm_baseline        = ["api-cpu", "web-cpu", "worker-cpu", "rds-storage", "redis-cpu"]
     create_live_resources = var.create_live_resources
     ecs_alarms_enabled    = var.ecs_alarms_enabled
     environment           = var.environment
@@ -117,6 +122,7 @@ output "ids" {
     log_retention_days       = var.log_retention_days
     rds_storage_alarm_name   = try(aws_cloudwatch_metric_alarm.rds_free_storage_low[0].alarm_name, null)
     redis_cpu_alarm_name     = try(aws_cloudwatch_metric_alarm.redis_cpu_high[0].alarm_name, null)
+    web_log_group_name       = try(aws_cloudwatch_log_group.ecs["web"].name, null)
     worker_log_group_name    = try(aws_cloudwatch_log_group.ecs["worker"].name, null)
     ecs_cpu_alarm_names      = [for alarm in aws_cloudwatch_metric_alarm.ecs_cpu_high : alarm.alarm_name]
     runtime_log_secret_check = "manual CloudWatch log inspection required after live deploy"

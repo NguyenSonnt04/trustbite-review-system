@@ -11,6 +11,7 @@ module "network" {
   redis_port              = var.redis_port
   tags                    = local.common_tags
   vpc_cidr                = var.vpc_cidr
+  web_container_port      = var.web_container_port
 }
 
 module "rds" {
@@ -109,6 +110,8 @@ module "observability" {
   redis_alarms_enabled       = var.redis_node_count > 0
   redis_replication_group_id = "${local.name_prefix}-redis"
   tags                       = local.common_tags
+  web_ecs_cluster_name       = "${local.name_prefix}-cluster"
+  web_ecs_service_name       = "${local.name_prefix}-web"
   worker_ecs_cluster_name    = "${local.name_prefix}-cluster"
   worker_ecs_service_name    = "${local.name_prefix}-worker"
 }
@@ -165,4 +168,16 @@ module "ecs" {
   worker_repository_url               = module.ecr.ids.worker_repository_url
   worker_security_group_id            = module.network.ids.worker_security_group_id
   worker_task_role_arn                = module.iam.ids.worker_task_role_arn
+  web_api_base_url                    = var.web_api_base_url
+  web_certificate_arn                 = var.web_certificate_arn
+  web_container_port                  = var.web_container_port
+  web_cpu                             = var.ecs_web_cpu
+  web_desired_count                   = var.ecs_web_desired_count
+  web_domain                          = var.web_domain
+  web_image_tag                       = var.ecs_image_tag
+  web_log_group_name                  = module.observability.ids.web_log_group_name
+  web_memory                          = var.ecs_web_memory
+  web_repository_url                  = module.ecr.ids.web_repository_url
+  web_security_group_id               = module.network.ids.web_security_group_id
+  web_task_role_arn                   = module.iam.ids.web_task_role_arn
 }
