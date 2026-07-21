@@ -205,6 +205,7 @@ try {
 }
 
 runNpm('server syntax build', ['run', 'server:build']);
+runNpm('web origin unit proof', ['run', 'test:unit', '--prefix', 'client']);
 run('server Docker image build', 'docker', ['build', '-t', 'trustbite-server:tb-infra-static', 'server']);
 run('web Docker image build', 'docker', [
   'build',

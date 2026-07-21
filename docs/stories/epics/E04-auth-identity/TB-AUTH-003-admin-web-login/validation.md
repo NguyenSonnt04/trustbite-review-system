@@ -34,6 +34,7 @@ npm run server:test:unit
 npm run server:test:integration
 npm run server:build
 npm run lint --prefix client
+npm run test:unit --prefix client
 npm run client:build
 npm run harness -- story verify TB-AUTH-003-admin-web-login
 ```
@@ -51,3 +52,18 @@ Recorded on 2026-07-14:
 - BFF abuse smoke returned `403` for missing and foreign origins, `415` for unsupported content type, and `413` for an oversized chunked request.
 - Repeated read-only security reviews found and verified fixes for confidential-client enforcement, refresh-token cleanup, streamed body limits, paginated app-client discovery, provisioning rollback, public error masking, client-address lockout behavior, spoof-resistant email-wide throttling, fixed-length BFF-secret comparison, and atomic Redis counter expiry.
 - The local AWS principal was denied `cognito-idp:ListUserPoolClients`, so real provider credential smoke remains blocked. Local dedicated-client values are intentionally empty and login fails closed until an authorized operator runs `CONFIRM_CREATE_ADMIN_COGNITO_CLIENT=true npm run cognito:configure-admin-web --prefix server`.
+
+Recorded on 2026-07-22 after the first ECS web deployment:
+
+- Production login returned `403 ORIGIN_NOT_ALLOWED` before credentials reached
+  Express because the browser sent the public HTTPS origin while the Next.js
+  request URL reflected the ALB-to-container HTTP hop.
+- Added an explicit `ADMIN_WEB_PUBLIC_ORIGIN` boundary. Production fails closed
+  when it is absent, malformed, non-HTTPS, or different from the browser Origin;
+  local development retains request-URL origin matching.
+- `npm run test:unit --prefix client` passed 4/4 cases, including the HTTPS
+  public-origin/HTTP internal-hop regression and foreign-origin rejection.
+- `npm run lint --prefix client` and the production client Docker build passed.
+  A container runtime reproduction changed the same request from
+  `403 ORIGIN_NOT_ALLOWED` to the backend authentication response, proving the
+  request crossed the origin boundary without weakening it.

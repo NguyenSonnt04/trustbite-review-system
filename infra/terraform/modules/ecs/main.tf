@@ -40,6 +40,7 @@ locals {
     { name = "NEXT_PUBLIC_API_URL", value = var.web_api_base_url == null ? "" : var.web_api_base_url },
     { name = "NEXT_PUBLIC_AWS_REGION", value = var.aws_region },
     { name = "TRUSTBITE_SERVER_API_URL", value = var.web_api_base_url == null ? "" : var.web_api_base_url },
+    { name = "ADMIN_WEB_PUBLIC_ORIGIN", value = var.web_domain == null ? "" : "https://${var.web_domain}" },
     { name = "ADMIN_WEB_TRUSTED_CLIENT_IP_HEADER", value = "x-forwarded-for" },
   ]
 
