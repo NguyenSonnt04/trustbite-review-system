@@ -522,7 +522,8 @@ export class AdminRestaurantManagementService {
          WHERE mi.id = $1
            AND mi.restaurant_id = $2
            AND r.is_deleted = FALSE
-         FOR UPDATE OF mi, r`,
+         FOR UPDATE OF mi
+         FOR SHARE OF r`,
         [menuItemId, restaurantId],
       );
       if (current.rowCount === 0) {

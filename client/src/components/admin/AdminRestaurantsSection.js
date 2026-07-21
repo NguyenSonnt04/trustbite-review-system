@@ -16,6 +16,7 @@ const MENU_STATUS_OPTIONS = [
   ['ACTIVE', 'Đang phục vụ'],
   ['ARCHIVED', 'Tạm ẩn'],
 ];
+const MENU_PAGE_SIZE = 100;
 const MAX_BULK_DELETE_RESTAURANTS = 100;
 const VND_FORMATTER = new Intl.NumberFormat('vi-VN', {
   style: 'currency',
@@ -327,6 +328,7 @@ function RestaurantMenuManager({ restaurantId, restaurantName }) {
   const [menu, setMenu] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(MENU_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -345,11 +347,12 @@ function RestaurantMenuManager({ restaurantId, restaurantName }) {
     try {
       const result = await adminService.listRestaurantMenu(restaurantId, {
         page: targetPage,
-        pageSize: 100,
+        pageSize: MENU_PAGE_SIZE,
       });
       setMenu(result.items || []);
       setTotal(result.total || 0);
       setPage(result.page || targetPage);
+      setPageSize(result.pageSize || MENU_PAGE_SIZE);
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -415,7 +418,7 @@ function RestaurantMenuManager({ restaurantId, restaurantName }) {
     }
   };
 
-  const hasMore = page * 100 < total;
+  const hasMore = page * pageSize < total;
 
   return (
     <section className={styles.restaurantMenuSection}>
