@@ -10,6 +10,10 @@ Before `create_live_resources=true`, confirm:
 - Encrypted remote state and locking are approved.
 - Terraform plan artifacts stay outside git and are treated as sensitive.
 - Deterministic image tag is a commit SHA pushed to the approved ECR repos.
+- The server image contains the AWS RDS global CA bundle and sets
+  `NODE_EXTRA_CA_CERTS` to that bundle. Keep certificate verification enabled;
+  do not use `DATABASE_SSL_REJECT_UNAUTHORIZED=false` to work around a missing
+  runtime trust bundle.
 - Private ECS task egress is approved through NAT. The current Terraform stack
   does not model the required ECR, CloudWatch Logs, Secrets Manager, and AWS API
   VPC endpoints yet.

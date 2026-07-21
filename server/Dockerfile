@@ -11,7 +11,13 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
-RUN apk add --no-cache wget && \
+ENV NODE_EXTRA_CA_CERTS=/opt/aws-rds/global-bundle.pem
+RUN apk add --no-cache ca-certificates wget && \
+    mkdir -p /opt/aws-rds && \
+    wget -qO /opt/aws-rds/global-bundle.pem \
+      https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem && \
+    grep -q -- '-----BEGIN CERTIFICATE-----' /opt/aws-rds/global-bundle.pem && \
+    chmod 0444 /opt/aws-rds/global-bundle.pem && \
     addgroup --system --gid 1001 appgroup && \
     adduser --system --uid 1001 appuser -G appgroup
 COPY --from=deps --chown=appuser:appgroup /app/node_modules ./node_modules

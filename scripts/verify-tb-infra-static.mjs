@@ -142,6 +142,19 @@ const staticPlanEnv = {
   AWS_EC2_METADATA_DISABLED: 'true',
 };
 
+const serverDockerfilePath = join(rootDir, 'server', 'Dockerfile');
+const serverDockerfile = readFileSync(serverDockerfilePath, 'utf8');
+for (const requiredRdsCaContract of [
+  'https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem',
+  'NODE_EXTRA_CA_CERTS=/opt/aws-rds/global-bundle.pem',
+  "grep -q -- '-----BEGIN CERTIFICATE-----' /opt/aws-rds/global-bundle.pem",
+]) {
+  if (!serverDockerfile.includes(requiredRdsCaContract)) {
+    console.error(`[tb-infra] server Docker image is missing RDS CA contract: ${requiredRdsCaContract}`);
+    process.exit(1);
+  }
+}
+
 runTerraform('terraform fmt check', [
   '-chdir=infra/terraform',
   'fmt',

@@ -1068,3 +1068,31 @@ Planning evidence only:
 
 Future implementation evidence must be appended here after each slice. Use
 concrete commands, dates, counts, environment, and proof classification.
+
+2026-07-21 live dev ECS RDS CA startup regression:
+
+- The approved `dev` foundation and ECS phases applied successfully in
+  `ap-southeast-1`, and the API/worker images were pushed with a deterministic
+  commit tag. Both ECS services remained `ACTIVE` with desired count 1 but
+  running count 0.
+- ECS service events showed repeated task startup failures. CloudWatch groups
+  `/aws/ecs/trustbite-dev/api` and `/aws/ecs/trustbite-dev/worker` consistently
+  logged `self-signed certificate in certificate chain` before either runtime
+  could stay up.
+- Root cause: the production task definitions correctly required
+  `DATABASE_SSL=true` with certificate verification, but the Node Alpine server
+  image did not package the AWS RDS CA chain. The fix keeps verification enabled,
+  downloads the AWS-published global RDS bundle during the image build, verifies
+  that the download contains a PEM certificate, and exposes it to Node through
+  `NODE_EXTRA_CA_CERTS`.
+- Static verification now fails if the server Dockerfile loses the AWS RDS
+  truststore URL, `NODE_EXTRA_CA_CERTS`, or PEM-content check. Live recovery
+  proof remains pending a new image build/push, ECS task-definition deployment,
+  API/worker running-count check, RDS migration, and smoke test.
+- Local validation passed: `node --check scripts/verify-tb-infra-static.mjs`;
+  `npm run test --prefix server -- tests/unit/config/dbSsl.test.js
+  tests/unit/config/ocrConfig.test.js` (2 files / 9 tests);
+  `npm run server:build` (154 files); and
+  `npm run verify:tb-infra-static` with Terraform fmt/init/validate/no-live
+  plan, a fresh server image build containing the RDS bundle, and git whitespace
+  checks.
