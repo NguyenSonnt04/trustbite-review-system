@@ -173,7 +173,7 @@ Use `docs/`, `docs/stories/`, `docs/decisions/`, and `scripts/schema/` as the sh
 
 ---
 
-## Configuration Files
+## Configuration Filess
 
 ### Server Settings (`/server/.env`)
 ```env
