@@ -155,6 +155,33 @@ const updateRestaurant = (restaurantId, body) => requestAdminResource(
   `/${restaurantId}`,
   { method: 'PATCH', body },
 );
+const listRestaurantMenu = (
+  restaurantId,
+  { page = 1, pageSize = 100 } = {},
+) => {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+  });
+  return requestAdminResource(
+    'restaurants',
+    `/${restaurantId}/menu?${params.toString()}`,
+  );
+};
+const createRestaurantMenuItem = (restaurantId, body) => requestAdminResource(
+  'restaurants',
+  `/${restaurantId}/menu`,
+  { method: 'POST', body },
+);
+const updateRestaurantMenuItem = (
+  restaurantId,
+  menuItemId,
+  body,
+) => requestAdminResource(
+  'restaurants',
+  `/${restaurantId}/menu/${menuItemId}`,
+  { method: 'PATCH', body },
+);
 const deleteRestaurants = (
   body,
   idempotencyKey = crypto.randomUUID(),
@@ -204,7 +231,7 @@ export const adminCapabilities = Object.freeze({
   },
   restaurants: {
     state: 'partial',
-    detail: 'Danh sách, hồ sơ, trạng thái và thư viện ảnh được bảo vệ qua BFF quản trị.',
+    detail: 'Danh sách, hồ sơ, thực đơn, trạng thái và thư viện ảnh được bảo vệ qua BFF quản trị.',
   },
   reviews: {
     state: 'read-only',
@@ -230,6 +257,9 @@ export const adminService = {
   listRestaurantReviews,
   getRestaurant,
   updateRestaurant,
+  listRestaurantMenu,
+  createRestaurantMenuItem,
+  updateRestaurantMenuItem,
   deleteRestaurants,
   uploadRestaurantImage,
   updateRestaurantImage,

@@ -1,17 +1,31 @@
 {
-  "scan_id": "scan-2026-07-19-001",
-  "scan_date": "2026-07-19T17:30:00Z",
-  "scan_type": "staged",
-  "commit_range": "5d3df3e..INDEX",
+  "scan_id": "scan-2026-07-21-003",
+  "scan_date": "2026-07-21T08:04:23Z",
+  "scan_type": "range",
+  "commit_range": "a7042d4..fa08b9f",
   "pr_number": null,
   "threat_model_version": "1.0.0",
-  "findings": [],
+  "findings": [
+    {
+      "id": "TB-SEC-2026-001",
+      "title": "Admin menu creation has no cumulative resource limit",
+      "severity": "MEDIUM",
+      "stride": "DoS",
+      "cwe": "CWE-770",
+      "file": "server/src/services/adminRestaurantManagementService.js",
+      "line": 428,
+      "description": "A compromised or malicious administrator can repeatedly create menu items. Each valid request adds both a menu_items row and an audit_logs row, while the route has no per-admin mutation throttle or per-restaurant item quota.",
+      "mitigation": "The route requires a current ADMIN or SUPER_ADMIN role, uses a same-origin BFF, limits request bodies to 32 KiB, validates all fields, and writes each mutation and audit record atomically.",
+      "recommendation": "Add server-side per-admin mutation throttling and a configurable maximum active and total menu-item count per restaurant.",
+      "status": "open"
+    }
+  ],
   "summary": {
-    "total_findings": 0,
+    "total_findings": 1,
     "by_severity": {
       "CRITICAL": 0,
       "HIGH": 0,
-      "MEDIUM": 0,
+      "MEDIUM": 1,
       "LOW": 0
     },
     "by_stride": {
@@ -19,9 +33,9 @@
       "Tampering": 0,
       "Repudiation": 0,
       "InfoDisclosure": 0,
-      "DoS": 0,
+      "DoS": 1,
       "ElevationOfPrivilege": 0
     },
-    "files_analyzed": 43
+    "files_analyzed": 16
   }
 }

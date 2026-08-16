@@ -8,13 +8,16 @@ import {
 import { reactivateUser, suspendUser } from '../controllers/adminUser.js';
 import { listRestaurantReviewsHandler } from '../controllers/restaurant.js';
 import {
+  createAdminRestaurantMenuItem,
   deleteAdminRestaurants,
   deleteAdminRestaurantImage,
   getAdminRestaurant,
+  listAdminRestaurantMenu,
   listAdminRestaurants,
   replaceAdminRestaurantImage,
   updateAdminRestaurant,
   updateAdminRestaurantImage,
+  updateAdminRestaurantMenuItem,
   uploadAdminRestaurantImage,
 } from '../controllers/adminRestaurantManagement.js';
 import { requireAdminBff, requireAdminWebSession } from '../middlewares/bffAuth.js';
@@ -34,6 +37,12 @@ router.post('/restaurants/bulk-delete', deleteAdminRestaurants);
 router.get('/restaurants/:restaurantId/reviews', listRestaurantReviewsHandler);
 router.get('/restaurants/:restaurantId', getAdminRestaurant);
 router.patch('/restaurants/:restaurantId', updateAdminRestaurant);
+router.get('/restaurants/:restaurantId/menu', listAdminRestaurantMenu);
+router.post('/restaurants/:restaurantId/menu', createAdminRestaurantMenuItem);
+router.patch(
+  '/restaurants/:restaurantId/menu/:menuItemId',
+  updateAdminRestaurantMenuItem,
+);
 router.post(
   '/restaurants/:restaurantId/images',
   uploadSingleRestaurantImage,

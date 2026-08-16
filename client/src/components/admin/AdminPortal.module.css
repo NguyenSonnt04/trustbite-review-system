@@ -633,6 +633,12 @@
   overflow-y: auto;
 }
 
+.restaurantDetailContent {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
 .restaurantDetailLayout {
   display: grid;
   grid-template-columns: minmax(340px, 0.78fr) minmax(0, 1.22fr);
@@ -676,6 +682,227 @@
 
 .restaurantModalSectionHeader p {
   margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.restaurantMenuSection {
+  border: 1px solid oklch(0.87 0.035 62);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, oklch(0.985 0.018 68), oklch(0.975 0.009 55));
+  padding: 24px;
+}
+
+.restaurantMenuSection > .restaurantModalSectionHeader {
+  align-items: center;
+  border-bottom: 1px solid oklch(0.87 0.035 62);
+  padding-bottom: 20px;
+}
+
+.restaurantMenuSection .restaurantModalSectionHeader h3 {
+  margin-top: 4px;
+  color: oklch(0.28 0.04 45);
+  font-size: 21px;
+  letter-spacing: -0.025em;
+}
+
+.sectionKicker {
+  color: oklch(0.5 0.12 48);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.menuSectionMark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: oklch(0.28 0.04 45);
+  box-shadow: 0 10px 24px oklch(0.28 0.04 45 / 0.16);
+  color: oklch(0.96 0.06 70);
+}
+
+.menuCreatePanel {
+  border: 1px solid oklch(0.84 0.025 60);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px oklch(0.3 0.035 45 / 0.06);
+  padding: 18px;
+}
+
+.menuCreateHeading,
+.menuListHeader,
+.menuItemCardHeader,
+.menuCreateActions,
+.menuItemActions,
+.menuPagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.menuCreateHeading {
+  margin-bottom: 16px;
+}
+
+.menuCreateHeading > div,
+.menuListHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.menuCreateHeading span,
+.menuListHeader span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.menuCreateHeading strong,
+.menuListHeader strong {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.menuCreateGrid,
+.menuItemFields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(140px, 0.7fr) minmax(150px, 0.7fr);
+  gap: 12px;
+}
+
+.menuCreatePanel > .formField {
+  margin-top: 12px;
+}
+
+.menuCreateActions {
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.menuListHeader {
+  margin: 24px 0 12px;
+}
+
+.menuItemGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.menuItemCard {
+  min-width: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 16px;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.menuItemCard:focus-within {
+  border-color: oklch(0.55 0.1 50);
+  box-shadow: 0 12px 28px oklch(0.3 0.035 45 / 0.08);
+  transform: translateY(-1px);
+}
+
+.menuItemCardHeader {
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.menuItemCardHeader > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.menuItemCardHeader > div > span:last-child {
+  color: oklch(0.34 0.045 45);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.menuStatusToggle {
+  border: 0;
+  background: transparent;
+  color: oklch(0.46 0.1 48);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.menuStatusToggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.menuItemCard > .formField {
+  margin-top: 12px;
+}
+
+.menuItemCard textarea,
+.menuCreatePanel textarea {
+  min-height: 72px;
+}
+
+.menuItemActions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.menuEmptyState {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed oklch(0.78 0.04 58);
+  border-radius: 12px;
+  background: oklch(0.99 0.008 65);
+  color: var(--muted);
+  padding: 24px;
+  text-align: center;
+}
+
+.menuEmptyState > div {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  place-items: center;
+  border-radius: 12px;
+  background: oklch(0.94 0.05 65);
+  color: oklch(0.46 0.1 48);
+}
+
+.menuEmptyState strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.menuEmptyState span {
+  margin-top: 5px;
+  font-size: 12px;
+}
+
+.menuPagination {
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.menuPagination > span {
   color: var(--muted);
   font-size: 12px;
 }
@@ -2705,6 +2932,10 @@
   .reviewRatingGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .menuItemGrid {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 860px) {
@@ -2961,8 +3192,31 @@
   .restaurantImageUpload,
   .restaurantAvatarUpload,
   .restaurantAvatarCard,
-  .restaurantGalleryGrid {
+  .restaurantGalleryGrid,
+  .menuCreateGrid,
+  .menuItemFields {
     grid-template-columns: 1fr;
+  }
+
+  .restaurantMenuSection {
+    padding: 16px;
+  }
+
+  .restaurantMenuSection > .restaurantModalSectionHeader,
+  .menuItemCardHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .menuSectionMark {
+    display: none;
+  }
+
+  .menuCreateActions,
+  .menuCreateActions button,
+  .menuItemActions,
+  .menuItemActions button {
+    width: 100%;
   }
 
   .restaurantAvatarCard > a,
