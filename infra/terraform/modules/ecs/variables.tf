@@ -259,3 +259,70 @@ variable "worker_task_role_arn" {
   type        = string
   default     = null
 }
+
+variable "web_api_base_url" {
+  description = "Public HTTPS API base URL used by browser and Next.js BFF requests."
+  type        = string
+  default     = null
+}
+
+variable "web_certificate_arn" {
+  description = "ACM certificate ARN for the public web hostname."
+  type        = string
+  default     = null
+}
+
+variable "web_container_port" {
+  description = "Container port for the Next.js web task."
+  type        = number
+}
+
+variable "web_cpu" {
+  description = "Fargate CPU units for the web task."
+  type        = number
+}
+
+variable "web_desired_count" {
+  description = "Desired Next.js web task count."
+  type        = number
+}
+
+variable "web_domain" {
+  description = "Public DNS hostname routed to the Next.js web service."
+  type        = string
+  default     = null
+}
+
+variable "web_image_tag" {
+  description = "Deterministic web image tag."
+  type        = string
+}
+
+variable "web_log_group_name" {
+  description = "CloudWatch log group name for web task logs."
+  type        = string
+  default     = null
+}
+
+variable "web_memory" {
+  description = "Fargate memory MiB for the web task."
+  type        = number
+}
+
+variable "web_repository_url" {
+  description = "ECR repository URL for the web image."
+  type        = string
+  default     = null
+}
+
+variable "web_security_group_id" {
+  description = "Security group id for web ECS tasks."
+  type        = string
+  default     = null
+}
+
+variable "web_task_role_arn" {
+  description = "Web ECS task role ARN."
+  type        = string
+  default     = null
+}

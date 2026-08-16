@@ -33,6 +33,13 @@ const validateSegments = (segments, method) => {
   if (
     segments.length === 2
     && UUID_PATTERN.test(segments[0])
+    && segments[1] === 'reviews'
+  ) {
+    return method === 'GET';
+  }
+  if (
+    segments.length === 2
+    && UUID_PATTERN.test(segments[0])
     && segments[1] === 'images'
   ) {
     return method === 'POST';

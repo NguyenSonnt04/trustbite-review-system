@@ -10,7 +10,10 @@
 ## Application Flow
 
 1. The browser posts email and password to `POST /api/admin-auth/login` on the Next.js origin.
-2. The Next.js route checks the request origin and forwards credentials to Express with a server-only BFF credential.
+2. The Next.js route checks the browser `Origin` against the explicitly
+   configured production HTTPS public origin and forwards credentials to
+   Express with a server-only BFF credential. It does not compare against the
+   ALB-to-container HTTP URL or trust a client-supplied forwarded host.
 3. Express validates and throttles the request, calls Cognito `InitiateAuth`, and verifies the returned access token through the existing Cognito adapter.
 4. Express maps the identity to the existing local user without provisioning a new user, rejects non-active/deletion-pending users, and requires a current local `ADMIN` or `SUPER_ADMIN` role.
 5. Express revokes any Cognito refresh token, creates a Redis session bounded by the access-token expiry, and returns the opaque marker only to Next.js.

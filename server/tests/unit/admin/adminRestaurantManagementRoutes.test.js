@@ -14,6 +14,8 @@ const mocks = vi.hoisted(() => ({
   updateImage: vi.fn(),
   replaceImage: vi.fn(),
   deleteImage: vi.fn(),
+  publicRestaurantExists: vi.fn(),
+  listPublicReviews: vi.fn(),
 }));
 
 vi.mock('../../../src/services/adminWebAuth.js', () => ({
@@ -41,6 +43,16 @@ vi.mock('../../../src/services/restaurantImageService.js', () => ({
   deleteRestaurantImage: mocks.deleteImage,
 }));
 
+vi.mock('../../../src/services/restaurantService.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  publicRestaurantExists: mocks.publicRestaurantExists,
+}));
+
+vi.mock('../../../src/services/reviewService.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  listPublicReviewsByRestaurant: mocks.listPublicReviews,
+}));
+
 const originalBffSecret = process.env.ADMIN_WEB_BFF_SECRET;
 let app;
 let appConfig;
@@ -65,6 +77,13 @@ describe('admin restaurant management BFF routes', () => {
     mocks.validateSession.mockResolvedValue({
       expiresAt: '2026-07-15T12:00:00.000Z',
       user: sessionUser,
+    });
+    mocks.publicRestaurantExists.mockResolvedValue(true);
+    mocks.listPublicReviews.mockResolvedValue({
+      items: [],
+      page: 1,
+      pageSize: 10,
+      total: 0,
     });
   });
 
@@ -116,7 +135,6 @@ describe('admin restaurant management BFF routes', () => {
     );
     expect(response.body.name).toBe('Updated Restaurant');
   });
-
   it('lists and creates menu items through the admin boundary', async () => {
     mocks.listMenuItems.mockResolvedValue({
       items: [{ id: '33333333-3333-4333-8333-333333333333', name: 'Phở bò' }],
@@ -203,6 +221,28 @@ describe('admin restaurant management BFF routes', () => {
       .expect(400);
 
     expect(mocks.updateMenuItem).toHaveBeenCalledTimes(1);
+=======
+  it('lists restaurant reviews only through a validated admin session', async () => {
+    await request(app)
+      .get(`/api/v1/admin-web/restaurants/${restaurantId}/reviews`)
+      .query({ status: 'ALL', page: 1, pageSize: 10 })
+      .expect(401);
+
+    const response = await request(app)
+      .get(`/api/v1/admin-web/restaurants/${restaurantId}/reviews`)
+      .set('x-trustbite-bff-secret', 'test-bff-secret')
+      .set('x-trustbite-admin-session', 'opaque-session-token')
+      .query({ status: 'ALL', page: 1, pageSize: 10 })
+      .expect(200);
+
+    expect(mocks.validateSession).toHaveBeenCalledWith('opaque-session-token');
+    expect(mocks.publicRestaurantExists).toHaveBeenCalledWith(restaurantId);
+    expect(mocks.listPublicReviews).toHaveBeenCalledWith(restaurantId, {
+      status: 'ALL',
+      page: 1,
+      pageSize: 10,
+    });
+    expect(response.body).toMatchObject({ items: [], total: 0 });
   });
 
   it('soft-deletes selected restaurants through the admin boundary', async () => {

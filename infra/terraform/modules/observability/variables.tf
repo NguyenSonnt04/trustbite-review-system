@@ -69,6 +69,18 @@ variable "worker_ecs_cluster_name" {
   default     = null
 }
 
+variable "web_ecs_cluster_name" {
+  description = "Web ECS cluster name for alarms."
+  type        = string
+  default     = null
+}
+
+variable "web_ecs_service_name" {
+  description = "Web ECS service name for alarms."
+  type        = string
+  default     = null
+}
+
 variable "worker_ecs_service_name" {
   description = "Worker ECS service name for alarms."
   type        = string

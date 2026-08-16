@@ -13,6 +13,8 @@ domains:
 - Receipt storage: S3 stores private receipt objects and related media evidence.
 - OCR/fraud worker: Redis/BullMQ queues receipt OCR and verification jobs; ECS
   worker tasks process those jobs.
+- Web/admin: the server-rendered Next.js BFF runs as a private ECS task, receives
+  only the shared BFF secret, and is exposed through an exact-host ALB rule.
 - Observability: CloudWatch logs and alarms support operational diagnosis, not
   product audit replacement.
 
@@ -61,12 +63,13 @@ Deployment flow after implementation:
 developer/CI
   -> validate IaC syntax and policy checks
   -> build client/server images
-  -> push API and worker images to ECR
+  -> push API, web, and worker images to ECR
   -> run terraform plan for selected environment
   -> human reviews plan, cost, and blast radius
   -> terraform apply for selected non-production environment
   -> run DB migrations against RDS
   -> deploy/update ECS API service
+  -> deploy/update ECS web service
   -> deploy/update ECS worker service
   -> run smoke checks
   -> record Harness evidence
@@ -75,8 +78,9 @@ developer/CI
 Runtime flow:
 
 ```text
-ALB or approved ingress
-  -> ECS API task
+shared HTTPS ALB
+  -> API default action -> ECS API task
+  -> exact web host rule -> ECS Next.js web/BFF task
   -> RDS PostgreSQL/PostGIS
   -> S3 private receipt bucket
   -> Redis/BullMQ cache
@@ -99,7 +103,7 @@ Infrastructure outputs should expose only non-secret values needed by deploy and
 smoke tooling:
 
 - API load balancer or service URL.
-- ECR repository URLs.
+- Web hostname and API/web/worker ECR repository URLs.
 - ECS cluster/service names.
 - S3 bucket name for the selected environment.
 - RDS endpoint reference only through secret/config wiring where possible.
@@ -177,6 +181,8 @@ Minimum IAM surfaces:
 - ECS task execution role for image pull and log delivery.
 - API task role for S3 signed upload/storage access and provider calls needed by
   API flows.
+- Web task role with no provider permissions; the execution role injects only
+  the BFF secret referenced by the web task definition.
 - Worker task role for S3 receipt read/write/delete as needed and Textract/OCR
   provider access.
 - GitHub deploy role with scoped ECR/ECS/Terraform backend access.
@@ -186,7 +192,7 @@ Minimum IAM surfaces:
 Default shape:
 
 - VPC with public subnets only for load balancer/NAT if selected.
-- Private subnets for ECS tasks, RDS, and Redis.
+- Private subnets for API/web/worker ECS tasks, RDS, and Redis.
 - RDS security group allows PostgreSQL only from ECS task security groups or an
   approved migration runner boundary.
 - Redis security group allows Redis only from ECS task security groups.
@@ -214,7 +220,7 @@ Expected repository additions during implementation:
 
 Minimum observability for non-production closeout:
 
-- ECS API and worker CloudWatch log groups with retention.
+- ECS API, web, and worker CloudWatch log groups with retention.
 - API task health and restart/failure visibility.
 - Worker task failure/restart visibility.
 - RDS availability/storage/CPU alarm baseline.

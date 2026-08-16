@@ -10,6 +10,10 @@ Before `create_live_resources=true`, confirm:
 - Encrypted remote state and locking are approved.
 - Terraform plan artifacts stay outside git and are treated as sensitive.
 - Deterministic image tag is a commit SHA pushed to the approved ECR repos.
+- The server image contains the AWS RDS global CA bundle and sets
+  `NODE_EXTRA_CA_CERTS` to that bundle. Keep certificate verification enabled;
+  do not use `DATABASE_SSL_REJECT_UNAUTHORIZED=false` to work around a missing
+  runtime trust bundle.
 - Private ECS task egress is approved through NAT. The current Terraform stack
   does not model the required ECR, CloudWatch Logs, Secrets Manager, and AWS API
   VPC endpoints yet.
@@ -53,6 +57,12 @@ Required environment variables:
 - `AWS_DEPLOY_ROLE_ARN`: AWS IAM role assumed by GitHub Actions through OIDC.
 - `API_CERTIFICATE_ARN`: ACM certificate ARN used by the public HTTPS API
   listener when `create_ecs=true`.
+- `WEB_CERTIFICATE_ARN`: issued ACM certificate ARN added to the shared HTTPS
+  listener for the Next.js web hostname.
+- `WEB_DOMAIN`: exact lowercase hostname routed to the Next.js web service,
+  such as `trustbite.io.vn`.
+- `WEB_API_BASE_URL`: public HTTPS API origin embedded into the web image and
+  supplied to the server-side BFF, such as `https://api.autolearn.io.vn`.
 - `TF_STATE_BUCKET`: encrypted S3 bucket for Terraform state.
 - `TF_STATE_KEY`: optional state key; defaults to
   `trustbite/<environment>/terraform.tfstate` when unset.
@@ -103,7 +113,7 @@ Required workflow dispatch inputs for a live apply:
    `confirm_live=TB-INFRA-001`, `cost_ack=TB-COST-ACK`,
    `create_live_resources=true`, and
    `create_ecs_resources=false`.
-4. Build and push API and worker images using the commit SHA tag.
+4. Build and push API, Next.js web, and worker images using the commit SHA tag.
 5. Run a saved ECS phase plan with `create_live_resources=true`,
    `create_ecs_resources=true`, `enable_nat_gateway=true`, the production
    Cognito/CORS runtime config, and the pushed image tag.
@@ -168,7 +178,7 @@ secret source, set `TRUSTBITE_SMOKE_NETWORK_CONTEXT=bastion-vpn` or
 
 Use the least destructive rollback first:
 
-- ECS app rollback: update API and worker services back to the previous task
+- ECS app rollback: update API, web, and worker services back to the previous task
   definition revision or previous image tag.
 - Bad image rollback: push or select the previous known-good commit SHA tag and
   force a new ECS deployment.

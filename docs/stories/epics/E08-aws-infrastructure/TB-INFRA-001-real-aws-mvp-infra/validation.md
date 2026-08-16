@@ -1068,3 +1068,66 @@ Planning evidence only:
 
 Future implementation evidence must be appended here after each slice. Use
 concrete commands, dates, counts, environment, and proof classification.
+
+2026-07-21 live dev ECS RDS CA startup regression:
+
+- The approved `dev` foundation and ECS phases applied successfully in
+  `ap-southeast-1`, and the API/worker images were pushed with a deterministic
+  commit tag. Both ECS services remained `ACTIVE` with desired count 1 but
+  running count 0.
+- ECS service events showed repeated task startup failures. CloudWatch groups
+  `/aws/ecs/trustbite-dev/api` and `/aws/ecs/trustbite-dev/worker` consistently
+  logged `self-signed certificate in certificate chain` before either runtime
+  could stay up.
+- Root cause: the production task definitions correctly required
+  `DATABASE_SSL=true` with certificate verification, but the Node Alpine server
+  image did not package the AWS RDS CA chain. The fix keeps verification enabled,
+  downloads the AWS-published global RDS bundle during the image build, verifies
+  that the download contains a PEM certificate, and exposes it to Node through
+  `NODE_EXTRA_CA_CERTS`.
+- Static verification now fails if the server Dockerfile loses the AWS RDS
+  truststore URL, `NODE_EXTRA_CA_CERTS`, or PEM-content check. Live recovery
+  proof remains pending a new image build/push, ECS task-definition deployment,
+  API/worker running-count check, RDS migration, and smoke test.
+- Local validation passed: `node --check scripts/verify-tb-infra-static.mjs`;
+  `npm run test --prefix server -- tests/unit/config/dbSsl.test.js
+  tests/unit/config/ocrConfig.test.js` (2 files / 9 tests);
+  `npm run server:build` (154 files); and
+  `npm run verify:tb-infra-static` with Terraform fmt/init/validate/no-live
+  plan, a fresh server image build containing the RDS bundle, and git whitespace
+  checks.
+
+2026-07-21 dev runtime recovery and Next.js web deployment slice:
+
+- API and worker revision 2 reached desired/running `1/1`. The public health
+  check at `https://api.autolearn.io.vn/health` returned HTTP 200 with
+  `{"status":"ok"}`; the one-off migration task exited 0.
+- The VPC-reachable MVP smoke exited 0 and proved API ingress, idempotent RDS
+  migration, PostGIS/pgcrypto, S3 write/read, and Redis AUTH/TLS connectivity.
+  Its receipt fixture cleanup was denied by the intentional immutable-receipt
+  task-role policy, so the exact non-sensitive versioned smoke object was
+  removed through the deploy boundary without broadening receipt delete access.
+- BullMQ reported the live ElastiCache default `volatile-lru` policy. The dev
+  parameter group was changed to `maxmemory-policy=noeviction`; a replacement
+  worker connected to the database and started without the eviction warning.
+  Terraform now records this parameter so future applies do not drift.
+- Added a third immutable ECR repository and a private ECS Fargate service for
+  the standalone Next.js BFF. The web task has a dedicated task role, security
+  group, CloudWatch log group/alarm, and receives only the existing shared BFF
+  secret. The existing ALB adds the web ACM certificate through SNI and forwards
+  only the exact configured web host to the web target group; API remains the
+  default action and worker remains private.
+- The deployment workflow now requires `WEB_CERTIFICATE_ARN`, `WEB_DOMAIN`, and
+  HTTPS `WEB_API_BASE_URL`, builds the client image with non-secret public build
+  arguments, pushes all three commit-SHA images, and passes the web inputs to
+  the reviewed ECS Terraform plan.
+- Live web apply, ECS running/target-health proof, DNS alias/CNAME, HTTPS page
+  smoke, administrator login smoke, and web log redaction inspection remain
+  pending.
+- Static validation passed: Actionlint 1.7.7 reported no workflow errors;
+  `node --check` passed for the ECR export and infrastructure verifier scripts;
+  `npm run verify:tb-infra-static` passed Terraform fmt/init/validate/no-live
+  plan, server syntax for 154 files, server image build, standalone Next.js
+  image build with all static/dynamic routes, and working/staged whitespace
+  checks. The built web image also started through `node server.js` and returned
+  HTTP 200 from `/` on a local container runtime smoke.

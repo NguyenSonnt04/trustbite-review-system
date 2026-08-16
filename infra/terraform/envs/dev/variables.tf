@@ -105,6 +105,39 @@ variable "api_certificate_arn" {
   }
 }
 
+variable "web_api_base_url" {
+  description = "Public HTTPS API base URL embedded into the Next.js image and used by the server-side BFF."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.web_api_base_url == null || can(regex("^https://[^[:space:]]+$", var.web_api_base_url))
+    error_message = "web_api_base_url must be null or an HTTPS URL."
+  }
+}
+
+variable "web_certificate_arn" {
+  description = "ACM certificate ARN for the public Next.js web hostname."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.web_certificate_arn == null || can(regex("^arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/.+", var.web_certificate_arn))
+    error_message = "web_certificate_arn must be null or an ACM certificate ARN."
+  }
+}
+
+variable "web_domain" {
+  description = "Public DNS hostname routed to the Next.js web service."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.web_domain == null || can(regex("^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$", var.web_domain))
+    error_message = "web_domain must be null or a lowercase DNS hostname."
+  }
+}
+
 variable "owner" {
   description = "Owner tag for cost and operations traceability."
   type        = string
@@ -156,6 +189,12 @@ variable "api_container_port" {
   description = "Container port for the Express API task."
   type        = number
   default     = 5000
+}
+
+variable "web_container_port" {
+  description = "Container port for the Next.js web task."
+  type        = number
+  default     = 3000
 }
 
 variable "public_ingress_cidrs" {
@@ -434,6 +473,24 @@ variable "ecs_api_desired_count" {
 
 variable "ecs_worker_desired_count" {
   description = "Desired worker task count."
+  type        = number
+  default     = 1
+}
+
+variable "ecs_web_cpu" {
+  description = "Fargate CPU units for the Next.js web task."
+  type        = number
+  default     = 256
+}
+
+variable "ecs_web_memory" {
+  description = "Fargate memory MiB for the Next.js web task."
+  type        = number
+  default     = 512
+}
+
+variable "ecs_web_desired_count" {
+  description = "Desired Next.js web task count."
   type        = number
   default     = 1
 }

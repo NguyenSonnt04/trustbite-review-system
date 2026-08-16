@@ -33,8 +33,9 @@ The baseline provisions or wires:
   lifecycle policy, and narrow application IAM access.
 - Redis-compatible managed cache for BullMQ/OCR jobs, expected to be
   ElastiCache Redis or Valkey-compatible Redis depending on AWS account support.
-- ECR repositories for the API and worker images.
-- ECS Fargate services for the Express API and OCR worker.
+- ECR repositories for the API, Next.js web, and worker images.
+- ECS Fargate services for the Express API, server-rendered Next.js web/BFF,
+  and OCR worker.
 - ECS task definitions, task roles, execution roles, log groups, health checks,
   and environment/secret injection.
 - Secrets Manager or SSM Parameter Store entries for runtime secrets and
@@ -71,8 +72,8 @@ The baseline provisions or wires:
    proposed path is Terraform under `infra/terraform/`, unless the team confirms
    CDK/CloudFormation or an existing organization standard first.
 2. IaC defines separate reusable modules or clearly separated resources for:
-   networking, RDS, S3, cache, ECR, ECS API, ECS worker, IAM, secrets/config, and
-   observability.
+   networking, RDS, S3, cache, ECR, ECS API, ECS web, ECS worker, IAM,
+   secrets/config, and observability.
 3. No source file contains real AWS credentials, database passwords, Cognito
    secrets, bucket names for production, account ids, or long-lived access keys.
    Environment-specific values are supplied through ignored tfvars, CI secrets,
@@ -88,10 +89,10 @@ The baseline provisions or wires:
    without public object ACLs.
 7. Redis/cache is private to application networking and configured for BullMQ
    compatibility with documented connection settings.
-8. ECS API service exposes the Express server health endpoint through the chosen
-   ingress boundary, while ECS worker runs without public ingress.
-9. API and worker task definitions use distinct commands, environment variables,
-   task roles, and scaling/min-count settings appropriate for MVP.
+8. ECS API exposes the Express health endpoint, the Next.js web/BFF is routed by
+   its exact HTTPS host on the shared ALB, and the ECS worker has no public ingress.
+9. API, web, and worker task definitions use distinct environment variables,
+   task roles, security groups, and scaling/min-count settings appropriate for MVP.
 10. ECR image push and ECS deployment workflow exists but is gated by explicit
     environment configuration and does not run on untrusted pull requests.
     GitHub OIDC trust policy must be constrained by audience, repository,

@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/aws-infra.yml"
       - "infra/terraform/**"
+      - "client/**"
       - "scripts/smoke-aws-mvp.mjs"
       - "scripts/export-terraform-ecr-env.mjs"
       - "scripts/verify-tb-infra-static.mjs"
@@ -24,6 +25,7 @@ on:
     paths:
       - ".github/workflows/aws-infra.yml"
       - "infra/terraform/**"
+      - "client/**"
       - "scripts/smoke-aws-mvp.mjs"
       - "scripts/export-terraform-ecr-env.mjs"
       - "scripts/verify-tb-infra-static.mjs"
@@ -163,6 +165,9 @@ jobs:
       AWS_REGION: ${{ inputs.aws_region }}
       AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
       API_CERTIFICATE_ARN: ${{ vars.API_CERTIFICATE_ARN }}
+      WEB_CERTIFICATE_ARN: ${{ vars.WEB_CERTIFICATE_ARN }}
+      WEB_DOMAIN: ${{ vars.WEB_DOMAIN }}
+      WEB_API_BASE_URL: ${{ vars.WEB_API_BASE_URL }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
       TF_VAR_redis_auth_token: ${{ secrets.REDIS_AUTH_TOKEN }}
@@ -229,8 +234,12 @@ jobs:
               echo "::error::create_ecs=true requires ecs_private_egress_enabled=true"
               exit 1
             fi
-            if [[ "$CREATE_ECS" == "true" && ( -z "$AWS_COGNITO_USER_POOL_ID" || -z "$AWS_COGNITO_USER_POOL_ARN" || -z "$AWS_COGNITO_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN" || -z "$ADMIN_WEB_BFF_SECRET_ARN" || -z "$ADMIN_WEB_SESSION_KEY_SECRET_ARN" || -z "$API_CERTIFICATE_ARN" ) ]]; then
-              echo "::error::create_ecs=true requires Cognito user-pool identifiers, both app-client identifiers, admin secret ARNs, and API_CERTIFICATE_ARN"
+            if [[ "$CREATE_ECS" == "true" && ( -z "$AWS_COGNITO_USER_POOL_ID" || -z "$AWS_COGNITO_USER_POOL_ARN" || -z "$AWS_COGNITO_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_ID" || -z "$AWS_COGNITO_ADMIN_WEB_CLIENT_SECRET_ARN" || -z "$ADMIN_WEB_BFF_SECRET_ARN" || -z "$ADMIN_WEB_SESSION_KEY_SECRET_ARN" || -z "$API_CERTIFICATE_ARN" || -z "$WEB_CERTIFICATE_ARN" || -z "$WEB_DOMAIN" || -z "$WEB_API_BASE_URL" ) ]]; then
+              echo "::error::create_ecs=true requires Cognito identifiers, admin secret ARNs, API/WEB certificate ARNs, WEB_DOMAIN, and WEB_API_BASE_URL"
+              exit 1
+            fi
+            if [[ "$CREATE_ECS" == "true" && ! "$WEB_API_BASE_URL" =~ ^https:// ]]; then
+              echo "::error::WEB_API_BASE_URL must use HTTPS"
               exit 1
             fi
             if [[ "$APPLY_REQUESTED" != "true" ]]; then
@@ -306,12 +315,13 @@ jobs:
         if: 'inputs.apply == true && inputs.create_ecs == true'
         run: node scripts/export-terraform-ecr-env.mjs
 
-      - name: Build and push API and worker images
+      - name: Build and push API, web, and worker images
         if: 'inputs.apply == true && inputs.create_ecs == true'
         run: |
           set -euo pipefail
           REGISTRY="${API_ECR_REPOSITORY_URL%%/*}"
           API_REPOSITORY_NAME="${API_ECR_REPOSITORY_URL#*/}"
+          WEB_REPOSITORY_NAME="${WEB_ECR_REPOSITORY_URL#*/}"
           WORKER_REPOSITORY_NAME="${WORKER_ECR_REPOSITORY_URL#*/}"
           aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$REGISTRY"
 
@@ -323,6 +333,7 @@ jobs:
           }
 
           API_IMAGE_EXISTS=false
+          WEB_IMAGE_EXISTS=false
           WORKER_IMAGE_EXISTS=false
           if image_exists "$API_REPOSITORY_NAME"; then
             API_IMAGE_EXISTS=true
@@ -333,8 +344,19 @@ jobs:
             echo "::notice::Worker image tag ${GITHUB_SHA} already exists in ${WORKER_REPOSITORY_NAME}; skipping push."
           fi
 
+          if image_exists "$WEB_REPOSITORY_NAME"; then
+            WEB_IMAGE_EXISTS=true
+            echo "::notice::Web image tag ${GITHUB_SHA} already exists in ${WEB_REPOSITORY_NAME}; skipping push."
+          fi
+
           if [[ "$API_IMAGE_EXISTS" != "true" || "$WORKER_IMAGE_EXISTS" != "true" ]]; then
             docker build -t "trustbite-server:${GITHUB_SHA}" server
+          fi
+          if [[ "$WEB_IMAGE_EXISTS" != "true" ]]; then
+            docker build \
+              --build-arg "NEXT_PUBLIC_API_URL=${WEB_API_BASE_URL}" \
+              --build-arg "NEXT_PUBLIC_AWS_REGION=${AWS_REGION}" \
+              -t "trustbite-web:${GITHUB_SHA}" client
           fi
           if [[ "$API_IMAGE_EXISTS" != "true" ]]; then
             docker tag "trustbite-server:${GITHUB_SHA}" "${API_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
@@ -343,6 +365,10 @@ jobs:
           if [[ "$WORKER_IMAGE_EXISTS" != "true" ]]; then
             docker tag "trustbite-server:${GITHUB_SHA}" "${WORKER_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
             docker push "${WORKER_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+          fi
+          if [[ "$WEB_IMAGE_EXISTS" != "true" ]]; then
+            docker tag "trustbite-web:${GITHUB_SHA}" "${WEB_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
+            docker push "${WEB_ECR_REPOSITORY_URL}:${GITHUB_SHA}"
           fi
 
       - name: Plan ECS resources
@@ -373,6 +399,9 @@ jobs:
             -var "admin_web_session_key_secret_arn=$ADMIN_WEB_SESSION_KEY_SECRET_ARN" \
             -var "allowed_origins=$ALLOWED_ORIGINS" \
             -var "api_certificate_arn=$API_CERTIFICATE_ARN" \
+            -var "web_api_base_url=$WEB_API_BASE_URL" \
+            -var "web_certificate_arn=$WEB_CERTIFICATE_ARN" \
+            -var "web_domain=$WEB_DOMAIN" \
             -var "create_live_resources=true" \
             -var "create_ecs_resources=true" \
             -var "enable_nat_gateway=true" \

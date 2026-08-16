@@ -53,11 +53,13 @@ const readContract = () => {
 
 const contract = JSON.parse(readContract());
 const apiRepositoryUrl = contract.ecr_ids?.api_repository_url;
+const webRepositoryUrl = contract.ecr_ids?.web_repository_url;
 const workerRepositoryUrl = contract.ecr_ids?.worker_repository_url;
 
-if (!apiRepositoryUrl || !workerRepositoryUrl) {
+if (!apiRepositoryUrl || !webRepositoryUrl || !workerRepositoryUrl) {
   throw new Error('ECR repository URLs are missing from Terraform output');
 }
 
 appendFileSync(githubEnvPath, `API_ECR_REPOSITORY_URL=${apiRepositoryUrl}\n`);
+appendFileSync(githubEnvPath, `WEB_ECR_REPOSITORY_URL=${webRepositoryUrl}\n`);
 appendFileSync(githubEnvPath, `WORKER_ECR_REPOSITORY_URL=${workerRepositoryUrl}\n`);

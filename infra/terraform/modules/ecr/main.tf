@@ -4,6 +4,10 @@ locals {
       name        = "${var.name_prefix}-api"
       description = "TrustBite Express API image repository"
     }
+    web = {
+      name        = "${var.name_prefix}-web"
+      description = "TrustBite Next.js web image repository"
+    }
     worker = {
       name        = "${var.name_prefix}-worker"
       description = "TrustBite receipt OCR worker image repository"
@@ -20,6 +24,7 @@ locals {
     image_tag_mutability  = var.image_tag_mutability
     lifecycle_policy      = "not-configured-no-expiration"
     module                = "ecr"
+    web_repository        = "${var.name_prefix}-web"
     worker_repository     = "${var.name_prefix}-worker"
   }
 }
@@ -77,6 +82,8 @@ output "ids" {
     api_repository_name    = try(aws_ecr_repository.this["api"].name, null)
     api_repository_url     = try(aws_ecr_repository.this["api"].repository_url, null)
     image_tag_policy       = "commit-sha"
+    web_repository_name    = try(aws_ecr_repository.this["web"].name, null)
+    web_repository_url     = try(aws_ecr_repository.this["web"].repository_url, null)
     worker_repository_name = try(aws_ecr_repository.this["worker"].name, null)
     worker_repository_url  = try(aws_ecr_repository.this["worker"].repository_url, null)
   }

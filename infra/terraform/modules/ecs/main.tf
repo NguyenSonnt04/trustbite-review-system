@@ -1,8 +1,10 @@
 locals {
   cluster_name        = "${var.name_prefix}-cluster"
   api_service_name    = "${var.name_prefix}-api"
+  web_service_name    = "${var.name_prefix}-web"
   worker_service_name = "${var.name_prefix}-worker"
   api_image           = var.create_live_resources ? "${var.api_repository_url}:${var.api_image_tag}" : "placeholder-api"
+  web_image           = var.create_live_resources ? "${var.web_repository_url}:${var.web_image_tag}" : "placeholder-web"
   worker_image        = var.create_live_resources ? "${var.worker_repository_url}:${var.worker_image_tag}" : "placeholder-worker"
 
   common_environment = [
@@ -31,6 +33,20 @@ locals {
     { name = "AWS_COGNITO_ADMIN_WEB_CLIENT_ID", value = var.cognito_admin_web_client_id == null ? "" : var.cognito_admin_web_client_id },
     { name = "TRUST_PROXY", value = "1" },
   ])
+
+  web_environment = [
+    { name = "NODE_ENV", value = "production" },
+    { name = "PORT", value = tostring(var.web_container_port) },
+    { name = "NEXT_PUBLIC_API_URL", value = var.web_api_base_url == null ? "" : var.web_api_base_url },
+    { name = "NEXT_PUBLIC_AWS_REGION", value = var.aws_region },
+    { name = "TRUSTBITE_SERVER_API_URL", value = var.web_api_base_url == null ? "" : var.web_api_base_url },
+    { name = "ADMIN_WEB_PUBLIC_ORIGIN", value = var.web_domain == null ? "" : "https://${var.web_domain}" },
+    { name = "ADMIN_WEB_TRUSTED_CLIENT_IP_HEADER", value = "x-forwarded-for" },
+  ]
+
+  web_secrets = var.admin_web_bff_secret_arn == null ? [] : [
+    { name = "ADMIN_WEB_BFF_SECRET", valueFrom = var.admin_web_bff_secret_arn },
+  ]
 
   database_secrets = var.database_secret_arn == null ? [] : [
     { name = "DATABASE_USER", valueFrom = "${var.database_secret_arn}:username::" },
@@ -69,8 +85,12 @@ locals {
     launch_type           = "FARGATE"
     private_egress        = var.private_egress_enabled
     module                = "ecs"
-    public_ingress        = "https-api-service-only"
+    public_ingress        = "shared-alb-host-routed-api-and-web"
     public_tls            = var.api_certificate_arn != null
+    web_container_port    = var.web_container_port
+    web_domain            = var.web_domain
+    web_service           = local.web_service_name
+    web_tls               = var.web_certificate_arn != null
     worker_command        = ["node", "src/worker.js"]
     worker_ingress        = false
     worker_service        = local.worker_service_name
@@ -204,6 +224,71 @@ resource "aws_lb_listener" "api_https" {
   }
 }
 
+resource "aws_lb_listener_certificate" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  certificate_arn = var.web_certificate_arn
+  listener_arn    = aws_lb_listener.api_https[0].arn
+
+  lifecycle {
+    precondition {
+      condition     = try(trimspace(var.web_certificate_arn) != "", false)
+      error_message = "Public web routing requires an ACM certificate ARN."
+    }
+  }
+}
+
+resource "aws_lb_target_group" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  deregistration_delay = 30
+  name                 = "${var.name_prefix}-web-tg"
+  port                 = var.web_container_port
+  protocol             = "HTTP"
+  target_type          = "ip"
+  vpc_id               = var.vpc_id
+
+  health_check {
+    enabled             = true
+    healthy_threshold   = 2
+    interval            = 30
+    matcher             = "200"
+    path                = "/"
+    protocol            = "HTTP"
+    timeout             = 5
+    unhealthy_threshold = 3
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-web-tg"
+  })
+}
+
+resource "aws_lb_listener_rule" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  listener_arn = aws_lb_listener.api_https[0].arn
+  priority     = 100
+
+  action {
+    target_group_arn = aws_lb_target_group.web[0].arn
+    type             = "forward"
+  }
+
+  condition {
+    host_header {
+      values = [var.web_domain]
+    }
+  }
+
+  lifecycle {
+    precondition {
+      condition     = try(trimspace(var.web_domain) != "", false)
+      error_message = "Public web routing requires a web domain."
+    }
+  }
+}
+
 resource "aws_ecs_task_definition" "api" {
   count = var.create_live_resources ? 1 : 0
 
@@ -319,6 +404,80 @@ resource "aws_ecs_task_definition" "api" {
   }
 }
 
+resource "aws_ecs_task_definition" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  container_definitions = jsonencode([
+    {
+      cpu         = var.web_cpu
+      environment = local.web_environment
+      essential   = true
+      image       = local.web_image
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = var.web_log_group_name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "web"
+        }
+      }
+      memory = var.web_memory
+      name   = "web"
+      portMappings = [
+        {
+          containerPort = var.web_container_port
+          hostPort      = var.web_container_port
+          protocol      = "tcp"
+        }
+      ]
+      secrets = local.web_secrets
+    }
+  ])
+  cpu                      = var.web_cpu
+  execution_role_arn       = var.execution_role_arn
+  family                   = "${var.name_prefix}-web"
+  memory                   = var.web_memory
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  task_role_arn            = var.web_task_role_arn
+
+  runtime_platform {
+    cpu_architecture        = var.cpu_architecture
+    operating_system_family = "LINUX"
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-web-task"
+  })
+
+  lifecycle {
+    precondition {
+      condition     = var.web_image_tag != "REPLACE_WITH_COMMIT_SHA"
+      error_message = "Web image tag must be a deterministic commit SHA before live ECS resources can be created."
+    }
+
+    precondition {
+      condition     = var.private_egress_enabled && var.nat_gateway_enabled
+      error_message = "Private ECS tasks require actual outbound egress. This stack does not model VPC endpoints yet, so enable_nat_gateway must be true before live ECS resources can be created."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.web_api_base_url) != "", false)
+      error_message = "Web ECS tasks require an HTTPS API base URL."
+    }
+
+    precondition {
+      condition     = try(startswith(var.web_api_base_url, "https://"), false)
+      error_message = "Web ECS tasks require web_api_base_url to use HTTPS."
+    }
+
+    precondition {
+      condition     = try(trimspace(var.admin_web_bff_secret_arn) != "", false)
+      error_message = "Web ECS tasks require admin_web_bff_secret_arn."
+    }
+  }
+}
+
 resource "aws_ecs_task_definition" "worker" {
   count = var.create_live_resources ? 1 : 0
 
@@ -414,6 +573,39 @@ resource "aws_ecs_service" "api" {
   ]
 }
 
+resource "aws_ecs_service" "web" {
+  count = var.create_live_resources ? 1 : 0
+
+  cluster         = aws_ecs_cluster.this[0].id
+  desired_count   = var.web_desired_count
+  launch_type     = "FARGATE"
+  name            = local.web_service_name
+  task_definition = aws_ecs_task_definition.web[0].arn
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
+  load_balancer {
+    container_name   = "web"
+    container_port   = var.web_container_port
+    target_group_arn = aws_lb_target_group.web[0].arn
+  }
+
+  network_configuration {
+    assign_public_ip = false
+    security_groups  = [var.web_security_group_id]
+    subnets          = var.private_subnet_ids
+  }
+
+  depends_on = [
+    aws_ecs_cluster_capacity_providers.this,
+    aws_lb_listener_certificate.web,
+    aws_lb_listener_rule.web,
+  ]
+}
+
 resource "aws_ecs_service" "worker" {
   count = var.create_live_resources ? 1 : 0
 
@@ -449,6 +641,8 @@ output "ids" {
     api_service_name           = local.api_service_name
     api_task_definition_arn    = try(aws_ecs_task_definition.api[0].arn, null)
     cluster_name               = local.cluster_name
+    web_service_name           = local.web_service_name
+    web_task_definition_arn    = try(aws_ecs_task_definition.web[0].arn, null)
     worker_service_name        = local.worker_service_name
     worker_task_definition_arn = try(aws_ecs_task_definition.worker[0].arn, null)
   }

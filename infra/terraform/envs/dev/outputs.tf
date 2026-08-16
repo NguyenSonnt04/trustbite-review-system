@@ -34,5 +34,13 @@ output "environment_contract" {
       REDIS_PORT             = tostring(var.redis_port)
       REDIS_TLS              = "true"
     }
+    web_runtime = {
+      TRUSTBITE_WEB_URL        = var.web_domain == null ? null : "https://${var.web_domain}"
+      TRUSTBITE_SERVER_API_URL = var.web_api_base_url
+      NEXT_PUBLIC_API_URL      = var.web_api_base_url
+      NEXT_PUBLIC_AWS_REGION   = var.aws_region
+      WEB_ECS_SERVICE_NAME     = module.ecs.ids.web_service_name
+      WEB_TASK_DEFINITION_ARN  = module.ecs.ids.web_task_definition_arn
+    }
   }
 }

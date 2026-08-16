@@ -1,4 +1,7 @@
 import 'server-only';
+import { isSameOriginRequest } from './request-origin.mjs';
+
+export { isSameOriginRequest };
 
 export const ADMIN_SESSION_COOKIE = 'trustbite_admin_session';
 
@@ -33,19 +36,6 @@ export const getExpiredSessionCookieOptions = () => ({
   expires: new Date(0),
   priority: 'high',
 });
-
-export const isSameOriginRequest = (request) => {
-  const origin = request.headers.get('origin');
-  if (!origin) {
-    return false;
-  }
-
-  try {
-    return new URL(origin).origin === new URL(request.url).origin;
-  } catch {
-    return false;
-  }
-};
 
 export const requestAdminAuthApi = async (path, {
   method = 'GET',

@@ -21,7 +21,7 @@ locals {
     secret_policy_gate    = "create_live_resources_and_task_secret_policy_enabled"
     s3_policy_scope       = "receipt-avatar-and-restaurant-image-prefixes"
     textract_policy_scope = "AnalyzeExpense requires provider-level wildcard"
-    task_roles            = ["api-task-role", "worker-task-role", "execution-role"]
+    task_roles            = ["api-task-role", "web-task-role", "worker-task-role", "execution-role"]
   }
 }
 
@@ -186,6 +186,18 @@ resource "aws_iam_role" "worker_task" {
   })
 }
 
+resource "aws_iam_role" "web_task" {
+  count = var.create_live_resources ? 1 : 0
+
+  assume_role_policy = data.aws_iam_policy_document.ecs_task_assume_role[0].json
+  description        = "TrustBite web ECS task role for ${var.environment}"
+  name               = "${var.name_prefix}-web-task"
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-web-task"
+  })
+}
+
 resource "aws_iam_role_policy_attachment" "execution_managed" {
   count = var.create_live_resources ? 1 : 0
 
@@ -230,6 +242,8 @@ output "ids" {
     execution_role_arn      = try(aws_iam_role.execution[0].arn, null)
     execution_role_name     = try(aws_iam_role.execution[0].name, null)
     task_secret_arn_count   = length(local.task_secret_arns)
+    web_task_role_arn       = try(aws_iam_role.web_task[0].arn, null)
+    web_task_role_name      = try(aws_iam_role.web_task[0].name, null)
     worker_task_role_arn    = try(aws_iam_role.worker_task[0].arn, null)
     worker_task_role_name   = try(aws_iam_role.worker_task[0].name, null)
     deploy_role_configured  = false

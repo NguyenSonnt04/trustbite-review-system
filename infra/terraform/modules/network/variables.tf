@@ -47,3 +47,8 @@ variable "vpc_cidr" {
   description = "Planned VPC CIDR."
   type        = string
 }
+
+variable "web_container_port" {
+  description = "Container port exposed by the Next.js web task."
+  type        = number
+}
